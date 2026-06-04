@@ -34,6 +34,48 @@ This release ships the **transport-agnostic** core:
 - D1 ghost Clerk identity injection.
 - Co-designed in a Theta cycle.
 
+## Usage examples
+
+### Constant-time byte comparison
+
+```ts
+import { timingSafeEqual } from "@vantageos/cloud-identity/crypto";
+
+const a = new TextEncoder().encode(presentedHash);
+const b = new TextEncoder().encode(expectedHash);
+if (!(await timingSafeEqual(a, b))) {
+  return new Response("forbidden", { status: 403 });
+}
+```
+
+### Scope-aware row filtering
+
+```ts
+import { scopeFilterList } from "@vantageos/cloud-identity/scope-filter";
+import type { OAuthCtx } from "@vantageos/cloud-identity/types";
+
+const ctx: OAuthCtx = {
+  fromAllowList: ["alice"],
+  namespaceReadPrefixes: ["orchestrator/alpha"],
+  namespaceWritePrefixes: [],
+};
+const visible = scopeFilterList(ctx, rowsFromConvex);
+```
+
+### Master Bearer validation
+
+```ts
+import { validateMasterBearer } from "@vantageos/cloud-identity/bearer-validation";
+
+const res = await validateMasterBearer(
+  request.headers.get("authorization") ?? undefined,
+  process.env.BEARER_SECRET_MASTER ?? "",
+);
+if (!res.ok) {
+  return new Response(`unauthorized: ${res.error}`, { status: 401 });
+}
+```
+
 ## Security doctrine
 
 Canonical reference: `docs/cloud/security-multi-tenant.md` in the `vantage-peers` repo.
