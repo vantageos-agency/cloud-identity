@@ -1,0 +1,72 @@
+{
+  "name": "@vantageos/cloud-identity",
+  "version": "0.1.0",
+  "description": "Framework-agnostic identity + scope-filter primitives for VantagePeers Cloud (multi-tenant MCP).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./crypto": {
+      "types": "./dist/crypto.d.ts",
+      "import": "./dist/crypto.js"
+    },
+    "./scope-filter": {
+      "types": "./dist/scope-filter.d.ts",
+      "import": "./dist/scope-filter.js"
+    },
+    "./bearer-validation": {
+      "types": "./dist/bearer-validation.d.ts",
+      "import": "./dist/bearer-validation.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "vantagepeers",
+    "mcp",
+    "oauth",
+    "scope",
+    "multi-tenant",
+    "identity"
+  ],
+  "author": "VantagePeers Cloud",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vantageos-agency/cloud-identity.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vantageos-agency/cloud-identity/issues"
+  },
+  "homepage": "https://github.com/vantageos-agency/cloud-identity#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
