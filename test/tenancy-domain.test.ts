@@ -16,7 +16,7 @@ import {
   tenantContextSchema,
   ScopeViolationError,
   getEffectiveTenantId,
-  resolveBearer,
+  decodeUnverifiedBearer,
 } from "../src/tenancy-domain.js";
 import type {
   Workspace,
@@ -277,19 +277,19 @@ describe("getEffectiveTenantId", () => {
 });
 
 // ---------------------------------------------------------------------------
-// resolveBearer
+// decodeUnverifiedBearer
 // ---------------------------------------------------------------------------
 
-describe("resolveBearer", () => {
+describe("decodeUnverifiedBearer", () => {
   it("resolves a well-formed bearer token to userId + workspaceId + roles", async () => {
-    // The token format for resolveBearer is: base64(JSON({userId, workspaceId, roles}))
+    // The token format for decodeUnverifiedBearer is: base64(JSON({userId, workspaceId, roles}))
     const payload = {
       userId: "user_charlie",
       workspaceId: "ws_delta",
       roles: ["Admin", "Editor"] as WorkspaceRole[],
     };
     const token = Buffer.from(JSON.stringify(payload)).toString("base64");
-    const result = await resolveBearer(token);
+    const result = await decodeUnverifiedBearer(token);
     expect(result.userId).toBe("user_charlie");
     expect(result.workspaceId).toBe("ws_delta");
     expect(result.roles).toContain("Admin");
@@ -297,25 +297,25 @@ describe("resolveBearer", () => {
   });
 
   it("throws on malformed token (not valid base64 JSON)", async () => {
-    await expect(resolveBearer("not-valid-base64!##")).rejects.toThrow();
+    await expect(decodeUnverifiedBearer("not-valid-base64!##")).rejects.toThrow();
   });
 
   it("throws when payload is missing required workspaceId", async () => {
     const payload = { userId: "u", roles: ["Viewer"] };
     const token = Buffer.from(JSON.stringify(payload)).toString("base64");
-    await expect(resolveBearer(token)).rejects.toThrow();
+    await expect(decodeUnverifiedBearer(token)).rejects.toThrow();
   });
 
   it("throws when roles contain invalid value", async () => {
     const payload = { userId: "u", workspaceId: "ws_x", roles: ["God"] };
     const token = Buffer.from(JSON.stringify(payload)).toString("base64");
-    await expect(resolveBearer(token)).rejects.toThrow();
+    await expect(decodeUnverifiedBearer(token)).rejects.toThrow();
   });
 
   it("resolves empty roles array", async () => {
     const payload = { userId: "u2", workspaceId: "ws_empty", roles: [] };
     const token = Buffer.from(JSON.stringify(payload)).toString("base64");
-    const result = await resolveBearer(token);
+    const result = await decodeUnverifiedBearer(token);
     expect(result.roles).toHaveLength(0);
   });
 });

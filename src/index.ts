@@ -32,7 +32,7 @@ export {
   tenantContextSchema,
   ScopeViolationError,
   getEffectiveTenantId,
-  resolveBearer,
+  decodeUnverifiedBearer,
 } from "./tenancy-domain.js";
 export type {
   Workspace,

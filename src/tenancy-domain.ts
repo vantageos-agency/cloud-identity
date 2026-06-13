@@ -10,7 +10,10 @@
  *   - TenantContext type + Zod schema
  *   - ScopeViolationError class (code: "SCOPE_VIOLATION")
  *   - getEffectiveTenantId(ctx, args) — multi-tenant isolation guard
- *   - resolveBearer(token) — parse a bearer token into { userId, workspaceId, roles[] }
+ *   - decodeUnverifiedBearer(token) — DECODE-ONLY helper, NOT authentication.
+ *     The decoded payload is attacker-controlled. Production code MUST use a
+ *     signed JWT or opaque-token lookup (planned: 0.3.0) before treating the
+ *     payload as a trust boundary.
  *
  * Task: k177hejb4tc5em5p70m9hxwn3x88kyp4
  * Mission: k57b4t2q VR Cloud MVP Day 100
@@ -127,22 +130,35 @@ export function getEffectiveTenantId(
 }
 
 // ---------------------------------------------------------------------------
-// resolveBearer
+// decodeUnverifiedBearer
 // ---------------------------------------------------------------------------
 
 /**
- * Decode and validate a bearer token into `{ userId, workspaceId, roles[] }`.
+ * @security ⚠️ DECODE-ONLY. NOT AUTHENTICATION. NOT A TRUST BOUNDARY.
  *
- * Token format: `base64(JSON({ userId, workspaceId, roles: WorkspaceRole[] }))`.
+ * Decodes a `base64(JSON({ userId, workspaceId, roles[] }))` payload and
+ * validates its SHAPE with Zod. It performs NO signature verification, NO
+ * issuer check, NO expiry check, NO replay-attack protection. The decoded
+ * payload is attacker-controlled and MUST NOT be used as the source of
+ * truth for multi-tenant isolation.
  *
- * This is intentionally a lightweight, framework-agnostic implementation —
- * production callers will substitute a signed JWT or opaque-token lookup
- * against a Convex tenancy table. The contract (shape + Zod validation) is
- * stable; the decode mechanism can be swapped without touching the API.
+ * Forgery example: any attacker producing
+ *   base64(JSON({ userId:"x", workspaceId:"victim-org", roles:["Admin"] }))
+ * passes this function. Treating the returned `workspaceId` as authoritative
+ * — for example feeding it into `getEffectiveTenantId` as the trusted
+ * `ctx.workspaceId` — silently grants cross-tenant access.
  *
- * Consistent with `validateMasterBearer` in that it treats ANY decode/shape
- * failure as a hard throw (not a soft `ok: false`) because the caller has
- * committed to multi-tenant isolation and should not silently degrade.
+ * Use only as:
+ *   - test fixture / harness helper
+ *   - decoder for a bearer that was ALREADY verified by an upstream signed-JWT
+ *     middleware (the production trust boundary)
+ *
+ * For the production trust boundary, callers MUST substitute a signed JWT
+ * (planned export in 0.3.0) or an opaque-token lookup against a Convex
+ * tenancy table.
+ *
+ * Renamed from `resolveBearer` (0.2.0 pre-release) to make the lack of
+ * verification impossible to miss at the call-site.
  */
 
 const bearerPayloadSchema = z.object({
@@ -153,19 +169,23 @@ const bearerPayloadSchema = z.object({
 
 export type BearerPayload = z.infer<typeof bearerPayloadSchema>;
 
-export async function resolveBearer(token: string): Promise<BearerPayload> {
+export async function decodeUnverifiedBearer(
+  token: string,
+): Promise<BearerPayload> {
   let raw: string;
   try {
     raw = Buffer.from(token, "base64").toString("utf-8");
   } catch {
-    throw new Error(`resolveBearer: failed to base64-decode token`);
+    throw new Error(`decodeUnverifiedBearer: failed to base64-decode token`);
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(`resolveBearer: token payload is not valid JSON`);
+    throw new Error(
+      `decodeUnverifiedBearer: token payload is not valid JSON`,
+    );
   }
 
   // Zod parse — throws ZodError on schema violations (missing fields, bad roles).
