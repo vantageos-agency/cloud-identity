@@ -23,3 +23,22 @@ export type {
   FromAllowListEntry,
   ValidateMasterBearerResult,
 } from "./types.js";
+
+// 0.2.0 — Domain-tenancy layer (additive)
+export {
+  workspaceSchema,
+  workspaceMemberSchema,
+  workspaceRoleSchema,
+  tenantContextSchema,
+  ScopeViolationError,
+  getEffectiveTenantId,
+  decodeUnverifiedBearer,
+} from "./tenancy-domain.js";
+export type {
+  Workspace,
+  WorkspaceMember,
+  WorkspaceRole,
+  TenantContext,
+  ScopeViolationPayload,
+  BearerPayload,
+} from "./tenancy-domain.js";
