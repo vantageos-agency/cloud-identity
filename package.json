@@ -53,7 +53,7 @@
     "identity"
   ],
   "author": "VantagePeers Cloud",
-  "license": "MIT",
+  "license": "FSL-1.1-Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/vantageos-agency/cloud-identity.git"
