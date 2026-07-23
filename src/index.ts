@@ -13,6 +13,7 @@ export {
   scopeFilterGet,
   isMasterScope,
   isWildcardScope,
+  LEGACY_WILDCARD_CTX,
   type ScopeFilterable,
 } from "./scope-filter.js";
 export { validateMasterBearer } from "./bearer-validation.js";
@@ -42,3 +43,7 @@ export type {
   ScopeViolationPayload,
   BearerPayload,
 } from "./tenancy-domain.js";
+
+// 0.3.0 — Organization-membership guard (unified session + bearer contract)
+export { requireTenantId } from "./org-guard.js";
+export type { SessionIdentity, TenantSource } from "./org-guard.js";

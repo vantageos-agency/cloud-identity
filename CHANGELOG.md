@@ -3,6 +3,44 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 0.3.0
+
+**BREAKING.** Closes two measured 0.2.0 defects — a right must never be
+granted by absence.
+
+### Changed (breaking)
+
+- `passesScopeFilter`, `scopeFilterList`, `scopeFilterGet`, `isMasterScope`,
+  `isWildcardScope`: `oauthCtx` is now **mandatory** (`OAuthCtx`, no longer
+  `OAuthCtx | undefined`). The 0.2.0 behaviour of an omitted `oauthCtx`
+  silently passing every row (wildcard, as if master-scoped) is removed.
+  Omitting the argument now breaks the caller's build; at runtime (for
+  callers that bypass TypeScript) it throws instead of granting access.
+  Callers that deliberately want the old legacy-bearer wildcard behaviour
+  must import and pass the new `LEGACY_WILDCARD_CTX` sentinel explicitly.
+
+### Added
+
+- `LEGACY_WILDCARD_CTX` — explicit, by-name opt-in for the pre-0.3.0
+  legacy-bearer wildcard behaviour (`src/scope-filter.ts`).
+- `requireTenantId(source: TenantSource): string` — organization/workspace
+  membership guard, unifying the human (session) and machine (bearer) entry
+  paths behind one contract. Hoisted from evevantage's
+  `convex/lib/auth.ts::requireOrgId`
+  (commit `1c102132ac5832573e58145de43b7338ba5d0b00`), adapted to be
+  framework-agnostic. Refuses on missing session, missing/empty `orgId`, and
+  missing/empty bearer-resolved `workspaceId` (`src/org-guard.ts`).
+- `SessionIdentity`, `TenantSource` types.
+
+### Scope note (2026-07-23 avenant)
+
+The package now exposes, behind one contract, all four primitives an
+application needs and should never reimplement: tenant resolution
+(`getEffectiveTenantId`), membership requirement (`requireTenantId`), row
+filtering (`passesScopeFilter` / `scopeFilterList` / `scopeFilterGet`), and
+identifier validation (`validateMasterBearer`). Framework adapters (Convex,
+Hono, etc.) wrap these; they must not reimplement the checks.
+
 ## [0.2.0] - 2026-06-13
 
 Additive release — domain-tenancy layer. No breaking changes. All 0.1.0 exports unchanged.
