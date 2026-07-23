@@ -150,8 +150,8 @@ export function getEffectiveTenantId(
  *     middleware (the production trust boundary)
  *
  * For the production trust boundary, callers MUST substitute a signed JWT
- * (planned export in 0.3.0) or an opaque-token lookup against a Convex
- * tenancy table.
+ * verifier (not yet exported by this package) or an opaque-token lookup
+ * against a Convex tenancy table.
  *
  * Renamed from `resolveBearer` (0.2.0 pre-release) to make the lack of
  * verification impossible to miss at the call-site.

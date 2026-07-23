@@ -1,9 +1,8 @@
 /**
  * Master-token Bearer validation.
  *
- * Extracted from the master-gate logic in
- * `vantage-memory/mcp-server/server-http.ts` (`masterOnlyMiddleware`) and
- * HARDENED per @vantageos/cloud-identity 0.1.0 contract:
+ * Extracted from an earlier in-tree master-gate middleware and HARDENED per
+ * this package's contract:
  *   - SHA-256 hash both the presented token AND the configured master secret,
  *     then compare the two digests with `timingSafeEqual` (constant time).
  *   - The original middleware did a direct `token !== masterToken` string
