@@ -8,9 +8,9 @@
  * through to full access — the same defect class as the scope-filter fix in
  * `./scope-filter.ts`.
  *
- * Hoisted (reused, not reimplemented) from evevantage's
- * `convex/lib/auth.ts::requireOrgId`
- * (commit 1c102132ac5832573e58145de43b7338ba5d0b00). The source function:
+ * The semantics are reused verbatim from a Convex implementation of the same
+ * guard rather than reinvented — a second implementation of one authorization
+ * check is a second chance to get it wrong. That original:
  *
  *   - takes a Convex `QueryCtx | MutationCtx | ActionCtx`
  *   - derives identity via `ctx.auth.getUserIdentity()`
@@ -27,12 +27,11 @@
  * refuse-on-empty semantics are otherwise identical to the source function;
  * no other behavioural change was made.
  *
- * This is one of the two membership/tenant-facing surfaces the 2026-07-23
- * scope avenant asks for behind a single contract (the other three — tenant
- * resolution + row filtering + identifier validation — are already covered
- * by `getEffectiveTenantId`, `passesScopeFilter`/`scopeFilterList`, and
- * `validateMasterBearer` respectively). Framework adapters (Convex, Hono,
- * etc.) wrap `requireTenantId`; they must never reimplement its checks.
+ * This is the membership half of the package's contract; tenant resolution,
+ * row filtering and identifier validation are covered by
+ * `getEffectiveTenantId`, `passesScopeFilter`/`scopeFilterList` and
+ * `validateMasterBearer` respectively. Framework adapters wrap
+ * `requireTenantId`; they must never reimplement its checks.
  */
 
 import type { TenantContext } from "./tenancy-domain.js";
