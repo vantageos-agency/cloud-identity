@@ -1,13 +1,9 @@
 /**
- * Sprint S3.1 B2 — scope-aware filter helpers for VP MCP tools.
+ * Scope-aware row filter.
  *
- * Ported from `vantage-memory/mcp-server/src/scope-filter.ts`. Behaviour is
- * preserved verbatim; only the type dependency on the in-tree `OAuthContext`
- * is replaced by the framework-agnostic `OAuthCtx` from `./types`.
- *
- * Doctrine references:
- *   - decisions/doctrine-scope-aware-filter-2026-05-26.md (D3 base)
- *   - memory j579y6f31g7xzgtgdnpgetdmjx87ztyj (D9-D14 extension)
+ * The behaviour was preserved verbatim from an earlier in-tree
+ * implementation; the only change was replacing a framework-specific context
+ * type with the framework-agnostic `OAuthCtx` from `./types`.
  *
  * Contract (0.3.0 — BREAKING vs. 0.2.0):
  *   - `oauthCtx` is now MANDATORY. A right is never granted by absence: the
