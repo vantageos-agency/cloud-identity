@@ -3,6 +3,7 @@ import {
   passesScopeFilter,
   scopeFilterList,
   scopeFilterGet,
+  LEGACY_WILDCARD_CTX,
 } from "../src/scope-filter.js";
 import type { OAuthCtx } from "../src/types.js";
 
@@ -35,9 +36,11 @@ describe("passesScopeFilter — master + legacy", () => {
     expect(scopeFilterGet(masterCtx, row)).toBe(row);
   });
 
-  it("undefined oauthCtx (legacy bearer) passes through as master-equivalent", () => {
+  it("LEGACY_WILDCARD_CTX, requested explicitly, passes through as master-equivalent", () => {
+    // 0.3.0: the old undefined-oauthCtx wildcard is no longer inferred from
+    // an omitted argument. Callers that want it request it BY NAME.
     expect(
-      passesScopeFilter(undefined, {
+      passesScopeFilter(LEGACY_WILDCARD_CTX, {
         createdBy: "stranger",
         namespace: "anywhere",
       }),
