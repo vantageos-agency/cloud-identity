@@ -76,5 +76,5 @@ Initial release.
 - Public type surface: `OAuthCtx`, `ScopeProfile`, `NamespacePrefix`, `FromAllowListEntry`, `ValidateMasterBearerResult`.
 
 ### Notes
-- `getEffectiveWorkspaceId` deferred to 0.2.0 (depends on `vantageos-crm` workspace helper, owned by Theta).
+- `getEffectiveWorkspaceId` deferred to 0.2.0.
 - No `provenance: true` in `publishConfig` — provenance only from CI per fleet friction lesson `npm-publish-provenance-only-from-ci-not-local-host`.
