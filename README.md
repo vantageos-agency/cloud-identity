@@ -51,6 +51,50 @@ Every symbol is available from the package root. Subpath imports
 (`@vantageos/cloud-identity/scope-filter` and friends) also work if you prefer
 to be explicit about where something comes from.
 
+## Both caller paths, one contract
+
+A right is never granted by an absent argument. `requireTenantId` refuses by
+default — a missing session, a missing organization, or a missing
+bearer-resolved workspace all throw; there is no branch that falls through to
+"full access" when tenant information is absent. The same function resolves
+both entry paths a VantagePeers Cloud request can arrive on:
+
+```ts
+import {
+  requireTenantId,
+  decodeUnverifiedBearer,
+  type TenantSource,
+} from "@vantageos/cloud-identity";
+
+async function resolveTenant(req: {
+  session?: { orgId?: string | null } | null;
+  bearerToken?: string;
+}): Promise<string> {
+  const source: TenantSource = req.session
+    ? { kind: "session", identity: req.session }
+    : {
+        // decodeUnverifiedBearer only decodes the shape — verify the token's
+        // signature (or look it up against your own store) before trusting
+        // any field on the payload. See "What this package does not do".
+        kind: "bearer",
+        context: await decodeUnverifiedBearer(req.bearerToken!),
+      };
+
+  // Throws for BOTH paths if no tenant is attached — never returns a
+  // "default" tenant id when one is missing.
+  return requireTenantId(source);
+}
+
+// Human path: a signed-in user with an active organization.
+await resolveTenant({ session: { orgId: "org_abc" } }); // -> "org_abc"
+
+// Machine path: a caller presenting an already-resolved bearer token.
+await resolveTenant({ bearerToken: someBase64Token }); // -> the token's workspaceId
+
+// Either path with nothing attached throws instead of granting access.
+await resolveTenant({ session: null }); // throws Error("Unauthenticated: no session.")
+```
+
 ## What each function does
 
 **Tenant resolution and membership**
@@ -89,10 +133,27 @@ Visibility is granted two ways: the row's `createdBy` appears in the caller's
 
 **Shapes**
 
-Zod schemas and TypeScript types for workspaces, members, roles and tenant
-context: `workspaceSchema`, `workspaceMemberSchema`, `workspaceRoleSchema`,
-`tenantContextSchema` — plus `ScopeViolationError`, for refusals you want to
-catch by type.
+Zod schemas and their inferred TypeScript types for workspaces, members,
+roles and tenant context: `workspaceSchema` (type `Workspace`),
+`workspaceMemberSchema` (type `WorkspaceMember`), `workspaceRoleSchema`
+(type `WorkspaceRole`), `tenantContextSchema` (type `TenantContext`) — plus
+`ScopeViolationError` (payload type `ScopeViolationPayload`), for refusals you
+want to catch by type, and `BearerPayload`, the type returned by
+`decodeUnverifiedBearer`.
+
+**Supporting types** (no runtime code — import with `import type`)
+
+- `OAuthCtx` — the context object every scope-filter function above requires:
+  `{ fromAllowList, namespaceReadPrefixes, namespaceWritePrefixes, scope? }`.
+- `ScopeProfile`, `NamespacePrefix`, `FromAllowListEntry` — the field types
+  that make up `OAuthCtx`.
+- `ValidateMasterBearerResult` — the return type of `validateMasterBearer`.
+- `ScopeFilterable` — the minimal row shape (`{ createdBy?, namespace? }`)
+  accepted by `passesScopeFilter` / `scopeFilterList` / `scopeFilterGet`.
+- `SessionIdentity` — the human-path shape `requireTenantId` accepts under
+  `{ kind: "session", identity }` (see "Both caller paths, one contract").
+- `TenantSource` — the discriminated union `requireTenantId` accepts:
+  `{ kind: "session", identity }` or `{ kind: "bearer", context }`.
 
 ## What this package does not do
 

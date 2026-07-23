@@ -1,5 +1,6 @@
 /**
- * @vantageos/cloud-identity 0.3.0 — Organization-membership guard.
+ * @vantageos/cloud-identity — Organization-membership guard.
+ * (See package.json "version" for the release this shipped in.)
  *
  * Closes the second measured 0.2.0 defect: the published package exposed no
  * "must belong to an organization" gate anywhere (`grep -rlE

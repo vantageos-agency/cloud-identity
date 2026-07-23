@@ -44,6 +44,6 @@ export type {
   BearerPayload,
 } from "./tenancy-domain.js";
 
-// 0.3.0 — Organization-membership guard (unified session + bearer contract)
+// Organization-membership guard (unified session + bearer contract)
 export { requireTenantId } from "./org-guard.js";
 export type { SessionIdentity, TenantSource } from "./org-guard.js";
