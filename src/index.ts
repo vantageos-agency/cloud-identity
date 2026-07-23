@@ -1,9 +1,9 @@
 /**
  * @vantageos/cloud-identity — public surface.
  *
- * Framework-agnostic identity + scope-filter primitives for VantagePeers Cloud
- * (multi-tenant MCP). Consumed by `vantage-peers-mcp` and
- * `@vantageos/vantage-crm-mcp`.
+ * Framework-agnostic building blocks for multi-tenant authorization:
+ * tenant resolution, membership requirement, row filtering and bearer
+ * validation.
  */
 
 export { timingSafeEqual } from "./crypto.js";

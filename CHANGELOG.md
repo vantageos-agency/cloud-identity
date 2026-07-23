@@ -25,14 +25,11 @@ granted by absence.
   legacy-bearer wildcard behaviour (`src/scope-filter.ts`).
 - `requireTenantId(source: TenantSource): string` — organization/workspace
   membership guard, unifying the human (session) and machine (bearer) entry
-  paths behind one contract. Hoisted from evevantage's
-  `convex/lib/auth.ts::requireOrgId`
-  (commit `1c102132ac5832573e58145de43b7338ba5d0b00`), adapted to be
-  framework-agnostic. Refuses on missing session, missing/empty `orgId`, and
+  paths behind one contract. Refuses on missing session, missing/empty `orgId`, and
   missing/empty bearer-resolved `workspaceId` (`src/org-guard.ts`).
 - `SessionIdentity`, `TenantSource` types.
 
-### Scope note (2026-07-23 avenant)
+### Scope note
 
 The package now exposes, behind one contract, all four primitives an
 application needs and should never reimplement: tenant resolution
@@ -76,5 +73,5 @@ Initial release.
 - Public type surface: `OAuthCtx`, `ScopeProfile`, `NamespacePrefix`, `FromAllowListEntry`, `ValidateMasterBearerResult`.
 
 ### Notes
-- `getEffectiveWorkspaceId` deferred to 0.2.0 (depends on `vantageos-crm` workspace helper, owned by Theta).
+- `getEffectiveWorkspaceId` deferred to 0.2.0.
 - No `provenance: true` in `publishConfig` — provenance only from CI per fleet friction lesson `npm-publish-provenance-only-from-ci-not-local-host`.

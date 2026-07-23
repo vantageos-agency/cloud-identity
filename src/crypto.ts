@@ -1,11 +1,9 @@
 /**
  * Constant-time byte-array comparison.
  *
- * Ported from `vantage-memory/mcp-server/src/crypto.ts` (Day 47 master-token
- * gate, Eta F1 MAJOR PR #621). Surface adapted from `(string, string)` to
- * `(Uint8Array, Uint8Array)` per @vantageos/cloud-identity 0.1.0 contract so
- * the helper is framework-agnostic and reusable by any caller (hash bytes,
- * raw token bytes, HMAC tags, etc.).
+ * Takes `(Uint8Array, Uint8Array)` rather than strings so the helper stays
+ * framework-agnostic and reusable by any caller: hash bytes, raw token
+ * bytes, HMAC tags.
  *
  * Algorithm (identical to source):
  *   1. Length mismatch → still run a dummy Web Crypto HMAC over equal-length

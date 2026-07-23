@@ -12,12 +12,8 @@
  *   - getEffectiveTenantId(ctx, args) — multi-tenant isolation guard
  *   - decodeUnverifiedBearer(token) — DECODE-ONLY helper, NOT authentication.
  *     The decoded payload is attacker-controlled. Production code MUST use a
- *     signed JWT or opaque-token lookup (planned: 0.3.0) before treating the
- *     payload as a trust boundary.
- *
- * Task: k177hejb4tc5em5p70m9hxwn3x88kyp4
- * Mission: k57b4t2q VR Cloud MVP Day 100
- * Orchestrator: Sigma — VantagePeers | 2026-06-13
+ *     signed JWT or opaque-token lookup before treating the payload as a
+ *     trust boundary.
  */
 
 import { z } from "zod";
