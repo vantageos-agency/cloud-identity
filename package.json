@@ -1,6 +1,6 @@
 {
   "name": "@vantageos/cloud-identity",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Framework-agnostic identity + scope-filter primitives for VantagePeers Cloud (multi-tenant MCP).",
   "type": "module",
   "main": "./dist/index.js",
@@ -29,6 +29,10 @@
     "./tenancy-domain": {
       "types": "./dist/tenancy-domain.d.ts",
       "import": "./dist/tenancy-domain.js"
+    },
+    "./human-path": {
+      "types": "./dist/human-path.d.ts",
+      "import": "./dist/human-path.js"
     }
   },
   "files": [
