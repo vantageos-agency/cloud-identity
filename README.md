@@ -229,6 +229,49 @@ Worth reading before you rely on it.
   have already fetched. If fetching them was itself expensive or unsafe, filter
   earlier, in your query.
 
+## Upgrading to 0.4.0
+
+**This release is purely additive — nothing you already call changes.** Every
+0.3.0 export keeps its exact behaviour; 0.4.0 only adds two primitives, so an
+upgrade from 0.3.0 compiles and runs unchanged until you choose to adopt them.
+
+What is new:
+
+- **A named deployment mode.** `requireTenantId` gains a `self-host` source
+  alongside `session` and `bearer`. `cloud` is unchanged — an org-less
+  identity is still refused. `self-host` is single-tenant and returns the
+  tenant you **declare**; it throws when none is configured, never inferring
+  one from absence.
+
+  ```js
+  import { requireTenantId } from "@vantageos/cloud-identity";
+
+  // cloud (unchanged): refuses when the session has no org
+  requireTenantId({ kind: "session", identity });
+  // self-host: returns the DECLARED tenant, throws if it is empty
+  requireTenantId({ kind: "self-host", tenantId: process.env.TENANT_ID });
+  ```
+
+- **A human-path normalizer.** `normalizeVerifiedHumanSession` maps an
+  **already-verified** Clerk-shaped session into `{ tenant, subject, role }`
+  (`role` ∈ `owner | admin | member | client`).
+
+  ```js
+  import { normalizeVerifiedHumanSession } from "@vantageos/cloud-identity";
+
+  // session MUST already be verified upstream, e.g. Clerk auth() server-side:
+  const { tenant, subject, role } = normalizeVerifiedHumanSession(session);
+  ```
+
+  ⚠️ It **normalizes, it does not authenticate.** Passing an unverified,
+  client-controlled object (a `req.body`, a query payload) makes that object
+  the trusted source of tenant, subject and role — a privilege escalation.
+  Verify the session upstream first; only pass the object your provider
+  already verified. (Same discipline as `decodeUnverifiedBearer`.)
+
+Nothing to change on upgrade, nothing removed. Adopt the new primitives when
+you need them.
+
 ## Upgrading to 0.3.0
 
 **This release changes a default, and it breaks compilation on purpose.**
