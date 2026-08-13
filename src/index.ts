@@ -44,6 +44,18 @@ export type {
   BearerPayload,
 } from "./tenancy-domain.js";
 
-// Organization-membership guard (unified session + bearer contract)
+// Organization-membership guard (unified session + bearer + self-host contract)
 export { requireTenantId } from "./org-guard.js";
-export type { SessionIdentity, TenantSource } from "./org-guard.js";
+export type {
+  SessionIdentity,
+  TenantSource,
+  DeploymentMode,
+} from "./org-guard.js";
+
+// 0.4.0 — Human-path resolver (Clerk-shaped session -> { tenant, subject, role })
+export { humanAccountRoleSchema, resolveHumanIdentity } from "./human-path.js";
+export type {
+  HumanAccountRole,
+  ClerkSessionLike,
+  ResolvedHumanIdentity,
+} from "./human-path.js";

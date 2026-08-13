@@ -3,6 +3,39 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0]
+
+**Additive.** Two new primitives so one identity layer covers both deployment
+shapes and the human sign-in path — no separate self-host layer, no change to
+the Cloud/machine path. Serves Tau's `vantage-starter` self-host install and
+the Hephaistos human-path onboarding, both stalled on this surface.
+
+### Added
+
+- **Named deployment mode** — `DeploymentMode` (`"cloud" | "self-host"`) and a
+  `{ kind: "self-host"; tenantId }` branch on `TenantSource` / `requireTenantId`
+  (`src/org-guard.ts`). `cloud` keeps the existing fail-closed behaviour
+  unchanged (org/workspace required on every request — invariant #1123 holds,
+  0.4.0 reopens nothing). `self-host` is single-tenant: `requireTenantId`
+  returns the configured `tenantId` only when it is a non-empty string, and
+  **throws** otherwise — the tenant is presented explicitly by configuration,
+  never inferred from the absence of an organization.
+- **Human-path resolver** — `resolveHumanIdentity()` (`src/human-path.ts`,
+  new `./human-path` subpath export) maps an already-resolved, framework-agnostic
+  Clerk-shaped session (`{ orgId, userId, orgRole }`) to
+  `{ tenant, subject, role }`. `role` is a new union `HumanAccountRole`
+  (`owner | admin | member | client`), distinct from `workspaceRoleSchema`
+  (`Admin | Editor | Viewer`) and never conflated. No Clerk SDK is imported.
+  Refuses (throws) on no session, no org, no user id, or an unrecognized/absent
+  org role — presented, never inferred.
+
+### Notes
+
+- Purely additive: every 0.3.0 export (`passesScopeFilter`, `scopeFilterList`,
+  `scopeFilterGet`, `validateMasterBearer`, `getEffectiveTenantId`,
+  `decodeUnverifiedBearer`, `requireTenantId`'s `session`/`bearer` branches, …)
+  is behaviorally unchanged. Full suite 87/87, `tsc --noEmit` 0.
+
 ## [Unreleased] - 0.3.0
 
 **BREAKING.** Closes two measured 0.2.0 defects — a right must never be

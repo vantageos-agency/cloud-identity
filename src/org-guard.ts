@@ -48,16 +48,31 @@ export type SessionIdentity = {
 };
 
 /**
+ * Named deployment mode — 0.4.0. `cloud` requires an organization/workspace
+ * on every request (the existing, unchanged `session`/`bearer` behaviour
+ * below). `self-host` is single-tenant: the tenant id is DECLARED via
+ * explicit configuration, never inferred from the absence of an
+ * organization. See the `self-host` branch of `TenantSource` and
+ * `requireTenantId` for the refuse-on-missing-config semantics.
+ */
+export type DeploymentMode = "cloud" | "self-host";
+
+/**
  * Discriminated union covering both VantagePeers Cloud entry paths behind
  * one contract:
  *   - `session`: human path, via a connection/login provider (Clerk, etc.).
  *   - `bearer`: machine path, via a resolved, ALREADY-VERIFIED token
  *     (`TenantContext` — see `decodeUnverifiedBearer` / the planned signed-JWT
  *     verifier for how a `TenantContext` gets produced).
+ *   - `self-host`: single-tenant path (0.4.0, additive). The tenant id is
+ *     presented explicitly by configuration, not inferred: `requireTenantId`
+ *     returns `tenantId` only when it is a non-empty string, and throws
+ *     otherwise — a right is never granted by absence, here either.
  */
 export type TenantSource =
   | { kind: "session"; identity: SessionIdentity | null | undefined }
-  | { kind: "bearer"; context: TenantContext };
+  | { kind: "bearer"; context: TenantContext }
+  | { kind: "self-host"; tenantId: string | null | undefined };
 
 /**
  * Resolve the caller's tenant id, refusing when no organization/workspace is
@@ -87,6 +102,16 @@ export function requireTenantId(source: TenantSource): string {
       );
     }
     return orgId;
+  }
+
+  if (source.kind === "self-host") {
+    const tenantId = source.tenantId;
+    if (typeof tenantId !== "string" || tenantId.length === 0) {
+      throw new Error(
+        "No tenant id configured for self-host mode: declare a tenantId explicitly — it is never inferred from absence.",
+      );
+    }
+    return tenantId;
   }
 
   const workspaceId = source.context?.workspaceId;

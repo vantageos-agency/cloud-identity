@@ -153,7 +153,59 @@ want to catch by type, and `BearerPayload`, the type returned by
 - `SessionIdentity` — the human-path shape `requireTenantId` accepts under
   `{ kind: "session", identity }` (see "Both caller paths, one contract").
 - `TenantSource` — the discriminated union `requireTenantId` accepts:
-  `{ kind: "session", identity }` or `{ kind: "bearer", context }`.
+  `{ kind: "session", identity }`, `{ kind: "bearer", context }`, or
+  `{ kind: "self-host", tenantId }`.
+- `DeploymentMode` — the named `"cloud" | "self-host"` literal union (0.4.0).
+
+**Deployment mode and the human path (0.4.0, additive)**
+
+- `DeploymentMode` (`"cloud" | "self-host"`) names the two ways this package
+  can be run. `cloud` keeps `requireTenantId`'s existing session/bearer
+  behaviour exactly as-is — organization/workspace REQUIRED, fail-closed.
+  `self-host` is single-tenant: pass `{ kind: "self-host", tenantId }` to
+  `requireTenantId`, and it returns `tenantId` when it is a non-empty string.
+  The self-host tenant id must be DECLARED via configuration — if you select
+  self-host mode without configuring a tenant id, `requireTenantId` throws
+  rather than returning a default. A right is never granted by absence,
+  whichever mode you are in.
+
+  ```ts
+  import { requireTenantId } from "@vantageos/cloud-identity";
+
+  // self-host: the tenant id is configured explicitly, once, at startup.
+  requireTenantId({ kind: "self-host", tenantId: "the-one-tenant" });
+  // -> "the-one-tenant"
+
+  requireTenantId({ kind: "self-host", tenantId: undefined });
+  // -> throws: "No tenant id configured for self-host mode..."
+  ```
+
+- `resolveHumanIdentity(session)` — maps an already-resolved,
+  framework-agnostic Clerk session object (`{ orgId, userId, orgRole }`) to
+  `{ tenant, subject, role }`. This package never imports a Clerk SDK; the
+  caller resolves the session and passes in a plain object. Refuses (throws)
+  when the session has no organization, no user id, or an org role this
+  package does not recognize — never defaults silently.
+- `humanAccountRoleSchema` (type `HumanAccountRole`) — the new
+  `"owner" | "admin" | "member" | "client"` role union returned by
+  `resolveHumanIdentity`. Distinct from `workspaceRoleSchema`
+  (`Admin | Editor | Viewer`) — one is an organization-account role, the
+  other is workspace membership; they are never conflated.
+- `ClerkSessionLike` — the minimal input shape `resolveHumanIdentity` accepts:
+  `{ orgId?, userId?, orgRole? }`.
+- `ResolvedHumanIdentity` — the `{ tenant, subject, role }` return type of
+  `resolveHumanIdentity`.
+
+  ```ts
+  import { resolveHumanIdentity } from "@vantageos/cloud-identity";
+
+  resolveHumanIdentity({
+    orgId: "org_abc",
+    userId: "user_123",
+    orgRole: "org:admin",
+  });
+  // -> { tenant: "org_abc", subject: "user_123", role: "admin" }
+  ```
 
 ## What this package does not do
 
