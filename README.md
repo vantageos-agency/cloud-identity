@@ -180,26 +180,31 @@ want to catch by type, and `BearerPayload`, the type returned by
   // -> throws: "No tenant id configured for self-host mode..."
   ```
 
-- `resolveHumanIdentity(session)` — maps an already-resolved,
+- `normalizeVerifiedHumanSession(session)` — **normalizes, does not
+  authenticate.** Maps an already-*verified* (not merely well-shaped),
   framework-agnostic Clerk session object (`{ orgId, userId, orgRole }`) to
   `{ tenant, subject, role }`. This package never imports a Clerk SDK; the
-  caller resolves the session and passes in a plain object. Refuses (throws)
-  when the session has no organization, no user id, or an org role this
-  package does not recognize — never defaults silently.
+  caller MUST verify the session upstream (e.g. Clerk's server-side `auth()`)
+  and pass in the already-verified object — never an unverified,
+  client-supplied object such as `req.body`, which would make the caller's
+  input the trusted source of tenant/subject/role. Refuses (throws) when the
+  session has no organization, no user id, or an org role this package does
+  not recognize — never defaults silently; these are shape checks, not a
+  verification step.
 - `humanAccountRoleSchema` (type `HumanAccountRole`) — the new
   `"owner" | "admin" | "member" | "client"` role union returned by
-  `resolveHumanIdentity`. Distinct from `workspaceRoleSchema`
+  `normalizeVerifiedHumanSession`. Distinct from `workspaceRoleSchema`
   (`Admin | Editor | Viewer`) — one is an organization-account role, the
   other is workspace membership; they are never conflated.
-- `ClerkSessionLike` — the minimal input shape `resolveHumanIdentity` accepts:
+- `ClerkSessionLike` — the minimal input shape `normalizeVerifiedHumanSession` accepts:
   `{ orgId?, userId?, orgRole? }`.
 - `ResolvedHumanIdentity` — the `{ tenant, subject, role }` return type of
-  `resolveHumanIdentity`.
+  `normalizeVerifiedHumanSession`.
 
   ```ts
-  import { resolveHumanIdentity } from "@vantageos/cloud-identity";
+  import { normalizeVerifiedHumanSession } from "@vantageos/cloud-identity";
 
-  resolveHumanIdentity({
+  normalizeVerifiedHumanSession({
     orgId: "org_abc",
     userId: "user_123",
     orgRole: "org:admin",

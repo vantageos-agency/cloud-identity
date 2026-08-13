@@ -53,7 +53,7 @@ export type {
 } from "./org-guard.js";
 
 // 0.4.0 — Human-path resolver (Clerk-shaped session -> { tenant, subject, role })
-export { humanAccountRoleSchema, resolveHumanIdentity } from "./human-path.js";
+export { humanAccountRoleSchema, normalizeVerifiedHumanSession } from "./human-path.js";
 export type {
   HumanAccountRole,
   ClerkSessionLike,
