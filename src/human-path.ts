@@ -78,7 +78,26 @@ const CLERK_ORG_ROLE_MAP: Record<string, HumanAccountRole> = {
 };
 
 /**
- * Resolves an already-resolved, framework-agnostic Clerk session object into
+ * @security ⚠️ DECODE/NORMALIZE-ONLY. NOT AUTHENTICATION. NOT VERIFICATION.
+ *
+ * This function does NOT authenticate a request and does NOT verify
+ * anything. It NORMALIZES a session that the caller has ALREADY verified
+ * upstream — e.g. via Clerk's own server-side `auth()` in a Next.js/Convex
+ * server context — into this package's `{ tenant, subject, role }` contract.
+ *
+ * Passing an unverified, client-supplied object here (for example
+ * `req.body`, a query-string payload, or anything else an attacker
+ * controls) makes THAT object the trusted source of `tenant`, `subject`,
+ * AND `role` — a privilege-escalation bug. The shape checks below (missing
+ * orgId/userId/orgRole) only guard against malformed input; they perform
+ * NO signature check, NO issuer check, NO session-validity check.
+ *
+ * Callers MUST verify the session upstream (Clerk `auth()` server-side, or
+ * an equivalent signed-session verifier) BEFORE calling this function. Only
+ * pass in the object Clerk itself already verified — never pass through an
+ * unverified request body.
+ *
+ * Resolves an already-verified, framework-agnostic Clerk session object into
  * the package's `{ tenant, subject, role }` contract.
  *
  *   - throws when `session` is null/undefined ("Unauthenticated: no
@@ -91,9 +110,15 @@ const CLERK_ORG_ROLE_MAP: Record<string, HumanAccountRole> = {
  *   - throws when `session.orgRole` is missing, empty, or not a recognized
  *     Clerk org role (unknown roles are refused, never defaulted).
  *
+ * Named to make the already-verified precondition explicit at the
+ * call-site — see CHANGELOG.md 0.4.0 for the naming history — mirroring
+ * `decodeUnverifiedBearer`'s equivalent rename in `./tenancy-domain.ts`.
+ *
  * @example
  * ```ts
- * const { tenant, subject, role } = resolveHumanIdentity({
+ * // session MUST already be verified upstream, e.g.:
+ * // const { orgId, userId, orgRole } = await auth(); // Clerk server-side
+ * const { tenant, subject, role } = normalizeVerifiedHumanSession({
  *   orgId: "org_abc",
  *   userId: "user_123",
  *   orgRole: "org:admin",
@@ -101,7 +126,7 @@ const CLERK_ORG_ROLE_MAP: Record<string, HumanAccountRole> = {
  * // -> { tenant: "org_abc", subject: "user_123", role: "admin" }
  * ```
  */
-export function resolveHumanIdentity(
+export function normalizeVerifiedHumanSession(
   session: ClerkSessionLike | null | undefined,
 ): ResolvedHumanIdentity {
   if (!session) {

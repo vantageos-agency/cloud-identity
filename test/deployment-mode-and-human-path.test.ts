@@ -7,7 +7,7 @@
  *      DECLARED tenant id, and throws (never defaults) when it is missing.
  *      The existing `session`/`bearer` branches are untouched.
  *
- *   2. Human-path resolver — `resolveHumanIdentity` maps an already-resolved
+ *   2. Human-path resolver — `normalizeVerifiedHumanSession` maps an already-resolved
  *      Clerk-shaped session to `{ tenant, subject, role }`, with `role` in
  *      the new `HumanAccountRole` union.
  *
@@ -20,7 +20,7 @@ import { describe, it, expect } from "vitest";
 import { requireTenantId } from "../src/org-guard.js";
 import type { TenantSource, DeploymentMode } from "../src/org-guard.js";
 import {
-  resolveHumanIdentity,
+  normalizeVerifiedHumanSession,
   humanAccountRoleSchema,
 } from "../src/human-path.js";
 
@@ -47,9 +47,9 @@ describe("(a) self-host deployment mode", () => {
 // (b) human path: resolved Clerk session -> { tenant, subject, role }
 // ---------------------------------------------------------------------------
 
-describe("(b) human path — resolveHumanIdentity", () => {
+describe("(b) human path — normalizeVerifiedHumanSession", () => {
   it("maps a resolved Clerk session to { tenant, subject, role }", () => {
-    const result = resolveHumanIdentity({
+    const result = normalizeVerifiedHumanSession({
       orgId: "org_abc",
       userId: "user_123",
       orgRole: "org:admin",
@@ -64,21 +64,21 @@ describe("(b) human path — resolveHumanIdentity", () => {
 
   it("maps every recognized Clerk org role", () => {
     expect(
-      resolveHumanIdentity({
+      normalizeVerifiedHumanSession({
         orgId: "o",
         userId: "u",
         orgRole: "org:owner",
       }).role,
     ).toBe("owner");
     expect(
-      resolveHumanIdentity({
+      normalizeVerifiedHumanSession({
         orgId: "o",
         userId: "u",
         orgRole: "org:member",
       }).role,
     ).toBe("member");
     expect(
-      resolveHumanIdentity({
+      normalizeVerifiedHumanSession({
         orgId: "o",
         userId: "u",
         orgRole: "org:client",
@@ -88,7 +88,7 @@ describe("(b) human path — resolveHumanIdentity", () => {
 
   it("throws on an unrecognized org role instead of defaulting", () => {
     expect(() =>
-      resolveHumanIdentity({
+      normalizeVerifiedHumanSession({
         orgId: "org_abc",
         userId: "user_123",
         orgRole: "org:superuser",
@@ -114,7 +114,7 @@ describe("(c) BIPOLAR PROBE — 0.4.0 reopens nothing", () => {
 
   it("cloud mode: an org-less human-path session is STILL REFUSED", () => {
     expect(() =>
-      resolveHumanIdentity({ orgId: null, userId: "u", orgRole: "org:admin" }),
+      normalizeVerifiedHumanSession({ orgId: null, userId: "u", orgRole: "org:admin" }),
     ).toThrow(/no active organization/i);
   });
 

@@ -20,14 +20,22 @@ the Hephaistos human-path onboarding, both stalled on this surface.
   returns the configured `tenantId` only when it is a non-empty string, and
   **throws** otherwise — the tenant is presented explicitly by configuration,
   never inferred from the absence of an organization.
-- **Human-path resolver** — `resolveHumanIdentity()` (`src/human-path.ts`,
-  new `./human-path` subpath export) maps an already-resolved, framework-agnostic
+- **Human-path resolver** — `normalizeVerifiedHumanSession()` (`src/human-path.ts`,
+  new `./human-path` subpath export) maps an already-*verified*, framework-agnostic
   Clerk-shaped session (`{ orgId, userId, orgRole }`) to
   `{ tenant, subject, role }`. `role` is a new union `HumanAccountRole`
   (`owner | admin | member | client`), distinct from `workspaceRoleSchema`
   (`Admin | Editor | Viewer`) and never conflated. No Clerk SDK is imported.
   Refuses (throws) on no session, no org, no user id, or an unrecognized/absent
-  org role — presented, never inferred.
+  org role — presented, never inferred. **Naming fix, still pre-publish:** this
+  function was originally named `resolveHumanIdentity`, which invited passing
+  in an unverified, client-supplied object (e.g. `req.body`) and would make
+  that object the trusted source of tenant/subject/role — a
+  privilege-escalation risk. Renamed to `normalizeVerifiedHumanSession` before
+  0.4.0 reaches npm (current published latest is 0.3.0) to make the
+  already-verified precondition explicit at the call-site, mirroring
+  `decodeUnverifiedBearer`'s rename from `resolveBearer` in 0.2.0. Not a
+  breaking change — 0.4.0 has no npm consumer yet.
 
 ### Notes
 

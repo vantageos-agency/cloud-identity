@@ -180,26 +180,31 @@ want to catch by type, and `BearerPayload`, the type returned by
   // -> throws: "No tenant id configured for self-host mode..."
   ```
 
-- `resolveHumanIdentity(session)` — maps an already-resolved,
+- `normalizeVerifiedHumanSession(session)` — **normalizes, does not
+  authenticate.** Maps an already-*verified* (not merely well-shaped),
   framework-agnostic Clerk session object (`{ orgId, userId, orgRole }`) to
   `{ tenant, subject, role }`. This package never imports a Clerk SDK; the
-  caller resolves the session and passes in a plain object. Refuses (throws)
-  when the session has no organization, no user id, or an org role this
-  package does not recognize — never defaults silently.
+  caller MUST verify the session upstream (e.g. Clerk's server-side `auth()`)
+  and pass in the already-verified object — never an unverified,
+  client-supplied object such as `req.body`, which would make the caller's
+  input the trusted source of tenant/subject/role. Refuses (throws) when the
+  session has no organization, no user id, or an org role this package does
+  not recognize — never defaults silently; these are shape checks, not a
+  verification step.
 - `humanAccountRoleSchema` (type `HumanAccountRole`) — the new
   `"owner" | "admin" | "member" | "client"` role union returned by
-  `resolveHumanIdentity`. Distinct from `workspaceRoleSchema`
+  `normalizeVerifiedHumanSession`. Distinct from `workspaceRoleSchema`
   (`Admin | Editor | Viewer`) — one is an organization-account role, the
   other is workspace membership; they are never conflated.
-- `ClerkSessionLike` — the minimal input shape `resolveHumanIdentity` accepts:
+- `ClerkSessionLike` — the minimal input shape `normalizeVerifiedHumanSession` accepts:
   `{ orgId?, userId?, orgRole? }`.
 - `ResolvedHumanIdentity` — the `{ tenant, subject, role }` return type of
-  `resolveHumanIdentity`.
+  `normalizeVerifiedHumanSession`.
 
   ```ts
-  import { resolveHumanIdentity } from "@vantageos/cloud-identity";
+  import { normalizeVerifiedHumanSession } from "@vantageos/cloud-identity";
 
-  resolveHumanIdentity({
+  normalizeVerifiedHumanSession({
     orgId: "org_abc",
     userId: "user_123",
     orgRole: "org:admin",
@@ -223,6 +228,49 @@ Worth reading before you rely on it.
 - **It does not talk to your database.** `scopeFilterList` filters rows you
   have already fetched. If fetching them was itself expensive or unsafe, filter
   earlier, in your query.
+
+## Upgrading to 0.4.0
+
+**This release is purely additive — nothing you already call changes.** Every
+0.3.0 export keeps its exact behaviour; 0.4.0 only adds two primitives, so an
+upgrade from 0.3.0 compiles and runs unchanged until you choose to adopt them.
+
+What is new:
+
+- **A named deployment mode.** `requireTenantId` gains a `self-host` source
+  alongside `session` and `bearer`. `cloud` is unchanged — an org-less
+  identity is still refused. `self-host` is single-tenant and returns the
+  tenant you **declare**; it throws when none is configured, never inferring
+  one from absence.
+
+  ```js
+  import { requireTenantId } from "@vantageos/cloud-identity";
+
+  // cloud (unchanged): refuses when the session has no org
+  requireTenantId({ kind: "session", identity });
+  // self-host: returns the DECLARED tenant, throws if it is empty
+  requireTenantId({ kind: "self-host", tenantId: process.env.TENANT_ID });
+  ```
+
+- **A human-path normalizer.** `normalizeVerifiedHumanSession` maps an
+  **already-verified** Clerk-shaped session into `{ tenant, subject, role }`
+  (`role` ∈ `owner | admin | member | client`).
+
+  ```js
+  import { normalizeVerifiedHumanSession } from "@vantageos/cloud-identity";
+
+  // session MUST already be verified upstream, e.g. Clerk auth() server-side:
+  const { tenant, subject, role } = normalizeVerifiedHumanSession(session);
+  ```
+
+  ⚠️ It **normalizes, it does not authenticate.** Passing an unverified,
+  client-controlled object (a `req.body`, a query payload) makes that object
+  the trusted source of tenant, subject and role — a privilege escalation.
+  Verify the session upstream first; only pass the object your provider
+  already verified. (Same discipline as `decodeUnverifiedBearer`.)
+
+Nothing to change on upgrade, nothing removed. Adopt the new primitives when
+you need them.
 
 ## Upgrading to 0.3.0
 
