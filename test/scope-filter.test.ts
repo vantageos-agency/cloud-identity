@@ -139,6 +139,78 @@ describe("passesScopeFilter — namespacePrefix", () => {
   });
 });
 
+describe("passesScopeFilter — grantFields (0.5.0, grant-aware widening)", () => {
+  // SCOPED identity under test: "alice" — fromAllowList=["alice"], NOT the
+  // row's createdBy in any of these cases. Exercises the grant path in
+  // isolation from the createdBy/namespace paths that 0.4.0 already covers.
+  const aliceCtx: OAuthCtx = {
+    scope: "tenant",
+    fromAllowList: ["alice"],
+    namespaceReadPrefixes: [],
+    namespaceWritePrefixes: [],
+  };
+
+  it("grantee (named in a string grant field, e.g. mission pilot) reads — identity: alice", () => {
+    const row = { createdBy: "bob", namespace: undefined, pilot: "alice" };
+    expect(passesScopeFilter(aliceCtx, row, ["pilot"])).toBe(true);
+  });
+
+  it("non-grantee (named nowhere on the row) does NOT read — identity: alice", () => {
+    const row = { createdBy: "bob", namespace: undefined, pilot: "carol" };
+    expect(passesScopeFilter(aliceCtx, row, ["pilot"])).toBe(false);
+  });
+
+  it("grantee named inside an array grant field (e.g. mission agents) reads — identity: alice", () => {
+    const row = { createdBy: "bob", namespace: undefined, agents: ["carol", "alice"] };
+    expect(passesScopeFilter(aliceCtx, row, ["agents"])).toBe(true);
+  });
+
+  it("non-grantee absent from the array grant field does NOT read — identity: alice", () => {
+    const row = { createdBy: "bob", namespace: undefined, agents: ["carol", "dave"] };
+    expect(passesScopeFilter(aliceCtx, row, ["agents"])).toBe(false);
+  });
+
+  it("grantee named via a mandate-shaped grant field (fulfilledBy) reads — identity: alice", () => {
+    const row = { createdBy: "bob", namespace: undefined, fulfilledBy: "alice" };
+    expect(passesScopeFilter(aliceCtx, row, ["fulfilledBy"])).toBe(true);
+  });
+
+  it("non-grantee on a mandate-shaped row does NOT read — identity: alice", () => {
+    const row = { createdBy: "bob", namespace: undefined, fulfilledBy: "dave" };
+    expect(passesScopeFilter(aliceCtx, row, ["fulfilledBy"])).toBe(false);
+  });
+
+  it("regression: declaring NO grant fields is byte-identical to 0.4.0 behaviour — identity: alice", () => {
+    const row = { createdBy: "bob", namespace: undefined, pilot: "alice" };
+    // pilot="alice" would pass if declared, but it is NOT declared here —
+    // omitting grantFields must reproduce the pre-0.5.0 createdBy/namespace-only
+    // predicate exactly.
+    expect(passesScopeFilter(aliceCtx, row)).toBe(false);
+    expect(passesScopeFilter(aliceCtx, row, [])).toBe(false);
+  });
+
+  it("scopeFilterList threads grantFields through — identity: alice", () => {
+    const rows = [
+      { createdBy: "bob", namespace: undefined, pilot: "alice" },
+      { createdBy: "carol", namespace: undefined, pilot: "dave" },
+    ];
+    expect(scopeFilterList(aliceCtx, rows, ["pilot"]).map((r) => r.createdBy)).toEqual(["bob"]);
+    // No grantFields declared — neither row passes (dave/alice not in createdBy, no namespace).
+    expect(scopeFilterList(aliceCtx, rows)).toEqual([]);
+  });
+
+  it("scopeFilterGet threads grantFields through — identity: alice", () => {
+    const row = { createdBy: "bob", namespace: undefined, fulfilledBy: "alice" };
+    expect(scopeFilterGet(aliceCtx, row, ["fulfilledBy"])).toEqual(row);
+    expect(scopeFilterGet(aliceCtx, row)).toBeNull();
+  });
+
+  it("master scope still wildcards regardless of grantFields — identity: master", () => {
+    const row = { createdBy: "bob", namespace: undefined, pilot: "someone-else" };
+    expect(passesScopeFilter(masterCtx, row, ["pilot"])).toBe(true);
+  });
+});
+
 describe("scopeFilterList + scopeFilterGet", () => {
   it("scopeFilterList drops cross-tenant rows", () => {
     const rows = [

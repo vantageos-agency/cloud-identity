@@ -3,6 +3,30 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0]
+
+**Additive — grant-aware scope filter.** Closes the other pole of the
+fail-closed defect class: 0.3.0/0.4.0 closed "a right granted by ABSENCE"
+(missing `oauthCtx` silently passing everything); this closes "a right
+REFUSED by absence" — a per-row grant (a named mission agent/pilot, a
+mandate's `fulfilledBy`) that IS present on the row but that
+`passesScopeFilter`/`scopeFilterList`/`scopeFilterGet` were structurally
+blind to, because they only ever consulted `createdBy`/`namespace`.
+
+### Added
+
+- `passesScopeFilter`, `scopeFilterList`, `scopeFilterGet` (`src/scope-filter.ts`)
+  now accept an optional `grantFields: readonly string[]` parameter, defaulting
+  to `[]`. Each entry names a property on the row that the CALLER declares as
+  a per-row grant — the field's runtime value is treated as a single identity
+  (`string`, equality match) or multiple identities (`string[]`, any-element
+  match) against `oauthCtx.fromAllowList`. The package never hardcodes which
+  fields are grants for which table; that declaration is caller-supplied data.
+- **Fail-closed regression preserved byte-for-byte:** omitting `grantFields`
+  (or passing `[]`) reproduces 0.4.0 behaviour exactly — this is a pure
+  widening, no existing caller's behaviour changes without an explicit
+  opt-in declaration at its own call site.
+
 ## [0.4.0]
 
 **Additive.** Two new primitives so one identity layer covers both deployment
