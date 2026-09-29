@@ -3,6 +3,30 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0]
+
+**Additive — typed refusal for reads, and a role assertion.**
+
+### Added
+
+- `resolveTenantIdOrAbsent(source)` (`src/org-guard.ts`): non-throwing sibling
+  of `requireTenantId`. Returns `{ present: true, tenantId }` or a typed
+  `{ present: false, absence: { code: "TENANT_ABSENT", reason } }`. A read that
+  throws crashes a mounted render; a read that returns a bare empty value is
+  byte-identical to "there is nothing". This returns neither.
+- `requireHumanRole(session, required)` and
+  `resolveHumanRoleOrRefusal(session, required)` (`src/human-path.ts`): role
+  assertion on the verified session's `orgRole`, throwing and non-throwing
+  forms. Exact match, no hierarchy; an empty required list admits nobody.
+- Types: `TenantAbsence`, `TenantAbsenceReason`, `TenantResolution`,
+  `RequiredHumanRole`, `RoleRefusal`, `RoleRefusalReason`, `RoleResolution`.
+
+### Unchanged
+
+- `requireTenantId` and `normalizeVerifiedHumanSession` are byte-for-byte
+  unchanged and still throw on every refusal.
+- The tenant key stays opaque: no export takes or returns a slug.
+
 ## [0.5.0]
 
 **Additive — grant-aware scope filter.** Closes the other pole of the

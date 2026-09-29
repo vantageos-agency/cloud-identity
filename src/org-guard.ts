@@ -122,3 +122,87 @@ export function requireTenantId(source: TenantSource): string {
   }
   return workspaceId;
 }
+
+// ---------------------------------------------------------------------------
+// 0.6.0 — the non-throwing sibling, for a public READ
+// ---------------------------------------------------------------------------
+
+/**
+ * Why a caller resolved to no tenant. A closed set, so a consumer can branch
+ * on content.
+ */
+export type TenantAbsenceReason =
+  | "no-session"
+  | "no-organization"
+  | "no-workspace"
+  | "no-tenant-configured";
+
+/**
+ * The typed absence. It is a NON-empty object carrying its own code: it can
+ * never be mistaken for `[]`, `{}`, `null`, `0` or a zeroed aggregate, all of
+ * which are what "an organization with nothing in it" looks like.
+ */
+export type TenantAbsence = {
+  code: "TENANT_ABSENT";
+  reason: TenantAbsenceReason;
+};
+
+/**
+ * Result of `resolveTenantIdOrAbsent`. Branch on `present`; the two arms
+ * share no field, so a consumer that forgets to branch gets a type error
+ * rather than a silently-empty read.
+ */
+export type TenantResolution =
+  | { present: true; tenantId: string }
+  | { present: false; absence: TenantAbsence };
+
+/**
+ * The tenant id is OPAQUE. It is returned byte-for-byte as presented
+ * (`orgId`, `workspaceId` or the self-host `tenantId`), never trimmed,
+ * lower-cased or otherwise interpreted. This package never receives or
+ * derives a slug or any human-facing name; each product maps its own notion
+ * (an organization id, a workspace id) onto that string.
+ *
+ * NON-THROWING sibling of `requireTenantId`, for a public READ.
+ *
+ * `requireTenantId` throws on every branch, which is right for a WRITE
+ * boundary and wrong for a subscribed read: a throw at a caller with no
+ * organization crashes a mounted render, while a bare empty value is
+ * byte-identical to "there is nothing". This function does neither: it
+ * returns the tenant, or a typed absence that cannot be confused with an
+ * empty result.
+ *
+ * Same `TenantSource` union, same refusal conditions as `requireTenantId` —
+ * every input that makes it throw makes this return `{ present: false }`,
+ * and every input it serves is served identically. Grants nothing that
+ * `requireTenantId` refuses.
+ */
+export function resolveTenantIdOrAbsent(source: TenantSource): TenantResolution {
+  const absent = (reason: TenantAbsenceReason): TenantResolution => ({
+    present: false,
+    absence: { code: "TENANT_ABSENT", reason },
+  });
+
+  if (source.kind === "session") {
+    if (!source.identity) return absent("no-session");
+    const orgId = source.identity.orgId;
+    if (typeof orgId !== "string" || orgId.length === 0) {
+      return absent("no-organization");
+    }
+    return { present: true, tenantId: orgId };
+  }
+
+  if (source.kind === "self-host") {
+    const tenantId = source.tenantId;
+    if (typeof tenantId !== "string" || tenantId.length === 0) {
+      return absent("no-tenant-configured");
+    }
+    return { present: true, tenantId };
+  }
+
+  const workspaceId = source.context?.workspaceId;
+  if (typeof workspaceId !== "string" || workspaceId.length === 0) {
+    return absent("no-workspace");
+  }
+  return { present: true, tenantId: workspaceId };
+}

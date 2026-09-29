@@ -162,3 +162,101 @@ export function normalizeVerifiedHumanSession(
 
   return { tenant: orgId, subject: userId, role: mapped };
 }
+
+// ---------------------------------------------------------------------------
+// 0.6.0 — role assertion (throwing + non-throwing pair)
+// ---------------------------------------------------------------------------
+
+/**
+ * Why a caller was not admitted. `role-not-held` is the one that matters: a
+ * verified member of the organization who does not carry the required role.
+ */
+export type RoleRefusalReason =
+  | "no-session"
+  | "no-organization"
+  | "no-verified-role"
+  | "role-not-held";
+
+/** The typed refusal. A non-empty object carrying its own code. */
+export type RoleRefusal = {
+  code: "ROLE_REFUSED";
+  reason: RoleRefusalReason;
+};
+
+/** Result of `resolveHumanRoleOrRefusal`. Branch on `admitted`. */
+export type RoleResolution =
+  | { admitted: true; identity: ResolvedHumanIdentity }
+  | { admitted: false; refusal: RoleRefusal };
+
+/**
+ * `required` is the POLICY the call site declares; the caller's role is the
+ * CLAIM, and it is read only from `session.orgRole` (which the caller has
+ * already verified upstream — see the @security note on
+ * `normalizeVerifiedHumanSession`). There is no parameter through which a
+ * caller can supply its own role. Matching is EXACT, with no hierarchy:
+ * `owner` does not satisfy `"admin"`; pass `["owner", "admin"]` to admit
+ * either. An empty list admits nobody.
+ */
+export type RequiredHumanRole = HumanAccountRole | readonly HumanAccountRole[];
+
+function requiredList(required: RequiredHumanRole): readonly HumanAccountRole[] {
+  return typeof required === "string" ? [required] : required;
+}
+
+/**
+ * THROWING form, for a write boundary. Returns the resolved identity when
+ * the verified session carries one of the `required` roles; throws
+ * otherwise. Malformed sessions throw exactly what
+ * `normalizeVerifiedHumanSession` throws; a well-formed session lacking the
+ * role throws "Role refused: ...".
+ *
+ * Same `@security` precondition as `normalizeVerifiedHumanSession`: this
+ * asserts on a session that is ALREADY verified. It verifies nothing.
+ */
+export function requireHumanRole(
+  session: ClerkSessionLike | null | undefined,
+  required: RequiredHumanRole,
+): ResolvedHumanIdentity {
+  const identity = normalizeVerifiedHumanSession(session);
+  const allowed = requiredList(required);
+  if (!allowed.includes(identity.role)) {
+    throw new Error(
+      `Role refused: this session is a verified member but does not carry ${
+        allowed.length === 0 ? "any admitted role" : `role ${allowed.join(" or ")}`
+      }.`,
+    );
+  }
+  return identity;
+}
+
+/**
+ * NON-THROWING form, for a public read. Returns `{ admitted: true, identity }`
+ * or `{ admitted: false, refusal }` where the refusal carries `ROLE_REFUSED`
+ * and a reason. Admits exactly the sessions `requireHumanRole` returns for
+ * and refuses exactly the ones it throws for.
+ */
+export function resolveHumanRoleOrRefusal(
+  session: ClerkSessionLike | null | undefined,
+  required: RequiredHumanRole,
+): RoleResolution {
+  const refuse = (reason: RoleRefusalReason): RoleResolution => ({
+    admitted: false,
+    refusal: { code: "ROLE_REFUSED", reason },
+  });
+
+  if (!session) return refuse("no-session");
+  const { orgId, userId, orgRole } = session;
+  if (typeof orgId !== "string" || orgId.length === 0) {
+    return refuse("no-organization");
+  }
+  if (typeof userId !== "string" || userId.length === 0) {
+    return refuse("no-verified-role");
+  }
+  if (typeof orgRole !== "string" || orgRole.length === 0) {
+    return refuse("no-verified-role");
+  }
+  const role = CLERK_ORG_ROLE_MAP[orgRole];
+  if (!role) return refuse("no-verified-role");
+  if (!requiredList(required).includes(role)) return refuse("role-not-held");
+  return { admitted: true, identity: { tenant: orgId, subject: userId, role } };
+}
