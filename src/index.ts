@@ -6,7 +6,7 @@
  * validation.
  */
 
-export { timingSafeEqual } from "./crypto.js";
+export { timingSafeEqual, sha256Hex } from "./crypto.js";
 export {
   passesScopeFilter,
   scopeFilterList,
@@ -71,3 +71,22 @@ export type {
   ClerkSessionLike,
   ResolvedHumanIdentity,
 } from "./human-path.js";
+
+// Presented-bearer resolution — the opaque-token trust boundary for a
+// NON-MASTER credential. The package's single answer to "who is calling"
+// for a presented bearer; consumers must not keep a local variant.
+export {
+  validatePresentedBearer,
+  requireAgentScopedIdentity,
+  storedBearerRowSchema,
+} from "./presented-bearer.js";
+export type {
+  StoredBearerRow,
+  AgentPresence,
+  ResolvedBearerIdentity,
+  AgentScopedIdentity,
+  ValidatePresentedBearerResult,
+  RequireAgentScopedResult,
+  PresentedBearerDeps,
+  PresentedBearerInternalReason,
+} from "./presented-bearer.js";

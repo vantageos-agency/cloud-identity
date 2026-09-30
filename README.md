@@ -129,6 +129,48 @@ await resolveTenant({ session: null }); // throws Error("Unauthenticated: no ses
 - `getEffectiveTenantId(ctx, args)` — resolves which tenant a request should
   act on when a caller may legitimately act on more than one.
 
+**Resolving a presented bearer token**
+
+- `validatePresentedBearer(authHeader, deps)` — takes the raw
+  `Authorization` header a non-master caller presented, and returns either a
+  resolved identity or a coarse refusal. It hashes the token, asks your
+  `deps.lookupBySecretHash` callback for the row carrying that digest,
+  re-compares the stored digest in constant time, and then checks revocation
+  and expiry. Your callback does one indexed read; every decision stays in the
+  package, so two consumers cannot drift into two different answers to "who is
+  calling".
+  - **Your callback receives the digest, never the token.** A raw secret
+    therefore never reaches your query, your query log or your slow-query log.
+    Use `sha256Hex` to produce the same digest when you WRITE a token row, so
+    the two sides agree.
+  - **An unknown token, a revoked token and an expired token return one
+    identical value** (`{ ok: false, error: "mismatch" }`). Someone probing
+    your endpoint cannot learn from the reply whether a token was ever real.
+    Pass `deps.onRefusal` to receive the distinction
+    (`PresentedBearerInternalReason`) in your own logs, where it belongs.
+  - **A failing lookup refuses.** If your callback throws, the result is
+    `{ ok: false, error: "unavailable" }` — a refusal you can answer with 503
+    instead of 401. There is no branch that grants anything when the lookup
+    fails.
+  - `deps.now` is an injectable clock, so expiry is testable without waiting.
+  - Types: `PresentedBearerDeps`, `StoredBearerRow` (validated at runtime by
+    `storedBearerRowSchema`), `ResolvedBearerIdentity`,
+    `ValidatePresentedBearerResult`.
+- `requireAgentScopedIdentity(identity)` — narrows a resolved identity to a
+  surface that acts as ONE agent, and refuses when the token has no agent.
+  A token can be organization-wide: it names a tenant and no agent. That is a
+  legitimate credential, and it must never be silently widened into whichever
+  agent the surface happened to be about. So the agent is not a nullable field
+  you have to remember to check — `ResolvedBearerIdentity.agent` is an
+  `AgentPresence`, a union you must narrow, and the per-agent form
+  (`AgentScopedIdentity`, with a plain `agentId: string`) can only be obtained
+  from this function. Returns `RequireAgentScopedResult`; its refusal is
+  distinct from a bad credential, because the right answer there is 403, not
+  401.
+- `sha256Hex(input)` — the lower-case hex SHA-256 digest of a string. Exported
+  so that the code storing a token row hashes it exactly the way the resolver
+  will recompute it. Hash once, store the digest, discard the token.
+
 **Row filtering**
 
 - `passesScopeFilter(ctx, row)` — true when this row is visible to this
@@ -249,6 +291,15 @@ Worth reading before you rely on it.
 - **It does not talk to your database.** `scopeFilterList` filters rows you
   have already fetched. If fetching them was itself expensive or unsafe, filter
   earlier, in your query.
+- **It does not issue, rotate or revoke tokens.** `validatePresentedBearer`
+  reads a row you already store and decides whether it may be believed. Minting
+  a token, writing its row, marking it revoked and expiring it are yours; the
+  package only insists that a row it is handed be believed in constant time,
+  and refused identically however it fails.
+- **It does not verify a signed JWT.** The presented-bearer path is for an
+  OPAQUE token — one whose only meaning is the row it matches. If your
+  credential carries its own signed claims, verify that signature with a JWT
+  library first; this package exports no verifier.
 
 ## Upgrading to 0.4.0
 

@@ -149,9 +149,12 @@ export function getEffectiveTenantId(
  *   - decoder for a bearer that was ALREADY verified by an upstream signed-JWT
  *     middleware (the production trust boundary)
  *
- * For the production trust boundary, callers MUST substitute a signed JWT
- * verifier (not yet exported by this package) or an opaque-token lookup
- * against a Convex tenancy table.
+ * For the production trust boundary on an OPAQUE token, callers MUST use
+ * `validatePresentedBearer` (see `./presented-bearer.ts`), which hashes the
+ * presented token, looks the row up by digest through a caller-supplied read,
+ * re-compares the stored digest in constant time, and honours revocation and
+ * expiry. For a SIGNED JWT, callers must substitute a signature verifier; this
+ * package does not export one.
  *
  * Renamed from `resolveBearer` (0.2.0 pre-release) to make the lack of
  * verification impossible to miss at the call-site.
