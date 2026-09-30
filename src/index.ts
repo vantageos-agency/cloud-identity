@@ -45,16 +45,28 @@ export type {
 } from "./tenancy-domain.js";
 
 // Organization-membership guard (unified session + bearer + self-host contract)
-export { requireTenantId } from "./org-guard.js";
+export { requireTenantId, resolveTenantIdOrAbsent } from "./org-guard.js";
 export type {
+  TenantAbsence,
+  TenantAbsenceReason,
+  TenantResolution,
   SessionIdentity,
   TenantSource,
   DeploymentMode,
 } from "./org-guard.js";
 
 // 0.4.0 — Human-path resolver (Clerk-shaped session -> { tenant, subject, role })
-export { humanAccountRoleSchema, normalizeVerifiedHumanSession } from "./human-path.js";
+export {
+  humanAccountRoleSchema,
+  normalizeVerifiedHumanSession,
+  requireHumanRole,
+  resolveHumanRoleOrRefusal,
+} from "./human-path.js";
 export type {
+  RequiredHumanRole,
+  RoleRefusal,
+  RoleRefusalReason,
+  RoleResolution,
   HumanAccountRole,
   ClerkSessionLike,
   ResolvedHumanIdentity,

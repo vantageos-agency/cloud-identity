@@ -105,6 +105,27 @@ await resolveTenant({ session: null }); // throws Error("Unauthenticated: no ses
   `{ kind: "bearer", context }` for a machine caller. A missing session, a
   missing organization and an empty organization id are all refusals, never a
   default.
+- `resolveTenantIdOrAbsent(source)` — the NON-throwing sibling of
+  `requireTenantId`, for a public READ. Same `TenantSource` union, same
+  refusal conditions; instead of throwing it returns
+  `{ present: true, tenantId }` or
+  `{ present: false, absence: { code: "TENANT_ABSENT", reason } }`
+  (`TenantAbsence`, `TenantAbsenceReason`, `TenantResolution`). The absence
+  is a non-empty object: it is never `[]`, `{}`, `null` or a zeroed count, so
+  "no organization" and "an organization with nothing in it" cannot collapse
+  into one value. Use `requireTenantId` at a WRITE boundary and
+  `resolveTenantIdOrAbsent` where a throw would crash a mounted render. The
+  tenant id is OPAQUE — returned byte-for-byte, never a slug or display name.
+- `requireHumanRole(session, required)` — asserts the VERIFIED session
+  carries `required` (a `HumanAccountRole` or a list of them, exact match, no
+  hierarchy) and returns the resolved identity; throws otherwise. The role is
+  read from `session.orgRole`, never from an argument. `RequiredHumanRole`
+  is its `required` type.
+- `resolveHumanRoleOrRefusal(session, required)` — the non-throwing form:
+  `{ admitted: true, identity }` or
+  `{ admitted: false, refusal: { code: "ROLE_REFUSED", reason } }`
+  (`RoleResolution`, `RoleRefusal`, `RoleRefusalReason`). `reason` is
+  `role-not-held` for a verified member lacking the role.
 - `getEffectiveTenantId(ctx, args)` — resolves which tenant a request should
   act on when a caller may legitimately act on more than one.
 
