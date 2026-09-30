@@ -38,3 +38,22 @@ export async function timingSafeEqual(
   }
   return diff === 0;
 }
+
+/**
+ * SHA-256 of a UTF-8 string as a lower-case hex digest.
+ *
+ * Exported because a consumer that STORES a bearer row must produce the digest
+ * the same way the resolver will recompute it. Without this, each consumer
+ * hashes its own way and the mismatch surfaces as "correct token refused".
+ *
+ * @security Hash the token once, store the digest, discard the token. This
+ * function is one-way; it is not a substitute for a comparison — compare
+ * digests with `timingSafeEqual`, never with `===`.
+ */
+export async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}

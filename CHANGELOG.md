@@ -3,6 +3,76 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0]
+
+**Additive — resolution of a PRESENTED, non-master bearer.** The published
+0.5.0 surface covered the master credential (`validateMasterBearer`) and a
+decoder that verifies nothing and says so (`decodeUnverifiedBearer`). Between
+them there was no function taking a presented non-master bearer, hashing it,
+looking the row up and returning a resolved identity or a typed refusal — so a
+consuming product wrote that primitive locally, against an untyped client, with
+the lookup failure swallowed into `null`. That is a second authority answering
+"who is calling". This release is the single one, so the local variant can be
+deleted rather than duplicated.
+
+**Version number.** This entry takes `0.7.0`, not `0.6.0`. An unmerged branch
+already claims `0.6.0` for `resolveTenantIdOrAbsent` (the non-throwing sibling
+of `requireTenantId`); leaving `0.6.0` to it means these two can land in either
+order without either having to be renumbered after review.
+
+### Added
+
+- `validatePresentedBearer(authHeader, deps)` (`src/presented-bearer.ts`) —
+  parses the header, hashes the token to a SHA-256 hex digest, obtains the row
+  through the caller-supplied `deps.lookupBySecretHash(digest)`, re-compares the
+  row's stored digest with `timingSafeEqual`, then honours row shape, revocation
+  and expiry. The package cannot query a datastore, so the read is injected; every
+  decision stays in the package. `deps.now` is an injectable clock.
+  - **The callback receives the DIGEST, never the token**, keeping a usable
+    secret out of a consumer's query and out of its query logs.
+  - **An unknown digest, a revoked row, an expired row, a row of invalid shape
+    and a row whose stored digest does not match all return ONE shared frozen
+    value**, `{ ok: false, error: "mismatch" }` — one object rather than five
+    equal literals, so the branches cannot drift apart by an added field. A
+    prober cannot learn whether a token was ever real. `deps.onRefusal` reports
+    the internal distinction (`PresentedBearerInternalReason`) to the consumer's
+    own logs; a throwing sink cannot change the outcome.
+  - **A lookup that throws is a REFUSAL** (`error: "unavailable"`), deliberately
+    outside the collapsed bucket so a datastore outage can be answered 503
+    rather than reported to every caller as a bad credential. No branch grants
+    anything on a lookup failure.
+  - Header vocabulary is `validateMasterBearer`'s, unchanged: `"missing"`,
+    `"malformed"`, `"mismatch"`. A malformed header costs no datastore read.
+- `requireAgentScopedIdentity(identity)` — the second, mandatory call for a
+  per-agent surface. An organization-wide token (a row with no agent identity)
+  resolves successfully and carries its agent as an EXPLICIT absence
+  (`AgentPresence`, a union that must be narrowed — not a nullable field a
+  caller can fail to check). The per-agent form `AgentScopedIdentity` carries a
+  module-private type brand, so it cannot be constructed outside the package: a
+  handler typed against it is reachable only through this function. Its refusal
+  is distinguishable from a bad credential on purpose — 403, not 401.
+- `sha256Hex(input)` (`src/crypto.ts`) — lower-case hex SHA-256 of a string,
+  exported so the code WRITING a token row derives the digest exactly as the
+  resolver recomputes it.
+- `storedBearerRowSchema` + `StoredBearerRow`, `AgentPresence`,
+  `ResolvedBearerIdentity`, `AgentScopedIdentity`,
+  `ValidatePresentedBearerResult`, `RequireAgentScopedResult`,
+  `PresentedBearerDeps`, `PresentedBearerInternalReason`.
+- Subpath export `@vantageos/cloud-identity/presented-bearer`.
+
+### Changed
+
+- Documentation only: `decodeUnverifiedBearer`'s security banner said the
+  production trust boundary was "not yet exported by this package". For an
+  opaque token it now is, and the banner names it. No behaviour change.
+
+### Unchanged
+
+- **Every existing export keeps its exact behaviour and signature.** The new
+  module is a new file; the only edits to existing sources are one appended
+  function in `src/crypto.ts`, new export lines in `src/index.ts`, and the
+  docstring above. No existing test was edited.
+
 ## [0.6.0]
 
 **Additive — typed refusal for reads, and a role assertion.**
