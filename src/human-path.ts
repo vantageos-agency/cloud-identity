@@ -66,16 +66,28 @@ export type ResolvedHumanIdentity = {
  * listed here is refused rather than silently coerced to a default, per
  * "presented, never inferred from an absence."
  */
-const CLERK_ORG_ROLE_MAP: Record<string, HumanAccountRole> = {
-  "org:owner": "owner",
-  owner: "owner",
-  "org:admin": "admin",
-  admin: "admin",
-  "org:member": "member",
-  member: "member",
-  "org:client": "client",
-  client: "client",
-};
+const CLERK_ORG_ROLE_MAP: Record<string, HumanAccountRole> = Object.assign(
+  // PROTOTYPE-LESS on purpose. As a plain object literal this map INHERITED
+  // `Object.prototype`, so a lookup of a presented role like `toString`,
+  // `constructor` or `__proto__` did not MISS — it returned an inherited
+  // value, which is truthy, and the resolver handed back a FUNCTION as the
+  // role instead of refusing. With a null prototype, any key that is not one
+  // of the eight own keys below is `undefined`, so the existing
+  // `if (!mapped) throw` refuses it. The lookup expressions in
+  // `normalizeVerifiedHumanSession` and `resolveHumanRoleOrRefusal` are
+  // unchanged — this is a fix at the DATA, not a list of forbidden names.
+  Object.create(null) as Record<string, HumanAccountRole>,
+  {
+    "org:owner": "owner",
+    owner: "owner",
+    "org:admin": "admin",
+    admin: "admin",
+    "org:member": "member",
+    member: "member",
+    "org:client": "client",
+    client: "client",
+  } satisfies Record<string, HumanAccountRole>,
+);
 
 /**
  * @security ⚠️ DECODE/NORMALIZE-ONLY. NOT AUTHENTICATION. NOT VERIFICATION.

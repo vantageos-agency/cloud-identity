@@ -21,11 +21,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Types: `TenantAbsence`, `TenantAbsenceReason`, `TenantResolution`,
   `RequiredHumanRole`, `RoleRefusal`, `RoleRefusalReason`, `RoleResolution`.
 
+### Fixed
+
+- The Clerk org-role map is now prototype-less (`Object.create(null)`). As a
+  plain object literal it inherited `Object.prototype`, so a presented
+  `orgRole` of `toString`, `constructor`, `valueOf` or `__proto__` did not
+  MISS the lookup — it returned an inherited value, which is truthy, and the
+  resolver handed back a FUNCTION as the role instead of refusing. Any key
+  that is not one of the eight own keys is now `undefined`, so the existing
+  refusal path rejects it. Fixed at the data; no lookup expression and no
+  function body changed, and no list of forbidden names was introduced.
+
 ### Unchanged
 
 - `requireTenantId` and `normalizeVerifiedHumanSession` are byte-for-byte
   unchanged and still throw on every refusal.
-- The tenant key stays opaque: no export takes or returns a slug.
+- The tenant key stays opaque: no export takes or returns a slug. That
+  opacity is now pinned on all four served paths (session, bearer,
+  self-host, `role.identity.tenant`), through BOTH the throwing and the
+  non-throwing sibling, with a fixture carrying edge whitespace so that
+  splicing a `.trim()` onto a served id goes RED instead of passing.
+
+### Removed
+
+- `bun.lock`, committed by accident in 0.5.0. `package-lock.json` is the
+  lockfile of record; two lockfiles for two package managers guarantee a
+  silent divergence.
 
 ## [0.5.0]
 

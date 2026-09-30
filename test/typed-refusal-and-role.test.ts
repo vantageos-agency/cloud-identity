@@ -19,6 +19,7 @@ import {
   type TenantSource,
 } from "../src/org-guard.js";
 import {
+  normalizeVerifiedHumanSession,
   requireHumanRole,
   resolveHumanRoleOrRefusal,
   type ClerkSessionLike,
@@ -92,11 +93,129 @@ describe("POLE 1 — no organization yields a typed absence, not an exception", 
     expect(r.present && r.tenantId).toBe(requireTenantId(scopedSource));
   });
 
-  it("the tenant id is opaque: returned byte-for-byte, never normalized", () => {
-    const odd = "Org Name/With Spaces-and-CASE";
-    const r = resolveTenantIdOrAbsent({ kind: "session", identity: { orgId: odd } });
-    expect(r).toEqual({ present: true, tenantId: odd });
+});
+
+// ---------------------------------------------------------------------------
+// The tenant id is OPAQUE — pinned on EVERY served path, and on BOTH siblings.
+//
+// The fixture carries EDGE WHITESPACE (two leading spaces, a trailing tab)
+// for one reason: a fixture with no edges cannot fail on the property this
+// pole names. An earlier version used "Org Name/With Spaces-and-CASE", and
+// splicing `.trim()` onto the served id left the whole suite green — the
+// guard against normalising an opaque identifier did not guard it. With the
+// edges below, the same mutation goes RED on all four paths.
+//
+// A tenant id is an OPAQUE key: trimming, lower-casing or otherwise touching
+// it silently changes WHICH TENANT a caller resolves to.
+// ---------------------------------------------------------------------------
+
+const OPAQUE_TENANT_ID = "  Org Name/With Spaces-and-CASE\t";
+
+/**
+ * Each served path, twice: once through the THROWING export shipped on main
+ * (`requireTenantId` / `requireHumanRole`) and once through the non-throwing
+ * sibling added here. A pole covering only the new export leaves the shipped
+ * one unguarded.
+ */
+const servedPaths: Array<{
+  label: string;
+  throwing: () => string;
+  typed: () => string;
+}> = [
+  {
+    label: "session",
+    throwing: () =>
+      requireTenantId({ kind: "session", identity: { orgId: OPAQUE_TENANT_ID } }),
+    typed: () => {
+      const r = resolveTenantIdOrAbsent({
+        kind: "session",
+        identity: { orgId: OPAQUE_TENANT_ID },
+      });
+      if (!r.present) throw new Error("fixture must be served, not refused");
+      return r.tenantId;
+    },
+  },
+  {
+    label: "bearer",
+    throwing: () =>
+      requireTenantId({
+        kind: "bearer",
+        context: { userId: "u", workspaceId: OPAQUE_TENANT_ID, roles: [] } as never,
+      }),
+    typed: () => {
+      const r = resolveTenantIdOrAbsent({
+        kind: "bearer",
+        context: { userId: "u", workspaceId: OPAQUE_TENANT_ID, roles: [] } as never,
+      });
+      if (!r.present) throw new Error("fixture must be served, not refused");
+      return r.tenantId;
+    },
+  },
+  {
+    label: "self-host",
+    throwing: () =>
+      requireTenantId({ kind: "self-host", tenantId: OPAQUE_TENANT_ID }),
+    typed: () => {
+      const r = resolveTenantIdOrAbsent({
+        kind: "self-host",
+        tenantId: OPAQUE_TENANT_ID,
+      });
+      if (!r.present) throw new Error("fixture must be served, not refused");
+      return r.tenantId;
+    },
+  },
+  {
+    label: "role.identity.tenant",
+    throwing: () =>
+      requireHumanRole(
+        { orgId: OPAQUE_TENANT_ID, userId: "u1", orgRole: "org:admin" },
+        "admin",
+      ).tenant,
+    typed: () => {
+      const r = resolveHumanRoleOrRefusal(
+        { orgId: OPAQUE_TENANT_ID, userId: "u1", orgRole: "org:admin" },
+        "admin",
+      );
+      if (!r.admitted) throw new Error("fixture must be admitted, not refused");
+      return r.identity.tenant;
+    },
+  },
+];
+
+describe("OPACITY — the tenant id is served byte-for-byte, never normalized", () => {
+  it("the fixture itself has edges that a normalisation would visibly alter", () => {
+    // If this ever fails, the fixture was weakened and every pole below
+    // became decoration again.
+    expect(OPAQUE_TENANT_ID).not.toBe(OPAQUE_TENANT_ID.trim());
+    expect(OPAQUE_TENANT_ID).not.toBe(OPAQUE_TENANT_ID.toLowerCase());
+    expect(OPAQUE_TENANT_ID.startsWith("  ")).toBe(true);
+    expect(OPAQUE_TENANT_ID.endsWith("\t")).toBe(true);
   });
+
+  for (const { label, throwing, typed } of servedPaths) {
+    it(`${label}: the THROWING sibling returns the id byte-for-byte`, () => {
+      const served = throwing();
+      // Compared against the literal fixture, never a normalised copy of it.
+      expect(served).toBe(OPAQUE_TENANT_ID);
+      expect(served.length).toBe(OPAQUE_TENANT_ID.length);
+      expect(
+        Buffer.from(served, "utf8").equals(Buffer.from(OPAQUE_TENANT_ID, "utf8")),
+      ).toBe(true);
+    });
+
+    it(`${label}: the TYPED sibling returns the id byte-for-byte`, () => {
+      const served = typed();
+      expect(served).toBe(OPAQUE_TENANT_ID);
+      expect(served.length).toBe(OPAQUE_TENANT_ID.length);
+      expect(
+        Buffer.from(served, "utf8").equals(Buffer.from(OPAQUE_TENANT_ID, "utf8")),
+      ).toBe(true);
+    });
+
+    it(`${label}: both siblings agree, byte for byte`, () => {
+      expect(typed()).toBe(throwing());
+    });
+  }
 });
 
 describe("POLE 2 — the absence is distinguishable from an empty result", () => {
@@ -201,4 +320,105 @@ describe("POLE 4 — the role assertion refuses a verified member lacking the ro
       if (!r.admitted) expect(r.refusal.reason).toBe(reason);
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// A prototype key is not a role.
+//
+// The Clerk-role map was a plain object literal, so `MAP["toString"]` did not
+// miss — it reached `Object.prototype` and returned a FUNCTION, which is
+// truthy. `normalizeVerifiedHumanSession` therefore returned `role` as a
+// function instead of refusing, and `__proto__` behaved the same way. The map
+// is now prototype-less, so a lookup that is not an own key MISSES.
+//
+// This is pinned by CLASS (any inherited key), never by a list of bad names:
+// a deny-list would have to be extended every time the prototype grows.
+// ---------------------------------------------------------------------------
+
+const prototypeKeys = [
+  "toString",
+  "constructor",
+  "valueOf",
+  "hasOwnProperty",
+  "isPrototypeOf",
+  "__proto__",
+];
+
+describe("POLE 5 — an inherited prototype key is refused, never resolved", () => {
+  for (const key of prototypeKeys) {
+    it(`orgRole "${key}" is refused as unrecognized by both forms`, () => {
+      const session: ClerkSessionLike = {
+        orgId: "o1",
+        userId: "u1",
+        orgRole: key,
+      };
+      expect(() => normalizeVerifiedHumanSession(session)).toThrow(
+        /^Unrecognized organization role/,
+      );
+      expect(() => requireHumanRole(session, "admin")).toThrow(
+        /^Unrecognized organization role/,
+      );
+      const r = resolveHumanRoleOrRefusal(session, [
+        "owner",
+        "admin",
+        "member",
+        "client",
+      ]);
+      expect(r.admitted).toBe(false);
+      if (!r.admitted) expect(r.refusal.reason).toBe("no-verified-role");
+    });
+  }
+
+  it("no inherited key ever resolves to a non-string role", () => {
+    for (const key of prototypeKeys) {
+      let served: unknown = "<threw>";
+      try {
+        served = normalizeVerifiedHumanSession({
+          orgId: "o1",
+          userId: "u1",
+          orgRole: key,
+        }).role;
+      } catch {
+        // refusing is the expected outcome; the assertion below covers the
+        // case where it did NOT refuse.
+      }
+      expect(typeof served).not.toBe("function");
+      expect(typeof served).not.toBe("object");
+      expect(served).toBe("<threw>");
+    }
+  });
+
+  it("GRANT: the eight own keys still resolve, unchanged", () => {
+    const own: Array<[string, string]> = [
+      ["org:owner", "owner"],
+      ["owner", "owner"],
+      ["org:admin", "admin"],
+      ["admin", "admin"],
+      ["org:member", "member"],
+      ["member", "member"],
+      ["org:client", "client"],
+      ["client", "client"],
+    ];
+    for (const [presented, expected] of own) {
+      expect(
+        normalizeVerifiedHumanSession({
+          orgId: "o1",
+          userId: "u1",
+          orgRole: presented,
+        }).role,
+      ).toBe(expected);
+    }
+  });
+
+  it("the refusal message still enumerates the eight own keys", () => {
+    expect(() =>
+      normalizeVerifiedHumanSession({
+        orgId: "o1",
+        userId: "u1",
+        orgRole: "org:god",
+      }),
+    ).toThrow(
+      "Unrecognized organization role \"org:god\": expected one of org:owner, owner, org:admin, admin, org:member, member, org:client, client.",
+    );
+  });
 });
