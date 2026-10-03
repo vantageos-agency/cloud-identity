@@ -275,6 +275,86 @@ want to catch by type, and `BearerPayload`, the type returned by
   // -> { tenant: "org_abc", subject: "user_123", role: "admin" }
   ```
 
+## Authorize a person and bind an organisation
+
+A connector that signs in a PERSON (a Claude or ChatGPT user) must end up with
+a token naming that person and one organisation they belong to, never an
+anonymous app. Clerk is the identity provider; this package holds the
+decisions and takes every collaborator as a parameter.
+
+```ts
+// GET /authorize
+const out = await startAuthorize(query, clerkSessionToken, cfg, deps);
+// GET /authorize/callback (the return from Clerk) and the picker's POST
+const out2 = await resumeAuthorize({ state, sessionToken, orgId, approved }, cfg, deps);
+// POST /token (authorization_code grant)
+const res = await exchangeAuthorizationCode(
+  { code, codeVerifier, redirectUri, clientId, resource },
+  { codeStore },
+);
+```
+
+- `startAuthorize(params, sessionToken, config, deps)` validates the request
+  (registered client, exact `redirect_uri`, a PKCE challenge using the SHA-256
+  method, an allowed RFC 8707 `resource`, supported scopes). With no valid Clerk
+  session it returns `{ kind: "redirect-to-sign-in", url }` and issues nothing;
+  the return URL carries a state blob signed with HMAC (`AuthorizeConfig.stateSecret`,
+  at least 32 characters) and valid for 600 seconds by default.
+- `resumeAuthorize(input, config, deps)` rebuilds the request ONLY from that
+  signed state (a tampered or expired blob is refused), verifies the Clerk
+  session token (`verifyClerkSessionToken`: RS256 against the key set the
+  consumer supplies, issuer, expiry, optional audience and authorized parties),
+  lists the user's organisations through `deps.listMemberships`, and answers
+  with an `AuthorizeOutcome`:
+  `redirect-to-sign-in`, `org-picker` (an `OrgPickerModel` the consumer renders;
+  it lists only the user's own organisations), `redirect-to-client` (the URL
+  carrying the code and the client's `state`) or `refused`.
+  Exactly one organisation is auto-picked; with several, a posted `orgId` is
+  honoured only if the verified user's own membership list contains it.
+  Consent is ON by default (`requireConsent` defaults to true): even with one
+  organisation the outcome is a picker/consent model, and a code is issued only
+  after the person posts `approved: true`. Without it, any dynamically
+  registered client could get a code for a signed-in victim who follows a link.
+  Set `requireConsent: false` explicitly ONLY for first-party clients whose
+  redirect URIs you control; a single organisation is then auto-picked.
+- The code is bound to `{ clerkUserId, orgId, orgSlug, orgRole, clientId,
+  redirectUri, codeChallenge, resource }`, stored as a digest through the
+  consumer's `AuthorizationCodeStore` (`put`, and an ATOMIC `consume`), single
+  use, 60 seconds by default. Records are `AuthorizationCodeRecord`; a consume
+  answers `ConsumeCodeResult`. `AuthorizeClient`, `ClerkOrgMembership`,
+  `AuthorizeDeps`, `ResumeInput` and `ClerkJwk` / `ClerkJwks` /
+  `VerifiedClerkSession` / `VerifyClerkSessionResult` /
+  `ClerkSessionVerifierConfig` are the shapes the consumer supplies or reads.
+- `exchangeAuthorizationCode(input, deps)` consumes the code FIRST (every
+  attempt burns it), then checks expiry, client, `redirect_uri`, resource and
+  the PKCE verifier (`pkceChallengeFromVerifier` derives a challenge). It
+  returns `AuthorizedTokenClaims`:
+  `{ sub, org_id, org_slug, org_role, aud, client_id, scope }` (`ExchangeInput`,
+  `ExchangeDeps`, `ExchangeResult`). No field comes from a client-registration
+  profile.
+- `buildDiscoveryDocument(config)` builds the discovery document
+  (`DiscoveryConfig`, `DiscoveryDocument`, `DiscoveryResult`); the issuer must
+  be https with no query. It advertises only what is implemented: the code
+  flow, PKCE, the `authorization_code` grant and UserInfo. It omits
+  `id_token_signing_alg_values_supported` (OIDC Discovery lists it as required
+  for a provider that issues id_tokens; this package issues none, so that is a
+  documented deviation), refresh tokens and client-authentication methods. A
+  consumer that implements any of them adds those keys itself. `buildUserInfo(claims, user)` returns `sub`, and
+  `email` / `email_verified` when the token carries `email`
+  (`ClerkUserLike`, `UserInfo`, `UserInfoResult`).
+- Every refusal is `{ code: "AUTHORIZE_REFUSED", reason }`
+  (`AuthorizeRefusal`, `AuthorizeRefusalReason`), the same shape as
+  `RoleRefusal`. `oauthErrorFor(refusal)` maps it to an OAuth error code and an
+  HTTP status (503 for a collaborator that failed, so an outage is not reported
+  as a bad credential). A collaborator that throws is always a refusal.
+
+Also exported as subpaths: `/authorize`, `/token-exchange`, `/clerk-session`,
+`/oidc`.
+
+Limits, stated: `redirect_uri` matching is exact (no loopback port variation);
+the package signs no access token and no id token and issues no refresh token (the consumer mints the token
+from the claims); it fetches no key set and calls no Clerk API itself.
+
 ## What this package does not do
 
 Worth reading before you rely on it.
@@ -296,10 +376,11 @@ Worth reading before you rely on it.
   a token, writing its row, marking it revoked and expiring it are yours; the
   package only insists that a row it is handed be believed in constant time,
   and refused identically however it fails.
-- **It does not verify a signed JWT.** The presented-bearer path is for an
-  OPAQUE token — one whose only meaning is the row it matches. If your
-  credential carries its own signed claims, verify that signature with a JWT
-  library first; this package exports no verifier.
+- **It does not verify an arbitrary signed JWT.** The presented-bearer path is
+  for an OPAQUE token — one whose only meaning is the row it matches. The one
+  signed token it verifies is a Clerk session token (`verifyClerkSessionToken`,
+  RS256 only). For any other signed credential, verify the signature with a
+  JWT library first.
 
 ## Upgrading to 0.4.0
 
