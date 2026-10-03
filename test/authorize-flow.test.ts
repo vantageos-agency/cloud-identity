@@ -394,7 +394,13 @@ describe("resumeAuthorize", () => {
     expect(out.model.consentRequired).toBe(true);
     expect(store.rows.size).toBe(0);
     const approved = await resumeAuthorize(
-      { state: out.model.state, sessionToken: await mintSession(), orgId: "org_A", approved: true },
+      {
+        state: out.model.state,
+        sessionToken: await mintSession(),
+        orgId: "org_A",
+        approved: true,
+        consentToken: out.model.consentToken ?? undefined,
+      },
       cfg,
       deps,
     );
@@ -694,5 +700,99 @@ describe("consent is the default", () => {
     const out = await startAuthorize(await params(), await mintSession(), cfg, deps);
     expect(out.kind).toBe("redirect-to-client");
     expect([...store.rows.values()][0]?.rec).toMatchObject({ orgId: "org_A", orgSlug: "acme", orgRole: "org:admin" });
+  });
+});
+
+describe("consent cannot be minted by the client", () => {
+  const consentSetup = () => setup([orgA, orgB], { requireConsent: true });
+  const stateFor = async (cfg: AuthorizeConfig, deps: AuthorizeDeps, over = {}) => {
+    const out = await startAuthorize(await params(over), undefined, cfg, deps);
+    if (out.kind !== "redirect-to-sign-in") throw new Error("setup");
+    return stateOf(out.url);
+  };
+  const picker = async (cfg: AuthorizeConfig, deps: AuthorizeDeps, session: string) => {
+    const out = await startAuthorize(await params(), session, cfg, deps);
+    if (out.kind !== "org-picker") throw new Error("setup");
+    return out.model;
+  };
+
+  it("Eta's attack: attacker state + victim session + approved:true, no token -> refused, no code", async () => {
+    const { cfg, deps, store } = consentSetup();
+    const attackerState = await stateFor(cfg, deps);
+    const victim = await mintSession({ sub: "victim" });
+    for (const consentToken of [undefined, "forged", ""]) {
+      const out = await resumeAuthorize(
+        { state: attackerState, sessionToken: victim, orgId: "org_A", approved: true, consentToken },
+        cfg,
+        deps,
+      );
+      expect(out).toMatchObject({ kind: "refused", refusal: { reason: "consent-required" } });
+    }
+    expect(store.rows.size).toBe(0);
+  });
+
+  it("also refused with a single organisation", async () => {
+    const { cfg, deps, store } = setup([orgA], { requireConsent: true });
+    const attackerState = await stateFor(cfg, deps);
+    const out = await resumeAuthorize(
+      { state: attackerState, sessionToken: await mintSession(), orgId: "org_A", approved: true },
+      cfg,
+      deps,
+    );
+    expect(out).toMatchObject({ refusal: { reason: "consent-required" } });
+    expect(store.rows.size).toBe(0);
+  });
+
+  it("legitimate flow: picker -> token -> resume -> code", async () => {
+    const { cfg, deps, store } = consentSetup();
+    const session = await mintSession();
+    const model = await picker(cfg, deps, session);
+    expect(model.consentToken).toMatch(/^[\w-]{43}$/);
+    const out = await resumeAuthorize(
+      { state: model.state, sessionToken: session, orgId: "org_B", approved: true, consentToken: model.consentToken ?? undefined },
+      cfg,
+      deps,
+    );
+    expect(out.kind).toBe("redirect-to-client");
+    expect([...store.rows.values()][0]?.rec.orgId).toBe("org_B");
+  });
+
+  it("a token minted for user A is refused under user B's session", async () => {
+    const { cfg, deps, store } = consentSetup();
+    const modelA = await picker(cfg, deps, await mintSession({ sub: "user_A" }));
+    const out = await resumeAuthorize(
+      { state: modelA.state, sessionToken: await mintSession({ sub: "user_B" }), orgId: "org_A", approved: true, consentToken: modelA.consentToken ?? undefined },
+      cfg,
+      deps,
+    );
+    expect(out).toMatchObject({ refusal: { reason: "consent-required" } });
+    expect(store.rows.size).toBe(0);
+  });
+
+  it("a token for state S1 is refused with state S2", async () => {
+    const { cfg, deps, store } = consentSetup();
+    const session = await mintSession();
+    const m1 = await picker(cfg, deps, session);
+    const s2 = await stateFor(cfg, deps, { state: "other" });
+    const out = await resumeAuthorize(
+      { state: s2, sessionToken: session, orgId: "org_A", approved: true, consentToken: m1.consentToken ?? undefined },
+      cfg,
+      deps,
+    );
+    expect(out).toMatchObject({ refusal: { reason: "consent-required" } });
+    expect(store.rows.size).toBe(0);
+  });
+
+  it("a token minted for a different organisation set is refused", async () => {
+    const a = setup([orgA, orgB], { requireConsent: true });
+    const session = await mintSession();
+    const model = await picker(a.cfg, a.deps, session);
+    a.deps.listMemberships = async () => [orgA];
+    const out = await resumeAuthorize(
+      { state: model.state, sessionToken: session, orgId: "org_A", approved: true, consentToken: model.consentToken ?? undefined },
+      a.cfg,
+      a.deps,
+    );
+    expect(out).toMatchObject({ refusal: { reason: "consent-required" } });
   });
 });

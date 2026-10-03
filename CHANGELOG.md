@@ -37,6 +37,13 @@ re-derives nothing from the client's profile.
   in the README section "Authorize a person and bind an organisation".
 - Subpath exports `/authorize`, `/token-exchange`, `/clerk-session`, `/oidc`.
 
+### Security
+
+- Consent is bound to a server-issued `consentToken` (HMAC over state, user and
+  organisation set). `approved: true` without a token valid for that state and
+  that session's user is refused with `consent-required`; a client can no
+  longer mint its own state and approve on a victim's behalf.
+
 ### Changed
 
 - README: the "does not verify a signed JWT" limit now names the one exception.

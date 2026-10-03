@@ -191,6 +191,16 @@ export async function signBlob(
   return `${body}.${toBase64Url(new Uint8Array(mac))}`;
 }
 
+/** `base64url(HMAC-SHA-256(secret, message))`. */
+export async function signMac(message: string, secret: string): Promise<string> {
+  const mac = await crypto.subtle.sign(
+    "HMAC",
+    await hmacKey(secret, "sign"),
+    utf8(message) as unknown as BufferSource,
+  );
+  return toBase64Url(new Uint8Array(mac));
+}
+
 /** Returns the parsed payload when the MAC verifies (constant time), else `null`. */
 export async function verifyBlob(
   blob: string,

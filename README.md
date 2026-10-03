@@ -286,7 +286,7 @@ decisions and takes every collaborator as a parameter.
 // GET /authorize
 const out = await startAuthorize(query, clerkSessionToken, cfg, deps);
 // GET /authorize/callback (the return from Clerk) and the picker's POST
-const out2 = await resumeAuthorize({ state, sessionToken, orgId, approved }, cfg, deps);
+const out2 = await resumeAuthorize({ state, sessionToken, orgId, approved, consentToken }, cfg, deps);
 // POST /token (authorization_code grant)
 const res = await exchangeAuthorizationCode(
   { code, codeVerifier, redirectUri, clientId, resource },
@@ -309,14 +309,29 @@ const res = await exchangeAuthorizationCode(
   `redirect-to-sign-in`, `org-picker` (an `OrgPickerModel` the consumer renders;
   it lists only the user's own organisations), `redirect-to-client` (the URL
   carrying the code and the client's `state`) or `refused`.
-  Exactly one organisation is auto-picked; with several, a posted `orgId` is
-  honoured only if the verified user's own membership list contains it.
-  Consent is ON by default (`requireConsent` defaults to true): even with one
-  organisation the outcome is a picker/consent model, and a code is issued only
-  after the person posts `approved: true`. Without it, any dynamically
-  registered client could get a code for a signed-in victim who follows a link.
+  A posted `orgId` is honoured only if the verified user's own membership list
+  contains it.
+  Consent is ON by default (`requireConsent` defaults to true). What it
+  protects: a code is issued only after the person was SHOWN the picker and
+  approved it. The picker's `OrgPickerModel` carries a `consentToken`:
+  `HMAC(stateSecret, "consent-v1" NUL state NUL clerkUserId NUL sorted
+  organisation ids)`. It is bound to the exact signed state (useless for any
+  other request), to the verified user (useless under another session) and to
+  the organisation set that user was shown. `resumeAuthorize` with
+  `approved: true` refuses with `consent-required` unless the presented
+  `consentToken` verifies, compared in constant time, for that state AND the
+  session's user. Without this, a client could mint its own state (the sign-in
+  redirect hands it one), replay it with a victim's session and
+  `approved: true`, and receive a code the victim never saw a screen for.
+  The consumer renders `consentToken` as a hidden field of the picker's POST
+  form and posts it back as `consentToken`. The token IS the CSRF protection
+  for that POST, because a cross-site form cannot know it; do not add a weaker
+  substitute and do not accept the POST without it. Also set
+  `session.authorizedParties` to your own origin(s) so a Clerk session token
+  minted for another application (`azp`) is not accepted here.
   Set `requireConsent: false` explicitly ONLY for first-party clients whose
-  redirect URIs you control; a single organisation is then auto-picked.
+  redirect URIs you control; exactly one organisation is then auto-picked and
+  no token is involved.
 - The code is bound to `{ clerkUserId, orgId, orgSlug, orgRole, clientId,
   redirectUri, codeChallenge, resource }`, stored as a digest through the
   consumer's `AuthorizationCodeStore` (`put`, and an ATOMIC `consume`), single

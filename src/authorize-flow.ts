@@ -5,10 +5,12 @@ import {
   isWellFormedChallenge,
   refusal,
   signBlob,
+  signMac,
+  utf8,
   toBase64Url,
   verifyBlob,
 } from "./authorize-shared.js";
-import { sha256Hex } from "./crypto.js";
+import { sha256Hex, timingSafeEqual } from "./crypto.js";
 import {
   type ClerkSessionVerifierConfig,
   type VerifiedClerkSession,
@@ -137,6 +139,12 @@ export interface OrgPickerModel {
   }[];
   /** True when the person must tick approval even with one organisation. */
   consentRequired: boolean;
+  /**
+   * Proof that THIS picker was shown to THIS verified user for THIS state.
+   * Render it as a hidden field and post it back as `consentToken`. Absent
+   * when consent is not required.
+   */
+  consentToken: string | null;
 }
 
 export type AuthorizeOutcome =
@@ -154,6 +162,8 @@ export interface ResumeInput {
   orgId?: string;
   /** The person's explicit approval, when `requireConsent` is on. */
   approved?: boolean;
+  /** The `consentToken` of the picker the person was shown. Required with `approved: true` when consent is on. */
+  consentToken?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +293,7 @@ async function bindAndIssue(
   stateBlob: string,
   session: VerifiedClerkSession,
   clientName: string | null,
-  choice: { orgId?: string; approved?: boolean },
+  choice: { orgId?: string; approved?: boolean; consentToken?: string },
   cfg: AuthorizeConfig,
   deps: AuthorizeDeps,
 ): Promise<AuthorizeOutcome> {
@@ -306,6 +316,27 @@ async function bindAndIssue(
   }
 
   const consentRequired = cfg.requireConsent !== false;
+  // The token binds the picker to the verified user, the signed state and the
+  // set of organisations that user belongs to (the set is what was shown).
+  const expectedToken = consentRequired
+    ? await consentTokenFor(
+        cfg.stateSecret,
+        stateBlob,
+        session.userId,
+        memberships.map((m) => m.organization.id),
+      )
+    : null;
+  if (consentRequired && picked && choice.approved === true) {
+    // `approved: true` is a CLAIM in a POST body. An attacker client can mint
+    // its own state and replay it with a victim's session; only a token the
+    // server issued to this user for this state proves the picker was shown.
+    const presented = choice.consentToken;
+    const ok =
+      typeof presented === "string" &&
+      expectedToken !== null &&
+      (await timingSafeEqual(utf8(presented), utf8(expectedToken)));
+    if (!ok) return refused("consent-required");
+  }
   if (!picked || (consentRequired && choice.approved !== true)) {
     return {
       kind: "org-picker",
@@ -321,6 +352,7 @@ async function bindAndIssue(
           role: m.role,
         })),
         consentRequired,
+        consentToken: expectedToken,
       },
     };
   }
@@ -348,6 +380,23 @@ async function bindAndIssue(
   back.searchParams.set("code", code);
   if (req.state !== null) back.searchParams.set("state", req.state);
   return { kind: "redirect-to-client", url: back.toString() };
+}
+
+/**
+ * `HMAC(stateSecret, "consent-v1\0" + state + "\0" + clerkUserId + "\0" +
+ * sorted organisation ids joined by ",")`. Bound to the exact state blob (so a
+ * token for one request is useless for another), to the verified user (so it
+ * cannot be replayed under another session) and to the organisation set shown
+ * (the chosen org is separately required to be in the live membership list).
+ */
+async function consentTokenFor(
+  secret: string,
+  state: string,
+  userId: string,
+  orgIds: readonly string[],
+): Promise<string> {
+  const set = [...orgIds].sort().join(",");
+  return signMac(`consent-v1\0${state}\0${userId}\0${set}`, secret);
 }
 
 function randomCode(): string {
@@ -456,7 +505,7 @@ export async function resumeAuthorize(
     input.state,
     verified.session,
     found.client.clientName ?? null,
-    { orgId: input.orgId, approved: input.approved },
+    { orgId: input.orgId, approved: input.approved, consentToken: input.consentToken },
     cfg,
     deps,
   );
