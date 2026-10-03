@@ -3,6 +3,57 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+**Additive — authorize a PERSON and bind an organisation (proposed 0.8.0).**
+A connector's `/authorize` that auto-approves with no user authentication, and
+derives the code's user from a client-registration profile, makes every client
+an anonymous app. This release is the flow that replaces it: Clerk session,
+verified organisation membership, a code bound to both, and an exchange that
+re-derives nothing from the client's profile.
+
+### Added
+
+- `startAuthorize` / `resumeAuthorize` (`src/authorize-flow.ts`): request
+  validation (exact `redirect_uri`, PKCE challenge required, allowed `resource`,
+  supported scopes); no Clerk session -> redirect to sign-in with an
+  HMAC-signed, short-lived state blob and no code; verified session -> one
+  organisation auto-picked, several -> an `OrgPickerModel`, a posted `orgId`
+  honoured only if it is in the user's own membership list; `requireConsent`
+  (default ON; opt out explicitly for first-party clients only). The code is single-use, short-lived and stored as a digest
+  through a consumer-supplied `AuthorizationCodeStore` whose `consume` must be
+  atomic.
+- `exchangeAuthorizationCode` (`src/token-exchange.ts`): consumes the code
+  first, then checks expiry, client, `redirect_uri`, `resource` and the PKCE
+  verifier; returns `{ sub, org_id, org_slug, org_role, aud, client_id, scope }`.
+- `verifyClerkSessionToken` (`src/clerk-session.ts`): RS256 against a
+  consumer-supplied key set; issuer, expiry, `nbf`, optional audience and
+  authorized parties.
+- `buildDiscoveryDocument`, `buildUserInfo` (`src/oidc.ts`). The document
+  advertises only what is implemented (no id_token alg, no refresh grant, no
+  client-auth methods).
+- `AuthorizeRefusal` / `AuthorizeRefusalReason` (`{ code: "AUTHORIZE_REFUSED",
+  reason }`), `oauthErrorFor`, `pkceChallengeFromVerifier`, and the types listed
+  in the README section "Authorize a person and bind an organisation".
+- Subpath exports `/authorize`, `/token-exchange`, `/clerk-session`, `/oidc`.
+
+### Security
+
+- Consent is bound to a server-issued `consentToken` (HMAC over state, user and
+  organisation set). `approved: true` without a token valid for that state and
+  that session's user is refused with `consent-required`; a client can no
+  longer mint its own state and approve on a victim's behalf.
+
+### Changed
+
+- README: the "does not verify a signed JWT" limit now names the one exception.
+- `package.json` version set to 0.8.0 (proposed; not published).
+
+### Unchanged
+
+- Every existing export keeps its behaviour and signature; no existing test
+  was edited. No new runtime dependency (Web Crypto only).
+
 ## [0.7.0]
 
 **Additive — resolution of a PRESENTED, non-master bearer.** The published

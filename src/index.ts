@@ -90,3 +90,51 @@ export type {
   PresentedBearerDeps,
   PresentedBearerInternalReason,
 } from "./presented-bearer.js";
+
+// 0.8.0 — Authorize a PERSON: Clerk session -> verified organisation -> a code
+// bound to both; the exchange that redeems it; the OIDC documents.
+export {
+  startAuthorize,
+  resumeAuthorize,
+} from "./authorize-flow.js";
+export type {
+  AuthorizeClient,
+  ClerkOrgMembership,
+  AuthorizationCodeRecord,
+  AuthorizationCodeStore,
+  ConsumeCodeResult,
+  AuthorizeConfig,
+  AuthorizeDeps,
+  AuthorizeOutcome,
+  OrgPickerModel,
+  ResumeInput,
+} from "./authorize-flow.js";
+export { exchangeAuthorizationCode } from "./token-exchange.js";
+export type {
+  AuthorizedTokenClaims,
+  ExchangeInput,
+  ExchangeDeps,
+  ExchangeResult,
+} from "./token-exchange.js";
+export { verifyClerkSessionToken } from "./clerk-session.js";
+export type {
+  ClerkJwk,
+  ClerkJwks,
+  ClerkSessionVerifierConfig,
+  VerifiedClerkSession,
+  VerifyClerkSessionResult,
+} from "./clerk-session.js";
+export { buildDiscoveryDocument, buildUserInfo } from "./oidc.js";
+export type {
+  DiscoveryConfig,
+  DiscoveryDocument,
+  DiscoveryResult,
+  ClerkUserLike,
+  UserInfo,
+  UserInfoResult,
+} from "./oidc.js";
+export { oauthErrorFor, pkceChallengeFromVerifier } from "./authorize-shared.js";
+export type {
+  AuthorizeRefusal,
+  AuthorizeRefusalReason,
+} from "./authorize-shared.js";
