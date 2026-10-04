@@ -3,9 +3,30 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0]
 
-**Additive — authorize a PERSON and bind an organisation (proposed 0.8.0).**
+**Additive — the person principal (`./person-principal`).** The decisions a
+server needs to serve a signed-in person in its own name, extracted from the
+first consumer so that every other one wires them the same way.
+
+### Added
+
+- `resolvePersonPrincipal`: a presented token's record -> `{ subject, orgSlug,
+  orgRole?, actor }`, or a typed refusal (not live, not a person's, no
+  organisation, organisation inactive or unmapped). Only the token's own
+  organisation is ever looked up.
+- `resolvePersonActingName` / `checkPersonCallShape`: the own-name rule. The
+  acting identity comes from the principal; another user's name and an agent's
+  name without that agent's credential are refused.
+- `resolvePersonTenantAccess`: strict organisation equality; unstamped refused.
+- `resolveWriterRole` / `requireWriterRole`: writer-role assertion, fail closed.
+- `PERSON_ACTOR_PREFIX`, `personActorName`, `isPersonActorName`,
+  `personTokenRecordSchema`, `PersonRefusalError` and the refusal types.
+- New subpath export `./person-principal`.
+
+## [0.8.0]
+
+**Additive — authorize a PERSON and bind an organisation (0.8.0).**
 A connector's `/authorize` that auto-approves with no user authentication, and
 derives the code's user from a client-registration profile, makes every client
 an anonymous app. This release is the flow that replaces it: Clerk session,
