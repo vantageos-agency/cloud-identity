@@ -236,6 +236,15 @@ describe("writer role", () => {
     expect(resolveWriterRole({ role: undefined, writerRoles: writers, door: DOOR, orgSlug: "org-a" }).ok).toBe(false);
     expect(resolveWriterRole({ role: null, writerRoles: writers, door: DOOR, orgSlug: "org-a" }).ok).toBe(false);
     expect(resolveWriterRole({ role: "org:admin", writerRoles: [], door: DOOR, orgSlug: "org-a" }).ok).toBe(false);
+    // An absent list (a consumer that failed to load it) is a typed refusal, never a TypeError.
+    const absent = resolveWriterRole({
+      role: "org:admin",
+      writerRoles: undefined as unknown as readonly string[],
+      door: DOOR,
+      orgSlug: "org-a",
+    });
+    expect(absent.ok).toBe(false);
+    if (!absent.ok) expect(absent.refusal.reason).toBe("role-not-writer");
   });
 
   it("the throwing form carries the same typed refusal", () => {
