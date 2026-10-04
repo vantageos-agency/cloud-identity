@@ -3,6 +3,16 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1]
+
+### Fixed
+
+- `resolveWriterRole` / `requireWriterRole`: an absent `writerRoles` list (a
+  consumer that failed to load it) now returns the typed `role-not-writer`
+  refusal instead of throwing a `TypeError`. It already granted nothing; the
+  refusal now carries its code, as the JSDoc and test promised. Found by the
+  reviewer of #15.
+
 ## [0.9.0]
 
 **Additive — the person principal (`./person-principal`).** The decisions a

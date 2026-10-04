@@ -368,8 +368,8 @@ export function resolvePersonTenantAccess(input: {
 type WriterRoleInput = {
   /** The VERIFIED role claim of the token. Absent or null is refused. */
   role: string | null | undefined;
-  /** The writer allowlist the consumer holds as data. Empty refuses all. */
-  writerRoles: readonly string[];
+  /** The writer allowlist the consumer holds as data. Absent or empty refuses all. */
+  writerRoles: readonly string[] | null | undefined;
   door: string;
   orgSlug?: string | null;
 };
@@ -381,7 +381,8 @@ type WriterRoleInput = {
  */
 export function resolveWriterRole(input: WriterRoleInput): PersonAccessResult {
   const role = input.role ?? null;
-  if (role !== null && input.writerRoles.includes(role)) return { ok: true };
+  const writerRoles = input.writerRoles ?? [];
+  if (role !== null && writerRoles.includes(role)) return { ok: true };
   return {
     ok: false,
     refusal: refuse(
