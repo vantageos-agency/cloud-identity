@@ -13,6 +13,7 @@ export {
   scopeFilterGet,
   isMasterScope,
   isWildcardScope,
+  namespaceMatchesPrefix,
   LEGACY_WILDCARD_CTX,
   type ScopeFilterable,
 } from "./scope-filter.js";
@@ -167,3 +168,33 @@ export type {
   PersonActingNameResult,
   PersonAccessResult,
 } from "./person-principal.js";
+
+// 0.10.0 — Identity gaps closed in the package so consumers adapt, never copy.
+export { IdentityRefusalError } from "./identity-refusal.js";
+export type {
+  IdentityRefusal,
+  IdentityRefusalCode,
+  IdentityRefusalReason,
+} from "./identity-refusal.js";
+export { resolveMinRole, assertMinRole, mapRoleClaim } from "./role-policy.js";
+export type {
+  MinRoleInput,
+  MinRoleResult,
+  MapRoleClaimInput,
+  MapRoleClaimResult,
+} from "./role-policy.js";
+export {
+  isRowInTenant,
+  resolveMembership,
+  requireOrgAdmin,
+  membershipRecordSchema,
+} from "./tenant-membership.js";
+export type {
+  MembershipRecord,
+  ResolvedMembership,
+  ResolveMembershipInput,
+  ResolveMembershipResult,
+  RequireOrgAdminInput,
+} from "./tenant-membership.js";
+export { assertNamespaceWrite } from "./namespace-write.js";
+export { timingSafeEqualSync, assertSecretSync } from "./secret-compare-sync.js";

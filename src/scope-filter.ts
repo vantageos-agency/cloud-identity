@@ -79,6 +79,16 @@ function assertOauthCtx(oauthCtx: OAuthCtx): asserts oauthCtx is OAuthCtx {
 }
 
 /**
+ * THE path-boundary rule for namespaces: `namespace` is inside `prefix` when it
+ * equals it, or continues it after a '/'. `team/finance-archive` is NOT inside
+ * `team/finance`. One implementation, used by the read filter and by
+ * `assertNamespaceWrite`, so the two can never drift apart.
+ */
+export function namespaceMatchesPrefix(namespace: string, prefix: string): boolean {
+  return namespace === prefix || namespace.startsWith(`${prefix}/`);
+}
+
+/**
  * Row shape accepted by the scope filter. All fields optional because real
  * Convex documents from list_peers / list_messages / etc. don't all carry both.
  */
@@ -160,8 +170,7 @@ export function passesScopeFilter<T extends ScopeFilterable>(
   if (createdBy && oauthCtx.fromAllowList.includes(createdBy)) return true;
   if (namespace) {
     for (const p of oauthCtx.namespaceReadPrefixes) {
-      if (namespace === p) return true;
-      if (namespace.startsWith(`${p}/`)) return true;
+      if (namespaceMatchesPrefix(namespace, p)) return true;
     }
   }
   for (const field of grantFields) {
