@@ -370,6 +370,75 @@ Limits, stated: `redirect_uri` matching is exact (no loopback port variation);
 the package signs no access token and no id token and issues no refresh token (the consumer mints the token
 from the claims); it fetches no key set and calls no Clerk API itself.
 
+## Wiring person sign-in in an MCP server
+
+A person signed in through an OAuth connector reaches your MCP server holding a
+bearer you minted for them (see "Authorize a person and bind an organisation").
+`@vantageos/cloud-identity/person-principal` turns that bearer's token record
+into the person's principal and answers the three questions every write needs.
+It is pure: you do the lookups, it decides. A server that serves people (a PDF
+inspector, a registry, a CRM) wires it the same way:
+
+```ts
+import {
+  resolvePersonPrincipal,
+  resolvePersonActingName,
+  resolvePersonTenantAccess,
+  resolveWriterRole,
+  type PersonPrincipal,
+  type PersonRefusal,
+} from "@vantageos/cloud-identity/person-principal";
+
+// 1. Who is calling: the token row you looked up by the bearer's digest.
+const who = await resolvePersonPrincipal(
+  { principal: row.principal, subject: row.userId, orgSlug: row.orgSlug,
+    orgRole: row.orgRole, revokedAt: row.revokedAt, expiresAt: row.expiresAt },
+  { now: Date.now(), lookupOrganisation: (slug) => orgTable.get(slug) },
+  "my-tool",
+);
+if (!who.ok) return deny(who.refusal);
+
+// 2. Under what name: the token's, never the argument's.
+const name = resolvePersonActingName({
+  principal: who.principal, claimedName: args.createdBy,
+  agentCredential: presentedAgent, door: "my-tool",
+});
+if (!name.ok) return deny(name.refusal);
+
+// 3. Which rows, and may they write.
+const inOrg = resolvePersonTenantAccess({
+  principal: who.principal, rowOrgId: record.orgId, door: "my-tool" });
+const mayWrite = resolveWriterRole({
+  role: who.principal.orgRole, writerRoles: writerRolesOfOrg, door: "my-tool",
+  orgSlug: who.principal.orgSlug });
+```
+
+- `resolvePersonPrincipal(token, deps, door)` refuses a token that is expired,
+  revoked, not a person's, bound to no organisation, or bound to an inactive or
+  unmapped one. It looks up only the token's own organisation.
+- `resolvePersonActingName` returns `{ ok: true, actingAs: "person", actor }`
+  for no name or the person's own (`user:<subject>`), and refuses another
+  user's name (`PERSON_ACTS_AS_ITSELF`) and an agent's name without that
+  agent's own credential (`AGENT_CREDENTIAL_REQUIRED`, or
+  `AGENT_IDENTITY_MISMATCH` when the credential belongs to another agent).
+  `checkPersonCallShape` is the same rule for a backend door that receives a
+  person's call already stripped of its name. `PERSON_ACTOR_PREFIX`,
+  `personActorName` and `isPersonActorName` spell and reserve the actor name:
+  refuse it when someone registers an agent.
+- `resolvePersonTenantAccess` is a strict equality on the organisation; an
+  unstamped row is refused.
+- `resolveWriterRole` / `requireWriterRole` check the verified role against a
+  writer allowlist you hold as data. A missing role, a missing list and an
+  empty list all refuse. `requireWriterRole` throws `PersonRefusalError`.
+- Every refusal is a `PersonRefusal` (`PersonRefusalCode`, `PersonRefusalReason`,
+  `door`, `detail`); you choose the transport shape. `personTokenRecordSchema`,
+  `PersonTokenRecord`, `PersonPrincipal`, `OrganisationState`,
+  `PersonPrincipalDeps`, `PersonPrincipalResult`, `PersonActingNameResult` and
+  `PersonAccessResult` are the input and result types.
+
+The module verifies no credential. The token record must come from your own
+lookup of the bearer the person presented, never from a request body.
+
 ## What this package does not do
 
 Worth reading before you rely on it.

@@ -138,3 +138,32 @@ export type {
   AuthorizeRefusal,
   AuthorizeRefusalReason,
 } from "./authorize-shared.js";
+
+// 0.9.0 — The person principal: a verified sign-in (person + organisation) as
+// pure data, the own-name actor rule, the tenant compare and the writer-role
+// assertion. Every consumer wires a person the same way.
+export {
+  PERSON_ACTOR_PREFIX,
+  PersonRefusalError,
+  personActorName,
+  isPersonActorName,
+  personTokenRecordSchema,
+  resolvePersonPrincipal,
+  resolvePersonActingName,
+  checkPersonCallShape,
+  resolvePersonTenantAccess,
+  resolveWriterRole,
+  requireWriterRole,
+} from "./person-principal.js";
+export type {
+  PersonRefusal,
+  PersonRefusalCode,
+  PersonRefusalReason,
+  PersonTokenRecord,
+  PersonPrincipal,
+  OrganisationState,
+  PersonPrincipalDeps,
+  PersonPrincipalResult,
+  PersonActingNameResult,
+  PersonAccessResult,
+} from "./person-principal.js";
