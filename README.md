@@ -186,6 +186,15 @@ Visibility is granted two ways: the row's `createdBy` appears in the caller's
 `namespaceReadPrefixes`. Prefixes match on a path boundary, so a caller allowed
 `team/finance` does not thereby see `team/finance-archive`.
 
+A third way is opt-in per call. All three functions take an optional last
+argument, `grantFields` (type `GrantFieldDeclaration`, a list of property
+names). It names the row properties that carry per-row grants, such as a
+mission's `agents`. A row is then also visible when one of those properties
+names an identity in the caller's `fromAllowList`. The property can hold a
+single string or an array of strings; a value of any other shape is skipped,
+not matched. The list is data supplied by your call site; the package
+hardcodes no field names. Omitting it, or passing `[]`, adds nothing.
+
 **Token validation**
 
 - `validateMasterBearer(header, secret)` — compares an `Authorization: Bearer`
@@ -213,6 +222,8 @@ want to catch by type, and `BearerPayload`, the type returned by
 - `ValidateMasterBearerResult` — the return type of `validateMasterBearer`.
 - `ScopeFilterable` — the minimal row shape (`{ createdBy?, namespace? }`)
   accepted by `passesScopeFilter` / `scopeFilterList` / `scopeFilterGet`.
+- `GrantFieldDeclaration` — `readonly string[]`, the optional `grantFields`
+  argument of those three functions.
 - `SessionIdentity` — the human-path shape `requireTenantId` accepts under
   `{ kind: "session", identity }` (see "Both caller paths, one contract").
 - `TenantSource` — the discriminated union `requireTenantId` accepts:
