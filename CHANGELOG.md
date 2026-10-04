@@ -3,6 +3,29 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0]
+
+**Additive — identity gaps a consumer had are now in the package.** Every
+consumer adapts these; none copies them. No existing function changes behaviour.
+
+### Added
+
+- `resolveMinRole` / `assertMinRole`: minimum-role check over an order the
+  caller supplies as data. Unknown role, unknown minimum, invalid order refuse.
+- `mapRoleClaim`: claim to role through caller data, with a fallback that must
+  be explicit. Absent or unmapped claim without a fallback refuses.
+- `resolveMembership` (injected async lookup; error, miss, inactive, malformed
+  and other-organisation all refuse), `isRowInTenant` (strict equality,
+  unstamped row refused), `membershipRecordSchema`.
+- `requireOrgAdmin`: the proof is bound to the caller's verified organisation.
+- `assertNamespaceWrite` and the shared boundary rule `namespaceMatchesPrefix`
+  (now also used by the read filter, same behaviour).
+- `timingSafeEqualSync` / `assertSecretSync`: synchronous constant-time
+  comparison; an unset expected secret matches nothing.
+- `IdentityRefusalError` and the `IdentityRefusal` types.
+- New subpath exports `./identity-refusal`, `./role-policy`,
+  `./tenant-membership`, `./namespace-write`, `./secret-compare-sync`.
+
 ## [0.9.1]
 
 ### Fixed
