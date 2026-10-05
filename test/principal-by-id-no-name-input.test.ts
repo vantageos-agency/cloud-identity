@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import ts from "typescript";
 import { beforeAll, describe, expect, it } from "vitest";
+import { scopeFilterList } from "../src/index.js";
 
 /**
  * Property: no function of the principal-by-id API, and no NEW export of the
@@ -50,7 +51,24 @@ function collectIdentifiers(type: ts.Type, out: Set<string>, seen: Set<ts.Type>)
   if (seen.has(type)) return;
   seen.add(type);
   if (type.flags & (ts.TypeFlags.Primitive | ts.TypeFlags.Literal | ts.TypeFlags.Never)) return;
-  if (isPlatformType(type)) return;
+  if (isPlatformType(type)) {
+    // a platform generic (`T[]`, `Promise<T>`, `ReadonlyArray<T>`) is not
+    // walked itself, but what it carries is
+    if ((type.flags & ts.TypeFlags.Object) !== 0 &&
+      ((type as ts.ObjectType).objectFlags & ts.ObjectFlags.Reference) !== 0) {
+      for (const t of checker.getTypeArguments(type as ts.TypeReference)) {
+        collectIdentifiers(t, out, seen);
+      }
+    }
+    return;
+  }
+  if (type.flags & ts.TypeFlags.TypeParameter) {
+    // a generic input (`rows: T[]`, `T extends ScopeFilterable`) is read
+    // through its constraint, so a name field behind a generic is still seen
+    const constraint = checker.getBaseConstraintOfType(type);
+    if (constraint !== undefined) collectIdentifiers(constraint, out, seen);
+    return;
+  }
   if (type.isUnionOrIntersection()) {
     for (const t of type.types) collectIdentifiers(t, out, seen);
     return;
@@ -158,13 +176,15 @@ describe("principal-by-id — no exported function accepts a name as identity", 
  * to this list.
  *   - resolvePersonActingName: names as identity input (R-53 clause 4);
  *     replaced by `resolveActingPrincipal`.
- *   - passesScopeFilter / scopeFilterGet: a `createdBy` name selects the row
- *     (R-53 clause 1).
+ *   - passesScopeFilter / scopeFilterGet / scopeFilterList: a `createdBy`
+ *     name selects the row (R-53 clause 1); scopeFilterList does it through
+ *     passesScopeFilter.
  */
 const LEGACY_NAME_INPUT_EXCEPTIONS = {
   resolvePersonActingName: "src/person-principal.ts",
   passesScopeFilter: "src/scope-filter.ts",
   scopeFilterGet: "src/scope-filter.ts",
+  scopeFilterList: "src/scope-filter.ts",
 } as const;
 
 /**
@@ -196,11 +216,12 @@ function nameInputsOf(exportName: string): string[] {
 }
 
 describe("package root — no new export takes a name as identity", () => {
-  it("the legacy exception list is exactly [resolvePersonActingName, passesScopeFilter, scopeFilterGet]", () => {
+  it("the legacy exception list is exactly [resolvePersonActingName, passesScopeFilter, scopeFilterGet, scopeFilterList]", () => {
     expect(Object.keys(LEGACY_NAME_INPUT_EXCEPTIONS)).toEqual([
       "resolvePersonActingName",
       "passesScopeFilter",
       "scopeFilterGet",
+      "scopeFilterList",
     ]);
   });
 
@@ -228,6 +249,25 @@ describe("package root — no new export takes a name as identity", () => {
     );
     expect(nameInputsOf("passesScopeFilter")).toContain("createdBy");
     expect(nameInputsOf("scopeFilterGet")).toContain("createdBy");
+  });
+
+  it("scopeFilterList: tagged @deprecated, and still selecting rows by a createdBy name", () => {
+    // tagged (the same check as above, named for this function)
+    const sf = program.getSourceFile(resolve(REPO_ROOT, "src/scope-filter.ts"));
+    const fn = sf?.statements.find(
+      (st): st is ts.FunctionDeclaration =>
+        ts.isFunctionDeclaration(st) && st.name?.text === "scopeFilterList",
+    );
+    const tag = fn === undefined ? [] : ts.getJSDocTags(fn).filter((t) => t.tagName.text === "deprecated");
+    expect(tag.length, "scopeFilterList carries no @deprecated tag").toBe(1);
+    // structurally: its generic row input carries a name field
+    expect(nameInputsOf("scopeFilterList")).toContain("createdBy");
+    // behaviourally: a row is selected by its createdBy NAME and nothing else
+    const ctx = { fromAllowList: ["eta"], namespaceReadPrefixes: [], namespaceWritePrefixes: [] };
+    const orgA = { createdBy: "eta", orgId: "org_a" };
+    const orgB = { createdBy: "eta", orgId: "org_b" };
+    const other = { createdBy: "rho", orgId: "org_a" };
+    expect(scopeFilterList(ctx, [orgA, orgB, other])).toEqual([orgA, orgB]);
   });
 
   it("the frozen pre-rule map equals the measured surface exactly", () => {
