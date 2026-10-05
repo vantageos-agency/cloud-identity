@@ -198,3 +198,26 @@ export type {
 } from "./tenant-membership.js";
 export { assertNamespaceWrite } from "./namespace-write.js";
 export { timingSafeEqualSync, assertSecretSync } from "./secret-compare-sync.js";
+
+// 0.11.0 — The acting principal by ID and the target checked by ID. A name is
+// a display label: it never selects a row and never authorises one.
+export {
+  FLEET_SCOPE_ORG_ID,
+  actingCredentialSchema,
+  principalRowSchema,
+  organisationRowSchema,
+  resolveActingPrincipal,
+  assertTargetBelongsTo,
+} from "./principal-by-id.js";
+export type {
+  ActingCredential,
+  PrincipalRow,
+  OrganisationRow,
+  PrincipalLookups,
+  ActingPrincipalKind,
+  ActingPrincipal,
+  ResolveActingPrincipalResult,
+  TargetIds,
+  AssertTargetOptions,
+  AssertTargetResult,
+} from "./principal-by-id.js";
