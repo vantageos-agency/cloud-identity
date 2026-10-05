@@ -1,6 +1,7 @@
 /**
  * Typed refusal shared by the 0.10.0 primitives (role policy, membership,
- * org-admin proof, namespace write, secret comparison).
+ * org-admin proof, namespace write, secret comparison) and the 0.11.0
+ * principal-by-id resolver and target check.
  *
  * A refusal is a value carrying its own code, reason and door, so a caller
  * branches on content rather than on the mere presence of an exception, and an
@@ -39,7 +40,19 @@ export type IdentityRefusalReason =
   | "namespace-write-denied"
   // synchronous secret comparison
   | "secret-not-configured"
-  | "secret-mismatch";
+  | "secret-mismatch"
+  // principal by id (0.11.0)
+  | "credential-invalid"
+  | "principal-lookup-failed"
+  | "principal-not-found"
+  | "principal-record-invalid"
+  | "principal-inactive"
+  | "organisation-not-active"
+  | "reserved-fleet-scope"
+  | "acting-agent-other-organisation"
+  | "target-unstamped"
+  | "target-other-organisation"
+  | "target-owner-mismatch";
 
 export type IdentityRefusal = {
   code: IdentityRefusalCode;

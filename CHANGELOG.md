@@ -3,6 +3,45 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0]
+
+**Additive — the acting principal by ID, and the target checked by ID
+(`./principal-by-id`).** An actor and a target are identified by their stored
+IDs; a name is a display label and never selects or authorises a row. Motivating
+incident: an agent of one organisation, calling by name through the service
+account, landed on another organisation's same-named agent's task at ten task
+doors, because admission compared names. No existing function changes behaviour.
+
+### Added
+
+- `resolveActingPrincipal(credential, lookups, door?)`: a verified credential
+  (agent bearer, person token, or the service account acting as itself or for
+  an agent named BY ID within its own organisation) to `{ principalId, orgId,
+  kind, viaServiceAccountId? }` read from stored rows, or a typed refusal.
+  Strict credential schemas: a credential carrying a name field is refused
+  whole. Missing or throwing lookups, misses, malformed, inactive, unstamped
+  and wrong-organisation rows, and inactive organisations all refuse.
+- `assertTargetBelongsTo(principal, target, opts?)`: compares the target's
+  stored `orgId` (and `ownerId` with `ownerOnly`) with the resolved IDs. An
+  unstamped target is refused to every principal except the fleet principal.
+- `FLEET_SCOPE_ORG_ID`: the reserved fleet scope, held as data. A client
+  credential, row or principal can never claim it; a fleet-scope row is refused
+  to every client; the fleet principal reaches a client organisation's row only
+  with `fleetCrossOrg: true`.
+- `actingCredentialSchema`, `principalRowSchema`, `organisationRowSchema` and
+  the types `ActingCredential`, `PrincipalRow`, `OrganisationRow`,
+  `PrincipalLookups`, `ActingPrincipalKind`, `ActingPrincipal`,
+  `ResolveActingPrincipalResult`, `TargetIds`, `AssertTargetOptions`,
+  `AssertTargetResult`.
+- New `IdentityRefusalReason` values: `credential-invalid`,
+  `principal-lookup-failed`, `principal-not-found`, `principal-record-invalid`,
+  `principal-inactive`, `organisation-not-active`, `reserved-fleet-scope`,
+  `acting-agent-other-organisation`, `target-unstamped`,
+  `target-other-organisation`, `target-owner-mismatch`.
+- New subpath export `./principal-by-id`.
+- A test that reads the exported signatures with the TypeScript checker and
+  fails if any identity input of this module is spelled like a name.
+
 ## [0.10.0]
 
 **Additive — identity gaps a consumer had are now in the package.** Every

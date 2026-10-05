@@ -521,6 +521,130 @@ refuses accepts an optional `door` so the refusal names your own entry point.
   empty) matches nothing, so a missing configuration never opens a door. The
   refusal carries neither value.
 
+## The acting principal by ID, and the target checked by ID (0.11.0)
+
+**Why this exists.** Two organisations each had an agent displayed as `eta`.
+An organisation A agent, calling through the shared service account and naming
+itself `eta`, completed, updated and deleted organisation B's `eta` task at ten
+different task doors. Every door admitted the call by comparing the typed name
+with a name stored on the task. The names were equal; the two agents were not.
+Nothing compared an ID.
+
+The rule this module carries: **an actor and a target are identified by their
+stored IDs. A name is a display label; it never selects a row and never
+authorises one.** Resolving the principal and checking the target both happen
+here, so a product never writes its own identity layer.
+
+```js
+import {
+  resolveActingPrincipal,
+  assertTargetBelongsTo,
+} from "@vantageos/cloud-identity";
+
+// 1. Who is acting? IDs from the VERIFIED credential, rows read by ID.
+const who = await resolveActingPrincipal(
+  { kind: "service", serviceAccountId: "svc_a", actingForAgentId: "agent_a_eta" },
+  {
+    agentById: (id) => db.agents.get(id),          // -> { id, orgId, active }
+    serviceAccountById: (id) => db.services.get(id),
+    organisationById: (id) => db.orgs.get(id),     // -> { id, active }
+  },
+  "tasks:complete",
+);
+if (!who.ok) throw toHttpError(who.refusal);       // RBAC_DENIED, typed reason
+
+// 2. Does the target belong to them? Stored IDs against resolved IDs.
+const task = await db.tasks.get(taskId);
+const may = assertTargetBelongsTo(
+  who.principal,
+  { orgId: task.orgId, ownerId: task.ownerId },
+  { ownerOnly: true, door: "tasks:complete" },
+);
+if (!may.ok) throw toHttpError(may.refusal);
+```
+
+Organisation B's `eta` task carries `orgId: "org_b"`; the principal above
+resolved to `orgId: "org_a"`. The target check refuses it with
+`target-other-organisation`, whatever either agent is called.
+
+**`resolveActingPrincipal(credential, lookups, door?)`** (`./principal-by-id`)
+
+Async. Returns `{ ok: true, principal }` or `{ ok: false, refusal }`
+(`ResolveActingPrincipalResult`). The `principal` (`ActingPrincipal`) is
+`{ principalId, orgId, kind, viaServiceAccountId? }`, where `kind` is
+`"agent" | "person" | "service" | "fleet"` (`ActingPrincipalKind`).
+
+`credential` (`ActingCredential`, validated by `actingCredentialSchema`) is one
+of three shapes, every identity field an ID:
+
+- `{ kind: "agent", agentId, verifiedOrgId }` — the machine path: an agent's
+  own bearer, already verified by you (for example with
+  `validatePresentedBearer`). The agent row's stored `orgId` must equal
+  `verifiedOrgId`.
+- `{ kind: "person", personId, verifiedOrgId }` — the human path: a person's
+  token, already verified by you. The person's row in that organisation is read
+  by `(personId, verifiedOrgId)`.
+- `{ kind: "service", serviceAccountId, actingForAgentId? }` — the service
+  account. Alone it acts as itself (`kind: "service"`, or `kind: "fleet"` if its
+  row is stamped with the fleet scope). With `actingForAgentId` it acts for that
+  agent, named BY ID and resolved within the service account's OWN
+  organisation; the principal is the agent, and `viaServiceAccountId` records
+  the carrier.
+
+The schemas are strict: a credential carrying any other key (`agentName`,
+`callerOrchestrator`, `name`, `assignedTo`) is refused whole with
+`credential-invalid`, before any lookup runs.
+
+`lookups` (`PrincipalLookups`) are your indexed reads by ID: `agentById(id)`,
+`personById(id, orgId)`, `serviceAccountById(id)` returning a `PrincipalRow`
+(`{ id, orgId?, active }`, schema `principalRowSchema`), and
+`organisationById(id)` returning an `OrganisationRow` (`{ id, active }`, schema
+`organisationRowSchema`). Only the lookups of the presented path are called.
+Each row must repeat the ID that was asked for, and `active` is required and
+must be `true`.
+
+Refused, each with a typed `IdentityRefusal` reason: a credential that does not
+parse; a missing or throwing lookup (its error text is never surfaced); a miss;
+a malformed, inactive or unstamped row; a row of another organisation than its
+credential; an unmapped or inactive organisation; a service account acting for
+an agent of another organisation. Nothing falls back to a default or master
+principal.
+
+**`assertTargetBelongsTo(principal, target, opts?)`** (`./principal-by-id`)
+
+Synchronous. Returns `{ ok: true }` or `{ ok: false, refusal }`
+(`AssertTargetResult`). `target` (`TargetIds`) is `{ orgId?, ownerId? }` read
+from the STORED row; `opts` (`AssertTargetOptions`) is
+`{ door?, ownerOnly?, fleetCrossOrg? }`. IDs are compared byte for byte.
+
+- The target's `orgId` must equal the principal's `orgId`
+  (`target-other-organisation` otherwise).
+- `ownerOnly: true` also requires `ownerId` to equal `principalId`; a target
+  with no owner is refused (`target-owner-mismatch`).
+- A target with no `orgId` is refused (`target-unstamped`) to every principal
+  except `kind: "fleet"`. An absence grants no client anything.
+- An absent principal, or one with an empty ID, is refused
+  (`credential-invalid`).
+
+**The reserved fleet scope.** `FLEET_SCOPE_ORG_ID` is the operator's own scope,
+used for master exports. It is data, stamped on a row only by the master or
+service identity, and shaped so it cannot collide with a Clerk organisation ID
+or a datastore ID. A client can never claim or read it:
+
+- an agent or person credential, or row, in the fleet scope is refused
+  (`reserved-fleet-scope`); only a service account stamped with it resolves to
+  `kind: "fleet"`, and only that service account can act for a fleet-stamped
+  agent;
+- a fleet-scope row is refused to every client principal;
+- a hand-built principal that claims the fleet scope without being the fleet
+  principal is refused;
+- the fleet principal reaches a CLIENT organisation's row only when the door
+  passes `fleetCrossOrg: true` (a master export). It is refused by default.
+
+`viaServiceAccountId` and `door` are not identity; no function in this module
+takes a name as an identity input, and a test reads the exported signatures to
+keep it that way.
+
 ## What this package does not do
 
 Worth reading before you rely on it.
