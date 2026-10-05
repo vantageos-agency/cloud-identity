@@ -410,6 +410,7 @@ const who = await resolvePersonPrincipal(
 if (!who.ok) return deny(who.refusal);
 
 // 2. Under what name: the token's, never the argument's.
+//    Deprecated since 0.11.0: a new door uses resolveActingPrincipal instead.
 const name = resolvePersonActingName({
   principal: who.principal, claimedName: args.createdBy,
   agentCredential: presentedAgent, door: "my-tool",
@@ -427,6 +428,12 @@ const mayWrite = resolveWriterRole({
 - `resolvePersonPrincipal(token, deps, door)` refuses a token that is expired,
   revoked, not a person's, bound to no organisation, or bound to an inactive or
   unmapped one. It looks up only the token's own organisation.
+- **Deprecated since 0.11.0:** `resolvePersonActingName`. It takes names
+  (`claimedName`, `agentCredential.agentName`) as identity input, which backend
+  standard R-53 clause 4 makes non-conforming for any new door. Use
+  `resolveActingPrincipal` and `assertTargetBelongsTo` (see "The acting
+  principal by ID, and the target checked by ID"). Its behaviour is unchanged;
+  it will be removed in a major release once consumers have migrated off it.
 - `resolvePersonActingName` returns `{ ok: true, actingAs: "person", actor }`
   for no name or the person's own (`user:<subject>`), and refuses another
   user's name (`PERSON_ACTS_AS_ITSELF`) and an agent's name without that

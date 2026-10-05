@@ -44,6 +44,21 @@ doors, because admission compared names. No existing function changes behaviour.
 - A test that reads the exported signatures with the TypeScript checker and
   fails if any identity input of this module is spelled like a name.
 
+### Deprecated
+
+- `resolvePersonActingName` (0.9.0). It takes names (`claimedName`,
+  `agentCredential.agentName`) as identity input; backend standard R-53
+  clause 4 makes it non-conforming for any new door. Use
+  `resolveActingPrincipal` and `assertTargetBelongsTo`. Behaviour unchanged;
+  removal is a major change, made only after consumers migrate off it.
+- The name-input test now covers every callable export of the package root:
+  a new export taking a name-like identity input fails.
+  `resolvePersonActingName` is the single listed legacy exception. Four
+  0.10.0 exports that already carried a name-like field (`passesScopeFilter`
+  and `scopeFilterGet`: `createdBy`; `isPersonActorName`: `name`;
+  `checkPersonCallShape`: `actingName`) are pinned in a frozen map that can
+  only shrink.
+
 ### Migration (required consumer step)
 
 - Before switching a door to `assertTargetBelongsTo`, stamp every existing row

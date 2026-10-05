@@ -239,6 +239,13 @@ export type PersonActingNameResult =
  *                                           resolved by the consumer): none ->
  *                                           AGENT_CREDENTIAL_REQUIRED, a
  *                                           different agent -> AGENT_IDENTITY_MISMATCH.
+ *
+ * @deprecated Since 0.11.0. Use `resolveActingPrincipal` (and
+ * `assertTargetBelongsTo` for the target), which resolve the actor by stored
+ * ID. This function takes names (`claimedName`, `agentCredential.agentName`)
+ * as identity input, which backend standard R-53 clause 4 makes
+ * non-conforming for any new door. Behaviour is unchanged; it will be removed
+ * in a major release once consumers have migrated off it.
  */
 export function resolvePersonActingName(input: {
   /** Only the actor name is read: the rule needs no organisation. */

@@ -3,8 +3,9 @@ import ts from "typescript";
 import { beforeAll, describe, expect, it } from "vitest";
 
 /**
- * Property: no function of the principal-by-id API accepts a bare name as an
- * identity input.
+ * Property: no function of the principal-by-id API, and no NEW export of the
+ * package root, accepts a bare name as an identity input (backend standard
+ * R-53, clause 4).
  *
  * Read from the EXPORTED SIGNATURES by the TypeScript checker, not from a
  * hand-typed list: every parameter of every exported function, every property
@@ -19,7 +20,20 @@ import { beforeAll, describe, expect, it } from "vitest";
  */
 
 const REPO_ROOT = resolve(__dirname, "..");
-const NAME_LIKE = /name|orchestrator|assignedto|createdby/i;
+const NAME_LIKE_RE = /name|orchestrator|assignedto|createdby/i;
+/** `namespace` is a path, not a name: strip it before testing. */
+function isNameLike(identifier: string): boolean {
+  return NAME_LIKE_RE.test(identifier.replace(/namespace/gi, ""));
+}
+
+/** Types from the TypeScript standard library or Node's typings are not walked. */
+function isPlatformType(type: ts.Type): boolean {
+  const decls = (type.aliasSymbol ?? type.getSymbol())?.declarations ?? [];
+  return (
+    decls.length > 0 &&
+    decls.every((d) => /[\\/]typescript[\\/]lib[\\/]|[\\/]@types[\\/]node[\\/]/.test(d.getSourceFile().fileName))
+  );
+}
 
 let program: ts.Program;
 let checker: ts.TypeChecker;
@@ -36,6 +50,7 @@ function collectIdentifiers(type: ts.Type, out: Set<string>, seen: Set<ts.Type>)
   if (seen.has(type)) return;
   seen.add(type);
   if (type.flags & (ts.TypeFlags.Primitive | ts.TypeFlags.Literal | ts.TypeFlags.Never)) return;
+  if (isPlatformType(type)) return;
   if (type.isUnionOrIntersection()) {
     for (const t of type.types) collectIdentifiers(t, out, seen);
     return;
@@ -79,9 +94,11 @@ function identityInputs(relPath: string, only?: string[]): Set<string> {
     const resolved = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
     const decl = resolved.declarations?.[0];
     if (decl === undefined) continue;
-    if (resolved.flags & ts.SymbolFlags.Function) {
+    if (resolved.flags & (ts.SymbolFlags.Function | ts.SymbolFlags.Class)) {
       const type = checker.getTypeOfSymbolAtLocation(resolved, decl);
-      for (const sig of type.getCallSignatures()) collectSignature(sig, out, seen);
+      for (const sig of [...type.getCallSignatures(), ...type.getConstructSignatures()]) {
+        collectSignature(sig, out, seen);
+      }
     } else if (resolved.flags & ts.SymbolFlags.TypeAlias) {
       collectIdentifiers(checker.getDeclaredTypeOfSymbol(resolved), out, seen);
     }
@@ -92,7 +109,7 @@ function identityInputs(relPath: string, only?: string[]): Set<string> {
 describe("principal-by-id — no exported function accepts a name as identity", () => {
   beforeAll(() => {
     program = ts.createProgram(
-      [resolve(REPO_ROOT, "src/principal-by-id.ts"), resolve(REPO_ROOT, "src/person-principal.ts")],
+      [resolve(REPO_ROOT, "src/index.ts")],
       {
         strict: true,
         target: ts.ScriptTarget.ES2022,
@@ -119,13 +136,109 @@ describe("principal-by-id — no exported function accepts a name as identity", 
     for (const expected of ["agentId", "personId", "serviceAccountId", "actingForAgentId", "verifiedOrgId", "agentById", "ownerId", "principalId"]) {
       expect(ids, `scan did not reach ${expected}`).toContain(expected);
     }
-    const nameLike = [...ids].filter((id) => NAME_LIKE.test(id));
+    const nameLike = [...ids].filter(isNameLike);
     expect(nameLike, `name-like identity inputs: ${nameLike.join(", ")}`).toEqual([]);
   });
 
   it("positive control: the same collector finds the names that resolvePersonActingName takes", () => {
     const ids = identityInputs("src/person-principal.ts", ["resolvePersonActingName"]);
-    const nameLike = [...ids].filter((id) => NAME_LIKE.test(id)).sort();
+    const nameLike = [...ids].filter(isNameLike).sort();
     expect(nameLike).toEqual(expect.arrayContaining(["agentName", "claimedName"]));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The whole public surface: any NEW export taking a name fails
+// ---------------------------------------------------------------------------
+
+/**
+ * The single legacy exception: deprecated in 0.11.0 in favour of
+ * `resolveActingPrincipal`, kept (behaviour unchanged) until consumers migrate
+ * off it, then removed in a major release. Never add to this list.
+ */
+const LEGACY_NAME_INPUT_EXCEPTIONS = ["resolvePersonActingName"] as const;
+
+/**
+ * Measured at 0.10.0 and FROZEN: exports that already carried a name-like
+ * field before this rule existed, with the exact fields. The test pins this
+ * map to the measured surface, so it can only shrink when the code does; an
+ * entry may never be added. None of them resolves an acting principal:
+ *   - passesScopeFilter / scopeFilterGet: `createdBy` is a row label matched
+ *     against `fromAllowList` (a read filter, not actor resolution);
+ *   - isPersonActorName: classifies a label as reserved;
+ *   - checkPersonCallShape: `actingName` is accepted only to be refused.
+ */
+const FROZEN_PRE_RULE_NAME_FIELDS: Record<string, readonly string[]> = {
+  passesScopeFilter: ["createdBy"],
+  scopeFilterGet: ["createdBy"],
+  isPersonActorName: ["name"],
+  checkPersonCallShape: ["actingName"],
+};
+
+function rootCallableExports(): string[] {
+  return moduleExports("src/index.ts")
+    .filter((s) => {
+      const r = s.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(s) : s;
+      return (r.flags & (ts.SymbolFlags.Function | ts.SymbolFlags.Class)) !== 0;
+    })
+    .map((s) => s.getName())
+    .sort();
+}
+
+function nameInputsOf(exportName: string): string[] {
+  return [...identityInputs("src/index.ts", [exportName])].filter(isNameLike).sort();
+}
+
+describe("package root — no new export takes a name as identity", () => {
+  it("the legacy exception list has exactly one entry: resolvePersonActingName", () => {
+    expect([...LEGACY_NAME_INPUT_EXCEPTIONS]).toEqual(["resolvePersonActingName"]);
+  });
+
+  it("the legacy exception is marked @deprecated in its source", () => {
+    const sf = program.getSourceFile(resolve(REPO_ROOT, "src/person-principal.ts"));
+    expect(sf).toBeDefined();
+    const fn = sf?.statements.find(
+      (st): st is ts.FunctionDeclaration =>
+        ts.isFunctionDeclaration(st) && st.name?.text === "resolvePersonActingName",
+    );
+    expect(fn).toBeDefined();
+    const tags = fn === undefined ? [] : ts.getJSDocTags(fn).map((t) => t.tagName.text);
+    expect(tags).toContain("deprecated");
+  });
+
+  it("the legacy exception still takes names (otherwise it must leave the list)", () => {
+    expect(nameInputsOf("resolvePersonActingName")).toEqual(
+      expect.arrayContaining(["agentName", "claimedName"]),
+    );
+  });
+
+  it("the frozen pre-rule map equals the measured surface exactly", () => {
+    for (const [fn, fields] of Object.entries(FROZEN_PRE_RULE_NAME_FIELDS)) {
+      expect(nameInputsOf(fn), fn).toEqual([...fields].sort());
+    }
+  });
+
+  it("every other callable export of the root takes no name-like input", () => {
+    const exports = rootCallableExports();
+    // the scan is not vacuous: it sees the old surface and the new one
+    expect(exports).toEqual(
+      expect.arrayContaining([
+        "resolveActingPrincipal",
+        "assertTargetBelongsTo",
+        "resolvePersonActingName",
+        "validatePresentedBearer",
+        "resolveMembership",
+      ]),
+    );
+    const legacy: readonly string[] = LEGACY_NAME_INPUT_EXCEPTIONS;
+    const violations = exports
+      .filter((fn) => !legacy.includes(fn))
+      .map((fn) => {
+        const allowed = FROZEN_PRE_RULE_NAME_FIELDS[fn] ?? [];
+        const extra = nameInputsOf(fn).filter((id) => !allowed.includes(id));
+        return extra.length > 0 ? `${fn}: ${extra.join(", ")}` : null;
+      })
+      .filter((v): v is string => v !== null);
+    expect(violations, `exports taking a name: ${violations.join("; ")}`).toEqual([]);
   });
 });
