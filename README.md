@@ -621,8 +621,10 @@ from the STORED row; `opts` (`AssertTargetOptions`) is
   (`target-other-organisation` otherwise).
 - `ownerOnly: true` also requires `ownerId` to equal `principalId`; a target
   with no owner is refused (`target-owner-mismatch`).
-- A target with no `orgId` is refused (`target-unstamped`) to every principal
-  except `kind: "fleet"`. An absence grants no client anything.
+- A target with no `orgId` is refused (`target-unstamped`) to EVERY
+  principal, the fleet principal included, with or without `fleetCrossOrg`.
+  No right is inferred from an absence: a row with no organisation is never
+  treated as a master row.
 - An absent principal, or one with an empty ID, is refused
   (`credential-invalid`).
 
@@ -640,6 +642,16 @@ or a datastore ID. A client can never claim or read it:
   principal is refused;
 - the fleet principal reaches a CLIENT organisation's row only when the door
   passes `fleetCrossOrg: true` (a master export). It is refused by default.
+- a fleet row is a row stamped with `FLEET_SCOPE_ORG_ID` explicitly. A row
+  with no `orgId` is not a fleet row and is refused to the fleet principal too.
+
+**Migration (required consumer step).** Before a product switches any door to
+`assertTargetBelongsTo`, it must stamp every existing row that has no `orgId`:
+with its real organisation ID, or with `FLEET_SCOPE_ORG_ID` if it belongs to
+the operator's own scope. An unstamped row is refused to every caller,
+including the fleet principal, so a door switched before the backfill stops
+serving those rows. Run the backfill first, confirm that no unstamped row is
+left in the tables the door reads, then switch the door.
 
 `viaServiceAccountId` and `door` are not identity; no function in this module
 takes a name as an identity input, and a test reads the exported signatures to

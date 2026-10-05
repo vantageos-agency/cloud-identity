@@ -23,7 +23,9 @@ doors, because admission compared names. No existing function changes behaviour.
   and wrong-organisation rows, and inactive organisations all refuse.
 - `assertTargetBelongsTo(principal, target, opts?)`: compares the target's
   stored `orgId` (and `ownerId` with `ownerOnly`) with the resolved IDs. An
-  unstamped target is refused to every principal except the fleet principal.
+  unstamped target is refused to every principal, the fleet principal
+  included: no right is inferred from an absence, and a fleet row carries
+  `FLEET_SCOPE_ORG_ID` explicitly.
 - `FLEET_SCOPE_ORG_ID`: the reserved fleet scope, held as data. A client
   credential, row or principal can never claim it; a fleet-scope row is refused
   to every client; the fleet principal reaches a client organisation's row only
@@ -41,6 +43,13 @@ doors, because admission compared names. No existing function changes behaviour.
 - New subpath export `./principal-by-id`.
 - A test that reads the exported signatures with the TypeScript checker and
   fails if any identity input of this module is spelled like a name.
+
+### Migration (required consumer step)
+
+- Before switching a door to `assertTargetBelongsTo`, stamp every existing row
+  that has no `orgId` with its real organisation ID or with
+  `FLEET_SCOPE_ORG_ID`. Unstamped rows are refused to every caller, so a door
+  switched before the backfill stops serving them.
 
 ## [0.10.0]
 

@@ -485,9 +485,15 @@ describe("assertTargetBelongsTo — stored IDs only", () => {
     }
   });
 
-  it("an unstamped row is admitted to the fleet principal only (it is not a fleet row)", () => {
-    expect(assertTargetBelongsTo(fleet, {})).toEqual({ ok: true });
-    expect(assertTargetBelongsTo(fleet, { orgId: null })).toEqual({ ok: true });
+  it("an unstamped row is refused to the fleet principal too: no right inferred from an absence", () => {
+    for (const orgId of [undefined, null, ""]) {
+      for (const opts of [{}, { fleetCrossOrg: true }]) {
+        expect(reasonOf(assertTargetBelongsTo(fleet, { orgId }, opts))).toBe("target-unstamped");
+      }
+    }
+    expect(reasonOf(assertTargetBelongsTo(fleet, null))).toBe("target-unstamped");
+    // a fleet row is reachable only when it carries the fleet scope explicitly
+    expect(assertTargetBelongsTo(fleet, { orgId: FLEET_SCOPE_ORG_ID })).toEqual({ ok: true });
   });
 
   it("a fleet-scope row: client refused, fleet allowed", () => {
