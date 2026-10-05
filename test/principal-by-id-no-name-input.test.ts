@@ -152,25 +152,31 @@ describe("principal-by-id — no exported function accepts a name as identity", 
 // ---------------------------------------------------------------------------
 
 /**
- * The single legacy exception: deprecated in 0.11.0 in favour of
- * `resolveActingPrincipal`, kept (behaviour unchanged) until consumers migrate
- * off it, then removed in a major release. Never add to this list.
+ * The deprecated legacy exceptions, each with the source file that declares
+ * it. Every one is `@deprecated Since 0.11.0`, kept (behaviour unchanged)
+ * until consumers migrate off it, then removed in a major release. Never add
+ * to this list.
+ *   - resolvePersonActingName: names as identity input (R-53 clause 4);
+ *     replaced by `resolveActingPrincipal`.
+ *   - passesScopeFilter / scopeFilterGet: a `createdBy` name selects the row
+ *     (R-53 clause 1).
  */
-const LEGACY_NAME_INPUT_EXCEPTIONS = ["resolvePersonActingName"] as const;
+const LEGACY_NAME_INPUT_EXCEPTIONS = {
+  resolvePersonActingName: "src/person-principal.ts",
+  passesScopeFilter: "src/scope-filter.ts",
+  scopeFilterGet: "src/scope-filter.ts",
+} as const;
 
 /**
  * Measured at 0.10.0 and FROZEN: exports that already carried a name-like
  * field before this rule existed, with the exact fields. The test pins this
  * map to the measured surface, so it can only shrink when the code does; an
- * entry may never be added. None of them resolves an acting principal:
- *   - passesScopeFilter / scopeFilterGet: `createdBy` is a row label matched
- *     against `fromAllowList` (a read filter, not actor resolution);
+ * entry may never be added. None of them resolves an acting principal or
+ * selects a row by a name:
  *   - isPersonActorName: classifies a label as reserved;
  *   - checkPersonCallShape: `actingName` is accepted only to be refused.
  */
 const FROZEN_PRE_RULE_NAME_FIELDS: Record<string, readonly string[]> = {
-  passesScopeFilter: ["createdBy"],
-  scopeFilterGet: ["createdBy"],
   isPersonActorName: ["name"],
   checkPersonCallShape: ["actingName"],
 };
@@ -190,26 +196,38 @@ function nameInputsOf(exportName: string): string[] {
 }
 
 describe("package root — no new export takes a name as identity", () => {
-  it("the legacy exception list has exactly one entry: resolvePersonActingName", () => {
-    expect([...LEGACY_NAME_INPUT_EXCEPTIONS]).toEqual(["resolvePersonActingName"]);
+  it("the legacy exception list is exactly [resolvePersonActingName, passesScopeFilter, scopeFilterGet]", () => {
+    expect(Object.keys(LEGACY_NAME_INPUT_EXCEPTIONS)).toEqual([
+      "resolvePersonActingName",
+      "passesScopeFilter",
+      "scopeFilterGet",
+    ]);
   });
 
-  it("the legacy exception is marked @deprecated in its source", () => {
-    const sf = program.getSourceFile(resolve(REPO_ROOT, "src/person-principal.ts"));
-    expect(sf).toBeDefined();
-    const fn = sf?.statements.find(
-      (st): st is ts.FunctionDeclaration =>
-        ts.isFunctionDeclaration(st) && st.name?.text === "resolvePersonActingName",
-    );
-    expect(fn).toBeDefined();
-    const tags = fn === undefined ? [] : ts.getJSDocTags(fn).map((t) => t.tagName.text);
-    expect(tags).toContain("deprecated");
-  });
+  it.each(Object.entries(LEGACY_NAME_INPUT_EXCEPTIONS))(
+    "%s is marked @deprecated Since 0.11.0 in %s",
+    (name, file) => {
+      const sf = program.getSourceFile(resolve(REPO_ROOT, file));
+      expect(sf, file).toBeDefined();
+      const fn = sf?.statements.find(
+        (st): st is ts.FunctionDeclaration =>
+          ts.isFunctionDeclaration(st) && st.name?.text === name,
+      );
+      expect(fn, `${name} not declared in ${file}`).toBeDefined();
+      const deprecated =
+        fn === undefined ? [] : ts.getJSDocTags(fn).filter((t) => t.tagName.text === "deprecated");
+      expect(deprecated.length, `${name} carries no @deprecated tag`).toBe(1);
+      const text = ts.getTextOfJSDocComment(deprecated[0]?.comment) ?? "";
+      expect(text).toMatch(/^Since 0\.11\.0\b/);
+    },
+  );
 
-  it("the legacy exception still takes names (otherwise it must leave the list)", () => {
+  it("each legacy exception still takes a name (otherwise it must leave the list)", () => {
     expect(nameInputsOf("resolvePersonActingName")).toEqual(
       expect.arrayContaining(["agentName", "claimedName"]),
     );
+    expect(nameInputsOf("passesScopeFilter")).toContain("createdBy");
+    expect(nameInputsOf("scopeFilterGet")).toContain("createdBy");
   });
 
   it("the frozen pre-rule map equals the measured surface exactly", () => {
@@ -230,7 +248,7 @@ describe("package root — no new export takes a name as identity", () => {
         "resolveMembership",
       ]),
     );
-    const legacy: readonly string[] = LEGACY_NAME_INPUT_EXCEPTIONS;
+    const legacy: readonly string[] = Object.keys(LEGACY_NAME_INPUT_EXCEPTIONS);
     const violations = exports
       .filter((fn) => !legacy.includes(fn))
       .map((fn) => {

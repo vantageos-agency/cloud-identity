@@ -158,6 +158,13 @@ function grantFieldMatches(value: unknown, fromAllowList: string[]): boolean {
  * Substring matches that don't fall on a '/' boundary are explicitly rejected
  * (e.g. namespace="orchestrator/alphabet" does NOT match prefix
  * "orchestrator/alpha"). This avoids the classic prefix-isolation bypass.
+ *
+ * @deprecated Since 0.11.0. A `createdBy` name matched against
+ * `fromAllowList` selects the row, which backend standard R-53 clause 1
+ * forbids: a name never selects or authorises a row. Use
+ * `resolveActingPrincipal` and `assertTargetBelongsTo`, which compare stored
+ * IDs. Behaviour unchanged; it stays exported until consumers migrate off it,
+ * and is removed in a major release.
  */
 export function passesScopeFilter<T extends ScopeFilterable>(
   oauthCtx: OAuthCtx,
@@ -202,6 +209,12 @@ export function scopeFilterList<T extends ScopeFilterable>(
  *
  * `grantFields` — see `passesScopeFilter`. Defaults to `[]` (0.4.0-identical
  * behaviour).
+ *
+ * @deprecated Since 0.11.0. It admits the row through `passesScopeFilter`,
+ * where a `createdBy` name selects the row, which backend standard R-53
+ * clause 1 forbids. Use `resolveActingPrincipal` and `assertTargetBelongsTo`,
+ * which compare stored IDs. Behaviour unchanged; it stays exported until
+ * consumers migrate off it, and is removed in a major release.
  */
 export function scopeFilterGet<T extends ScopeFilterable>(
   oauthCtx: OAuthCtx,
