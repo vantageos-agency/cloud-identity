@@ -192,6 +192,12 @@ export function passesScopeFilter<T extends ScopeFilterable>(
  *
  * `grantFields` — see `passesScopeFilter`. Defaults to `[]` (0.4.0-identical
  * behaviour).
+ *
+ * @deprecated Since 0.11.0. It selects rows through `passesScopeFilter`,
+ * where a `createdBy` name selects the row, which backend standard R-53
+ * clause 1 forbids. Use `resolveActingPrincipal` and `assertTargetBelongsTo`,
+ * which compare stored IDs. Behaviour unchanged; it stays exported until
+ * consumers migrate off it, and is removed in a major release.
  */
 export function scopeFilterList<T extends ScopeFilterable>(
   oauthCtx: OAuthCtx,

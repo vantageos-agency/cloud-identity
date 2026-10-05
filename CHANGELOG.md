@@ -51,18 +51,21 @@ doors, because admission compared names. No existing function changes behaviour.
   clause 4 makes it non-conforming for any new door. Use
   `resolveActingPrincipal` and `assertTargetBelongsTo`. Behaviour unchanged;
   removal is a major change, made only after consumers migrate off it.
-- `passesScopeFilter` and `scopeFilterGet`. A `createdBy` name matched
-  against `fromAllowList` selects the row; backend standard R-53 clause 1
-  forbids it. Use `resolveActingPrincipal` and `assertTargetBelongsTo`.
-  Behaviour unchanged; they stay exported until consumers migrate off them.
-- The name-input test now covers every callable export of the package root:
-  a new export taking a name-like identity input fails. The deprecated legacy
-  exceptions are exactly `resolvePersonActingName`, `passesScopeFilter` and
-  `scopeFilterGet`, and the test fails if any of them loses its
-  `@deprecated Since 0.11.0` tag. Two 0.10.0 exports that carry a name-like
-  field without selecting a row by it (`isPersonActorName`: `name`;
-  `checkPersonCallShape`: `actingName`, accepted only to be refused) are
-  pinned in a frozen map that can only shrink.
+- `passesScopeFilter`, `scopeFilterGet` and `scopeFilterList` (the last two
+  through the first). A `createdBy` name matched against `fromAllowList`
+  selects the row; backend standard R-53 clause 1 forbids it. Use
+  `resolveActingPrincipal` and `assertTargetBelongsTo`. Behaviour unchanged;
+  they stay exported until consumers migrate off them.
+- The name-input test now covers every callable export of the package root: a
+  new export taking a name-like identity input fails. The deprecated legacy
+  exceptions are exactly `resolvePersonActingName`, `passesScopeFilter`,
+  `scopeFilterGet` and `scopeFilterList`, and the test fails if any of them
+  loses its `@deprecated Since 0.11.0` tag. The scan reads a generic input
+  through its constraint, so a name field behind `T extends ScopeFilterable`
+  is seen. Two 0.10.0 exports that carry a name-like field without selecting a
+  row by it (`isPersonActorName`: `name`; `checkPersonCallShape`:
+  `actingName`, accepted only to be refused) are pinned in a frozen map that
+  can only shrink.
 
 ### Migration (required consumer step)
 
