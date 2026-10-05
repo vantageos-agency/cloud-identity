@@ -369,9 +369,10 @@ export async function resolveActingPrincipal(
  *   - An absent principal, or one with an empty ID, is refused.
  *   - The fleet scope is held only by `kind: "fleet"` and by an agent the fleet
  *     service account acts for; any other principal in it is refused.
- *   - An unstamped target (no `orgId`) is refused to every principal except
- *     `kind: "fleet"`. It is never treated as a fleet row: an absence grants
- *     no client anything.
+ *   - An unstamped target (no `orgId`) is refused to EVERY principal, the
+ *     fleet principal included. No right is inferred from an absence: a fleet
+ *     row carries `FLEET_SCOPE_ORG_ID` explicitly, and a row with no
+ *     organisation is never treated as a master row.
  *   - A fleet-scope row is refused to every client principal.
  *   - Otherwise the target's `orgId` must equal the principal's. A fleet
  *     principal reaches a client organisation's row only when the door sets
@@ -403,12 +404,12 @@ export function assertTargetBelongsTo(
 
   const targetOrg = target?.orgId;
   if (!nonEmpty(targetOrg)) {
-    if (!isFleet) {
-      return denied("target-unstamped", door, "The target carries no organisation, so it is not reachable.");
-    }
-  } else if (targetOrg === FLEET_SCOPE_ORG_ID && !inFleet) {
+    return denied("target-unstamped", door, "The target carries no organisation, so it is not reachable.");
+  }
+  if (targetOrg === FLEET_SCOPE_ORG_ID && !inFleet) {
     return denied("reserved-fleet-scope", door, "The target is in the fleet scope.");
-  } else if (targetOrg !== principal.orgId && !(isFleet && opts.fleetCrossOrg === true)) {
+  }
+  if (targetOrg !== principal.orgId && !(isFleet && opts.fleetCrossOrg === true)) {
     return denied("target-other-organisation", door, "The target belongs to another organisation.");
   }
 
