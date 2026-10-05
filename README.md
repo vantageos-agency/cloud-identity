@@ -174,9 +174,19 @@ await resolveTenant({ session: null }); // throws Error("Unauthenticated: no ses
 **Row filtering**
 
 - `passesScopeFilter(ctx, row)` — true when this row is visible to this
-  caller.
+  caller. **Deprecated since 0.11.0** (see below).
 - `scopeFilterList(ctx, rows)` — the subset of rows the caller may see.
 - `scopeFilterGet(ctx, row)` — the row, or `null` if the caller may not see it.
+  **Deprecated since 0.11.0** (see below).
+
+**Deprecated since 0.11.0: `passesScopeFilter` and `scopeFilterGet`.** Both
+admit a row when its `createdBy` NAME appears in the caller's `fromAllowList`,
+so a name selects the row, which backend standard R-53 clause 1 forbids. For a
+target that carries an organisation or owner ID, use `resolveActingPrincipal`
+and `assertTargetBelongsTo`, which compare stored IDs (see "The acting
+principal by ID, and the target checked by ID"). Their behaviour is unchanged;
+they stay exported until consumers migrate off them, and are removed in a
+major release.
 - `isMasterScope(ctx)` / `isWildcardScope(ctx)` — true when the caller holds
   unrestricted access. Useful for skipping filtering you know is pointless;
   never as a substitute for it.
