@@ -202,7 +202,6 @@ export { timingSafeEqualSync, assertSecretSync } from "./secret-compare-sync.js"
 // 0.11.0 — The acting principal by ID and the target checked by ID. A name is
 // a display label: it never selects a row and never authorises one.
 export {
-  FLEET_SCOPE_ORG_ID,
   actingCredentialSchema,
   principalRowSchema,
   organisationRowSchema,
@@ -214,6 +213,8 @@ export type {
   PrincipalRow,
   OrganisationRow,
   PrincipalLookups,
+  OrgKind,
+  OrgKindLookups,
   ActingPrincipalKind,
   ActingPrincipal,
   ResolveActingPrincipalResult,
