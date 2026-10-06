@@ -405,27 +405,8 @@ describe("name collision — org-a's 'eta' never reaches org-b's 'eta'", () => {
 // The reserved fleet scope
 // ---------------------------------------------------------------------------
 
-describe("reserved fleet scope — a client can never claim it", () => {
-  it("refuses an agent or person credential verified for the fleet scope", async () => {
-    expect(
-      await refusedReason(
-        resolveActingPrincipal(
-          { kind: "agent", agentId: "agent_fleet", verifiedOrgId: OPERATOR },
-          world(),
-        ),
-      ),
-    ).toBe("reserved-fleet-scope");
-    expect(
-      await refusedReason(
-        resolveActingPrincipal(
-          { kind: "person", personId: "user_1", verifiedOrgId: OPERATOR },
-          world(),
-        ),
-      ),
-    ).toBe("reserved-fleet-scope");
-  });
-
-  it("refuses a client-org service account acting for a fleet-stamped agent", async () => {
+describe("reserved fleet scope — only the operator org's service account holds it", () => {
+  it("refuses a client-org service account acting for an operator-org agent", async () => {
     expect(
       await refusedReason(
         resolveActingPrincipal(
@@ -534,10 +515,10 @@ describe("assertTargetBelongsTo — stored IDs only", () => {
     expect(await assertTargetBelongsTo(fleet, { orgId: "org_b" }, kinds, { fleetCrossOrg: true })).toEqual({
       ok: true,
     });
-    // the declaration widens nothing for a client principal
+    // the declaration widens nothing for a client principal: claiming it is refused
     expect(
       reasonOf(await assertTargetBelongsTo(agentA, { orgId: "org_b" }, kinds, { fleetCrossOrg: true })),
-    ).toBe("target-other-organisation");
+    ).toBe("reserved-fleet-scope");
   });
 
   it("owner-only binds the fleet principal too", async () => {
@@ -568,38 +549,29 @@ describe("assertTargetBelongsTo — stored IDs only", () => {
   });
 
   it("refuses a hand-built principal that claims the fleet scope without being fleet", async () => {
-    for (const kind of ["person", "service"] as const) {
-      const forged: ActingPrincipal = { principalId: "x", orgId: OPERATOR, kind };
-      expect(reasonOf(await assertTargetBelongsTo(forged, { orgId: OPERATOR }, kinds))).toBe(
-        "reserved-fleet-scope",
-      );
-    }
-    // an agent in the fleet scope exists only through the fleet service account
-    const directFleetAgent: ActingPrincipal = {
-      principalId: "agent_fleet",
-      orgId: OPERATOR,
-      kind: "agent",
-    };
-    expect(reasonOf(await assertTargetBelongsTo(directFleetAgent, { orgId: OPERATOR }, kinds))).toBe(
+    // the operator org's service account is the fleet; a plain service there is not coherent
+    const forgedService: ActingPrincipal = { principalId: "x", orgId: OPERATOR, kind: "service" };
+    expect(reasonOf(await assertTargetBelongsTo(forgedService, { orgId: OPERATOR }, kinds))).toBe(
       "reserved-fleet-scope",
     );
-    // and kind "fleet" outside the fleet scope is not fleet
+    // and kind "fleet" outside the operator org is not fleet
     const fakeFleet: ActingPrincipal = { principalId: "svc_a", orgId: "org_a", kind: "fleet" };
     expect(reasonOf(await assertTargetBelongsTo(fakeFleet, {}, kinds))).toBe("reserved-fleet-scope");
   });
 
-  it("a fleet-stamped agent acting through the fleet service reaches fleet rows, not unstamped or client rows", async () => {
-    const fleetAgent: ActingPrincipal = {
-      principalId: "agent_fleet",
-      orgId: OPERATOR,
-      kind: "agent",
-      viaServiceAccountId: "svc_fleet",
-    };
-    expect(await assertTargetBelongsTo(fleetAgent, { orgId: OPERATOR }, kinds)).toEqual({ ok: true });
-    expect(reasonOf(await assertTargetBelongsTo(fleetAgent, {}, kinds))).toBe("target-unstamped");
-    expect(
-      reasonOf(await assertTargetBelongsTo(fleetAgent, { orgId: "org_a" }, kinds, { fleetCrossOrg: true })),
-    ).toBe("target-other-organisation");
+  it("an operator-org agent, direct or through the fleet service, reaches operator rows, not unstamped or client rows", async () => {
+    const direct: ActingPrincipal = { principalId: "agent_fleet", orgId: OPERATOR, kind: "agent" };
+    const viaFleet: ActingPrincipal = { ...direct, viaServiceAccountId: "svc_fleet" };
+    for (const p of [direct, viaFleet]) {
+      expect(await assertTargetBelongsTo(p, { orgId: OPERATOR }, kinds)).toEqual({ ok: true });
+      expect(reasonOf(await assertTargetBelongsTo(p, {}, kinds))).toBe("target-unstamped");
+      expect(reasonOf(await assertTargetBelongsTo(p, { orgId: "org_a" }, kinds))).toBe(
+        "target-other-organisation",
+      );
+      expect(
+        reasonOf(await assertTargetBelongsTo(p, { orgId: "org_a" }, kinds, { fleetCrossOrg: true })),
+      ).toBe("reserved-fleet-scope");
+    }
   });
 
   it("carries the consumer's door on the refusal", async () => {
@@ -611,6 +583,91 @@ describe("assertTargetBelongsTo — stored IDs only", () => {
 // ---------------------------------------------------------------------------
 // RULING 4: the fleet is the operator org, decided by the adapter from data
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// RULING 5: operator-org membership is ordinary membership; cross-org reach
+// belongs to the fleet service account alone
+// ---------------------------------------------------------------------------
+
+describe("RULING 5 — operator-org members are ordinary principals of their org", () => {
+  const operatorRow = { orgId: OPERATOR };
+  const clientRow = { orgId: "org_b" };
+
+  async function resolved(credential: Parameters<typeof resolveActingPrincipal>[0]) {
+    const r = await resolveActingPrincipal(credential, world());
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("unreachable");
+    return r.principal;
+  }
+
+  it("pole 1 ALLOW: an operator-org agent and an operator-org person resolve in that org and reach an operator-stamped row", async () => {
+    const agent = await resolved({ kind: "agent", agentId: "agent_fleet", verifiedOrgId: OPERATOR });
+    expect(agent).toEqual({ principalId: "agent_fleet", orgId: OPERATOR, kind: "agent" });
+    const person = await resolved({ kind: "person", personId: "user_1", verifiedOrgId: OPERATOR });
+    expect(person).toEqual({ principalId: "user_1", orgId: OPERATOR, kind: "person" });
+    for (const p of [agent, person]) {
+      expect(await assertTargetBelongsTo(p, operatorRow, kinds)).toEqual({ ok: true });
+      expect(
+        await assertTargetBelongsTo(p, { orgId: OPERATOR, ownerId: p.principalId }, kinds, { ownerOnly: true }),
+      ).toEqual({ ok: true });
+    }
+  });
+
+  it("pole 2 REFUSE: the same operator agent and person have no cross-org reach to a client-stamped row", async () => {
+    const agent = await resolved({ kind: "agent", agentId: "agent_fleet", verifiedOrgId: OPERATOR });
+    const person = await resolved({ kind: "person", personId: "user_1", verifiedOrgId: OPERATOR });
+    const viaFleet = await resolved({
+      kind: "service",
+      serviceAccountId: "svc_fleet",
+      actingForAgentId: "agent_fleet",
+    });
+    for (const p of [agent, person, viaFleet]) {
+      expect(reasonOf(await assertTargetBelongsTo(p, clientRow, kinds))).toBe("target-other-organisation");
+      expect(reasonOf(await assertTargetBelongsTo(p, clientRow, kinds, { fleetCrossOrg: true }))).toBe(
+        "reserved-fleet-scope",
+      );
+    }
+  });
+
+  it("pole 3 REFUSE: a client credential claiming fleet scope or fleetCrossOrg is refused reserved-fleet-scope", async () => {
+    // a credential asserting the fleet kind, from a client or from an operator member
+    for (const credential of [
+      { kind: "fleet", agentId: "agent_a_eta", verifiedOrgId: "org_a" },
+      { kind: "fleet", serviceAccountId: "svc_a" },
+      { kind: "fleet", agentId: "agent_fleet", verifiedOrgId: OPERATOR },
+      { kind: "fleet", personId: "user_1", verifiedOrgId: OPERATOR },
+    ]) {
+      const lookups = world();
+      // biome-ignore lint/suspicious/noExplicitAny: a fleet-claiming credential is the probe
+      const reason = await refusedReason(resolveActingPrincipal(credential as any, lookups));
+      expect(reason).toBe("reserved-fleet-scope");
+      expect(lookups.agentById).not.toHaveBeenCalled();
+      expect(lookups.serviceAccountById).not.toHaveBeenCalled();
+    }
+    // a client principal relabelled fleet
+    const claimed: ActingPrincipal = { principalId: "agent_a_eta", orgId: "org_a", kind: "fleet" };
+    expect(reasonOf(await assertTargetBelongsTo(claimed, clientRow, kinds, { fleetCrossOrg: true }))).toBe(
+      "reserved-fleet-scope",
+    );
+    // a client principal on a door that declares fleetCrossOrg
+    for (const p of [agentA, personA, serviceA]) {
+      expect(reasonOf(await assertTargetBelongsTo(p, clientRow, kinds, { fleetCrossOrg: true }))).toBe(
+        "reserved-fleet-scope",
+      );
+      // the declaration does not take away its own-org row
+      expect(await assertTargetBelongsTo(p, { orgId: "org_a" }, kinds, { fleetCrossOrg: true })).toEqual({
+        ok: true,
+      });
+    }
+  });
+
+  it("pole 4 ALLOW: the fleet service account reaches a client row cross-org with fleetCrossOrg", async () => {
+    const svc = await resolved({ kind: "service", serviceAccountId: "svc_fleet" });
+    expect(svc).toEqual({ principalId: "svc_fleet", orgId: OPERATOR, kind: "fleet" });
+    expect(await assertTargetBelongsTo(svc, clientRow, kinds, { fleetCrossOrg: true })).toEqual({ ok: true });
+    expect(reasonOf(await assertTargetBelongsTo(svc, clientRow, kinds))).toBe("target-other-organisation");
+  });
+});
 
 describe("RULING 4 — the fleet is the org the adapter calls operator", () => {
   const RETIRED_LITERAL = "vantageos:fleet";

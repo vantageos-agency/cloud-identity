@@ -23,6 +23,12 @@
  * time. No organisation ID is reserved or spelled in this package; an
  * adapter that answers anything else, or nothing, means "not the fleet".
  *
+ * RULING 5: membership of the operator org is ORDINARY membership. Its agents
+ * and persons resolve as `kind: "agent"` / `"person"` of that org and reach its
+ * rows only. Cross-org reach (`kind: "fleet"` + `fleetCrossOrg`) belongs to the
+ * operator org's SERVICE ACCOUNT alone; `reserved-fleet-scope` refuses a claim
+ * of that scope by any other credential, never plain membership.
+ *
  * Pure functions over injected lookups: no database, no framework, no network.
  * The consumer performs each indexed read by ID and passes the function in;
  * every failure (throwing lookup, miss, malformed row, inactive row, wrong
@@ -278,17 +284,19 @@ function served(principal: ActingPrincipal): ResolveActingPrincipalResult {
 
 /**
  * Resolves the acting principal from a VERIFIED credential to stored IDs, or
- * refuses. Refusal by default: a credential that does not parse (including one
+ * refuses. Refusal by default: a credential claiming the fleet kind
+ * (`reserved-fleet-scope`), a credential that does not parse (including one
  * carrying any name field), a missing or throwing lookup, a miss, a malformed
- * or inactive row, an unstamped row, an inactive organisation, and any agent
- * or person credential that lands on the operator organisation are all
- * refused. Nothing
- * is ever resolved by a name, and nothing falls back to a master principal.
+ * or inactive row, an unstamped row and an inactive organisation are all
+ * refused. Nothing is ever resolved by a name, and nothing falls back to a
+ * master principal.
  *
  *   - agent: the agent row by `agentId`; its stored org must equal the org
- *     the credential was verified for.
+ *     the credential was verified for. An agent of the operator org resolves
+ *     as an ordinary `kind: "agent"` of that org (RULING 5).
  *   - person: the person row by (`personId`, `verifiedOrgId`); it must be
- *     stamped with that org.
+ *     stamped with that org. A person of the operator org resolves as an
+ *     ordinary `kind: "person"` of that org (RULING 5).
  *   - service: the service-account row by `serviceAccountId`. Alone, it acts
  *     as itself (`kind: "service"`, or `kind: "fleet"` when `orgKindOf` reports
  *     its stored org as `"operator"`). With `actingForAgentId`, the agent row is read by
@@ -300,6 +308,17 @@ export async function resolveActingPrincipal(
   lookups: PrincipalLookups,
   door = "resolveActingPrincipal",
 ): Promise<ResolveActingPrincipalResult> {
+  if (
+    credential !== null &&
+    typeof credential === "object" &&
+    (credential as { kind?: unknown }).kind === "fleet"
+  ) {
+    return denied(
+      "reserved-fleet-scope",
+      door,
+      "The fleet scope is held only by the operator organisation's service account; no credential claims it.",
+    );
+  }
   const parsed = actingCredentialSchema.safeParse(credential);
   if (!parsed.success) {
     return denied(
@@ -312,11 +331,10 @@ export async function resolveActingPrincipal(
   const look: PrincipalLookups = lookups ?? {};
 
   if (cred.kind === "agent" || cred.kind === "person") {
+    // The org's kind is read so a missing or throwing adapter refuses here as
+    // on every path; an operator-org member is NOT refused (RULING 5).
     const credKind = await loadOrgKind(look, cred.verifiedOrgId, door);
     if (!credKind.ok) return credKind;
-    if (credKind.kind === "operator") {
-      return denied("reserved-fleet-scope", door, "A client credential cannot act in the fleet scope.");
-    }
     const loaded =
       cred.kind === "agent"
         ? await loadPrincipalRow(look.agentById, [cred.agentId], cred.agentId, "agent", door)
@@ -332,9 +350,6 @@ export async function resolveActingPrincipal(
     if (!nonEmpty(rowOrg)) {
       return denied("no-verified-organisation", door, `The ${cred.kind} is stamped with no organisation.`);
     }
-    // The row's org must equal the verified org, which was classified above as
-    // not the operator org; an agent or person row in the operator org is
-    // therefore refused either above or here.
     if (rowOrg !== cred.verifiedOrgId) {
       return denied(
         "other-organisation",
@@ -408,9 +423,10 @@ export async function resolveActingPrincipal(
  * `lookups.orgKindOf`; a missing or throwing adapter refuses.
  *
  *   - An absent principal, or one with an empty ID, is refused.
- *   - The operator org is held only by `kind: "fleet"` and by an agent the
- *     fleet service account acts for; any other principal in it is refused,
- *     and a `kind: "fleet"` principal outside it is refused.
+ *   - A `kind: "fleet"` principal outside the operator org is refused, and so
+ *     is a `kind: "service"` principal inside it (the operator org's service
+ *     account is the fleet). An agent or person of the operator org is an
+ *     ordinary member of it (RULING 5).
  *   - An unstamped target (no `orgId`) is refused to EVERY principal, the
  *     fleet principal included. No right is inferred from an absence: a fleet
  *     row carries the operator org's ID explicitly, and a row with no
@@ -419,7 +435,9 @@ export async function resolveActingPrincipal(
  *   - Otherwise the target's `orgId` must equal the principal's. A fleet
  *     principal reaches a client organisation's row only when the door sets
  *     `fleetCrossOrg` (a master export) AND `orgKindOf` reports that
- *     organisation as `"client"`; an unknown organisation is refused.
+ *     organisation as `"client"`; an unknown organisation is refused. Any
+ *     other principal reaching across organisations under `fleetCrossOrg`
+ *     claims the fleet scope and is refused `reserved-fleet-scope`.
  *   - `ownerOnly`: the target's `ownerId` must also equal `principalId`; an
  *     absent owner is refused.
  */
@@ -443,8 +461,7 @@ export async function assertTargetBelongsTo(
   if (!principalKind.ok) return principalKind;
   const inFleet = principalKind.kind === "operator";
   const isFleet = principal.kind === "fleet";
-  const fleetAgent = principal.kind === "agent" && nonEmpty(principal.viaServiceAccountId);
-  if (isFleet !== inFleet && !(inFleet && fleetAgent)) {
+  if ((isFleet && !inFleet) || (inFleet && principal.kind === "service")) {
     return denied("reserved-fleet-scope", door, "The principal does not hold the fleet scope.");
   }
 
@@ -457,6 +474,13 @@ export async function assertTargetBelongsTo(
     if (!targetKind.ok) return targetKind;
     if (targetKind.kind === "operator") {
       return denied("reserved-fleet-scope", door, "The target is in the fleet scope.");
+    }
+    if (!isFleet && opts.fleetCrossOrg === true) {
+      return denied(
+        "reserved-fleet-scope",
+        door,
+        "Cross-organisation reach is held only by the operator organisation's service account.",
+      );
     }
     const masterExport = isFleet && opts.fleetCrossOrg === true && targetKind.kind === "client";
     if (!masterExport) {

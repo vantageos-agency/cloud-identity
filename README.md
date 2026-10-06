@@ -660,18 +660,28 @@ is the organisation your `orgKindOf` adapter reports as `"operator"` (for
 example the organisation whose mapping row carries `orgKind: "operator"`),
 read from your data at run time. The package spells no organisation ID. An
 adapter answering `null`, a miss, or anything other than exactly
-`"operator"` means "not the fleet"; a missing or throwing adapter refuses. A
-client can never claim or read the operator organisation:
+`"operator"` means "not the fleet"; a missing or throwing adapter refuses.
 
-- an agent or person credential, or row, in the operator organisation is
-  refused (`reserved-fleet-scope`); only a service account stamped with it
-  resolves to `kind: "fleet"`, and only that service account can act for an
-  agent of the operator organisation;
+**RULING 5: membership of the operator organisation is ordinary membership.**
+Its agents and persons resolve as `kind: "agent"` / `"person"` of that
+organisation and reach its rows only; cross-organisation reach (`kind: "fleet"`
+with `fleetCrossOrg`) belongs to the operator organisation's service account
+alone, and `reserved-fleet-scope` refuses a CLAIM of that scope, never plain
+membership:
+
+- an agent or person credential verified for the operator organisation
+  resolves as an ordinary principal of it, with no cross-organisation reach;
+  only a service account stamped with it resolves to `kind: "fleet"`;
+- a credential carrying `kind: "fleet"` is refused (`reserved-fleet-scope`),
+  whoever presents it;
+- any non-fleet principal reaching another organisation's row under
+  `fleetCrossOrg: true` is refused (`reserved-fleet-scope`); without it,
+  `target-other-organisation`;
 - an operator-organisation row is refused to every client principal, with or
   without `fleetCrossOrg` (`reserved-fleet-scope`);
-- a hand-built principal that claims the operator organisation without being
-  the fleet principal is refused, and so is a `kind: "fleet"` principal whose
-  organisation the adapter does not report as `"operator"`;
+- a `kind: "fleet"` principal whose organisation the adapter does not report
+  as `"operator"` is refused, and so is a `kind: "service"` principal in the
+  operator organisation (its service account is the fleet);
 - the fleet principal reaches a CLIENT organisation's row only when the door
   passes `fleetCrossOrg: true` (a master export) AND the adapter reports that
   organisation as `"client"`. An unknown organisation is refused;

@@ -30,10 +30,16 @@ doors, because admission compared names. No existing function changes behaviour.
   method `orgKindOf(orgId) => "operator" | "client" | null` on
   `PrincipalLookups` (and `OrgKindLookups` for `assertTargetBelongsTo`). `null`,
   a miss or any other answer is not the fleet; a missing or throwing adapter
-  refuses. A client credential, row or principal can never claim the operator
-  organisation; an operator-organisation row is refused to every client; the
+  refuses. An operator-organisation row is refused to every client; the
   fleet principal reaches a client organisation's row only with
   `fleetCrossOrg: true` and only when the adapter reports it as `"client"`.
+- RULING 5: membership of the operator organisation is ordinary membership.
+  Its agents and persons resolve as `kind: "agent"` / `"person"` of that
+  organisation and reach its rows only; cross-organisation reach (`kind:
+  "fleet"` + `fleetCrossOrg`) belongs to its service account alone, and
+  `reserved-fleet-scope` refuses a claim of that scope (a `kind: "fleet"`
+  credential, or `fleetCrossOrg` used by any other principal), never plain
+  membership.
   The operator organisation is checked by `organisationById` like any other.
 - `FLEET_SCOPE_ORG_ID` (a reserved `"vantageos:fleet"` constant, merged on
   `main` but never published) is REMOVED before release, with no alias (RULING
