@@ -21,18 +21,34 @@ doors, because admission compared names. No existing function changes behaviour.
   Strict credential schemas: a credential carrying a name field is refused
   whole. Missing or throwing lookups, misses, malformed, inactive, unstamped
   and wrong-organisation rows, and inactive organisations all refuse.
-- `assertTargetBelongsTo(principal, target, opts?)`: compares the target's
-  stored `orgId` (and `ownerId` with `ownerOnly`) with the resolved IDs. An
-  unstamped target is refused to every principal, the fleet principal
-  included: no right is inferred from an absence, and a fleet row carries
-  `FLEET_SCOPE_ORG_ID` explicitly.
-- `FLEET_SCOPE_ORG_ID`: the reserved fleet scope, held as data. A client
-  credential, row or principal can never claim it; a fleet-scope row is refused
-  to every client; the fleet principal reaches a client organisation's row only
-  with `fleetCrossOrg: true`.
+- `assertTargetBelongsTo(principal, target, lookups, opts?)` (async):
+  compares the target's stored `orgId` (and `ownerId` with `ownerOnly`) with
+  the resolved IDs. An unstamped target is refused to every principal, the
+  fleet principal included: no right is inferred from an absence, and a fleet
+  row carries the operator organisation's ID explicitly.
+- The fleet is the OPERATOR ORGANISATION, decided from data by the adapter
+  method `orgKindOf(orgId) => "operator" | "client" | null` on
+  `PrincipalLookups` (and `OrgKindLookups` for `assertTargetBelongsTo`). `null`,
+  a miss or any other answer is not the fleet; a missing or throwing adapter
+  refuses. An operator-organisation row is refused to every client; the
+  fleet principal reaches a client organisation's row only with
+  `fleetCrossOrg: true` and only when the adapter reports it as `"client"`.
+- RULING 5: membership of the operator organisation is ordinary membership.
+  Its agents and persons resolve as `kind: "agent"` / `"person"` of that
+  organisation and reach its rows only; cross-organisation reach (`kind:
+  "fleet"` + `fleetCrossOrg`) belongs to its service account alone, and
+  `reserved-fleet-scope` refuses a claim of that scope (a `kind: "fleet"`
+  credential, or `fleetCrossOrg` used by any other principal), never plain
+  membership.
+  The operator organisation is checked by `organisationById` like any other.
+- `FLEET_SCOPE_ORG_ID` (a reserved `"vantageos:fleet"` constant, merged on
+  `main` but never published) is REMOVED before release, with no alias (RULING
+  4). A row stamped with that literal is an unknown organisation and is refused
+  to every caller.
 - `actingCredentialSchema`, `principalRowSchema`, `organisationRowSchema` and
   the types `ActingCredential`, `PrincipalRow`, `OrganisationRow`,
-  `PrincipalLookups`, `ActingPrincipalKind`, `ActingPrincipal`,
+  `PrincipalLookups`, `OrgKind`, `OrgKindLookups`, `ActingPrincipalKind`,
+  `ActingPrincipal`,
   `ResolveActingPrincipalResult`, `TargetIds`, `AssertTargetOptions`,
   `AssertTargetResult`.
 - New `IdentityRefusalReason` values: `credential-invalid`,
@@ -70,8 +86,8 @@ doors, because admission compared names. No existing function changes behaviour.
 ### Migration (required consumer step)
 
 - Before switching a door to `assertTargetBelongsTo`, stamp every existing row
-  that has no `orgId` with its real organisation ID or with
-  `FLEET_SCOPE_ORG_ID`. Unstamped rows are refused to every caller, so a door
+  that has no `orgId` with its real organisation ID or with the operator
+  organisation's ID, and supply `orgKindOf` reading the stored `orgKind`. Unstamped rows are refused to every caller, so a door
   switched before the backfill stops serving them.
 
 ## [0.10.0]

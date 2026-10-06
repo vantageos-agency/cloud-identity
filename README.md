@@ -559,6 +559,9 @@ import {
   assertTargetBelongsTo,
 } from "@vantageos/cloud-identity";
 
+// The operator org is DATA: the org whose mapping row says orgKind "operator".
+const orgKindOf = async (id) => (await db.orgs.get(id))?.orgKind ?? null;
+
 // 1. Who is acting? IDs from the VERIFIED credential, rows read by ID.
 const who = await resolveActingPrincipal(
   { kind: "service", serviceAccountId: "svc_a", actingForAgentId: "agent_a_eta" },
@@ -566,6 +569,7 @@ const who = await resolveActingPrincipal(
     agentById: (id) => db.agents.get(id),          // -> { id, orgId, active }
     serviceAccountById: (id) => db.services.get(id),
     organisationById: (id) => db.orgs.get(id),     // -> { id, active }
+    orgKindOf,                                     // -> "operator" | "client" | null
   },
   "tasks:complete",
 );
@@ -573,9 +577,10 @@ if (!who.ok) throw toHttpError(who.refusal);       // RBAC_DENIED, typed reason
 
 // 2. Does the target belong to them? Stored IDs against resolved IDs.
 const task = await db.tasks.get(taskId);
-const may = assertTargetBelongsTo(
+const may = await assertTargetBelongsTo(
   who.principal,
   { orgId: task.orgId, ownerId: task.ownerId },
+  { orgKindOf },
   { ownerOnly: true, door: "tasks:complete" },
 );
 if (!may.ok) throw toHttpError(may.refusal);
@@ -603,8 +608,8 @@ of three shapes, every identity field an ID:
   token, already verified by you. The person's row in that organisation is read
   by `(personId, verifiedOrgId)`.
 - `{ kind: "service", serviceAccountId, actingForAgentId? }` — the service
-  account. Alone it acts as itself (`kind: "service"`, or `kind: "fleet"` if its
-  row is stamped with the fleet scope). With `actingForAgentId` it acts for that
+  account. Alone it acts as itself (`kind: "service"`, or `kind: "fleet"` if
+  `orgKindOf` reports its organisation as `"operator"`). With `actingForAgentId` it acts for that
   agent, named BY ID and resolved within the service account's OWN
   organisation; the principal is the agent, and `viaServiceAccountId` records
   the carrier.
@@ -617,7 +622,9 @@ The schemas are strict: a credential carrying any other key (`agentName`,
 `personById(id, orgId)`, `serviceAccountById(id)` returning a `PrincipalRow`
 (`{ id, orgId?, active }`, schema `principalRowSchema`), and
 `organisationById(id)` returning an `OrganisationRow` (`{ id, active }`, schema
-`organisationRowSchema`). Only the lookups of the presented path are called.
+`organisationRowSchema`), and `orgKindOf(orgId)` returning an `OrgKind`
+(`"operator" | "client"`) or `null`. Only the lookups of the presented path
+are called; `orgKindOf` is called on every path.
 Each row must repeat the ID that was asked for, and `active` is required and
 must be `true`.
 
@@ -628,11 +635,13 @@ credential; an unmapped or inactive organisation; a service account acting for
 an agent of another organisation. Nothing falls back to a default or master
 principal.
 
-**`assertTargetBelongsTo(principal, target, opts?)`** (`./principal-by-id`)
+**`assertTargetBelongsTo(principal, target, lookups, opts?)`** (`./principal-by-id`)
 
-Synchronous. Returns `{ ok: true }` or `{ ok: false, refusal }`
+Async. Returns `{ ok: true }` or `{ ok: false, refusal }`
 (`AssertTargetResult`). `target` (`TargetIds`) is `{ orgId?, ownerId? }` read
-from the STORED row; `opts` (`AssertTargetOptions`) is
+from the STORED row; `lookups` (`OrgKindLookups`) is `{ orgKindOf }`, the same
+adapter as above, and is required (a missing or throwing adapter refuses with
+`principal-lookup-failed`); `opts` (`AssertTargetOptions`) is
 `{ door?, ownerOnly?, fleetCrossOrg? }`. IDs are compared byte for byte.
 
 - The target's `orgId` must equal the principal's `orgId`
@@ -646,27 +655,46 @@ from the STORED row; `opts` (`AssertTargetOptions`) is
 - An absent principal, or one with an empty ID, is refused
   (`credential-invalid`).
 
-**The reserved fleet scope.** `FLEET_SCOPE_ORG_ID` is the operator's own scope,
-used for master exports. It is data, stamped on a row only by the master or
-service identity, and shaped so it cannot collide with a Clerk organisation ID
-or a datastore ID. A client can never claim or read it:
+**The fleet is the operator organisation.** The fleet is not a reserved ID: it
+is the organisation your `orgKindOf` adapter reports as `"operator"` (for
+example the organisation whose mapping row carries `orgKind: "operator"`),
+read from your data at run time. The package spells no organisation ID. An
+adapter answering `null`, a miss, or anything other than exactly
+`"operator"` means "not the fleet"; a missing or throwing adapter refuses.
 
-- an agent or person credential, or row, in the fleet scope is refused
-  (`reserved-fleet-scope`); only a service account stamped with it resolves to
-  `kind: "fleet"`, and only that service account can act for a fleet-stamped
-  agent;
-- a fleet-scope row is refused to every client principal;
-- a hand-built principal that claims the fleet scope without being the fleet
-  principal is refused;
+**RULING 5: membership of the operator organisation is ordinary membership.**
+Its agents and persons resolve as `kind: "agent"` / `"person"` of that
+organisation and reach its rows only; cross-organisation reach (`kind: "fleet"`
+with `fleetCrossOrg`) belongs to the operator organisation's service account
+alone, and `reserved-fleet-scope` refuses a CLAIM of that scope, never plain
+membership:
+
+- an agent or person credential verified for the operator organisation
+  resolves as an ordinary principal of it, with no cross-organisation reach;
+  only a service account stamped with it resolves to `kind: "fleet"`;
+- a credential carrying `kind: "fleet"` is refused (`reserved-fleet-scope`),
+  whoever presents it;
+- any non-fleet principal reaching another organisation's row under
+  `fleetCrossOrg: true` is refused (`reserved-fleet-scope`); without it,
+  `target-other-organisation`;
+- an operator-organisation row is refused to every client principal, with or
+  without `fleetCrossOrg` (`reserved-fleet-scope`);
+- a `kind: "fleet"` principal whose organisation the adapter does not report
+  as `"operator"` is refused, and so is a `kind: "service"` principal in the
+  operator organisation (its service account is the fleet);
 - the fleet principal reaches a CLIENT organisation's row only when the door
-  passes `fleetCrossOrg: true` (a master export). It is refused by default.
-- a fleet row is a row stamped with `FLEET_SCOPE_ORG_ID` explicitly. A row
-  with no `orgId` is not a fleet row and is refused to the fleet principal too.
+  passes `fleetCrossOrg: true` (a master export) AND the adapter reports that
+  organisation as `"client"`. An unknown organisation is refused;
+- the operator organisation is an ordinary stored organisation:
+  `organisationById` must return it mapped and active, like any other;
+- a fleet row is a row stamped with the operator organisation's ID explicitly.
+  A row with no `orgId` is not a fleet row and is refused to the fleet
+  principal too.
 
 **Migration (required consumer step).** Before a product switches any door to
 `assertTargetBelongsTo`, it must stamp every existing row that has no `orgId`:
-with its real organisation ID, or with `FLEET_SCOPE_ORG_ID` if it belongs to
-the operator's own scope. An unstamped row is refused to every caller,
+with its real organisation ID, or with the operator organisation's ID if it
+belongs to the operator's own scope. An unstamped row is refused to every caller,
 including the fleet principal, so a door switched before the backfill stops
 serving those rows. Run the backfill first, confirm that no unstamped row is
 left in the tables the door reads, then switch the door.
