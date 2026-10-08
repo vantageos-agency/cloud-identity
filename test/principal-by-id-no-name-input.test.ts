@@ -140,18 +140,18 @@ describe("principal-by-id — no exported function accepts a name as identity", 
     checker = program.getTypeChecker();
   }, 60_000);
 
-  it("the exported functions are the two expected, so the scan is not vacuous", () => {
+  it("the exported functions are the three expected, so the scan is not vacuous", () => {
     const fns = moduleExports("src/principal-by-id.ts")
       .filter((s) => s.flags & ts.SymbolFlags.Function)
       .map((s) => s.getName())
       .sort();
-    expect(fns).toEqual(["assertTargetBelongsTo", "resolveActingPrincipal"]);
+    expect(fns).toEqual(["assertOrgAdmin", "assertTargetBelongsTo", "resolveActingPrincipal"]);
   });
 
   it("every identifier reachable from their inputs is an ID, a kind, an option or a door", () => {
     const ids = identityInputs("src/principal-by-id.ts");
     // sanity: the scan reached the credential, the lookups and the target
-    for (const expected of ["agentId", "personId", "serviceAccountId", "actingForAgentId", "verifiedOrgId", "agentById", "ownerId", "principalId"]) {
+    for (const expected of ["agentId", "personId", "serviceAccountId", "actingForAgentId", "verifiedOrgId", "agentById", "ownerId", "principalId", "verifiedOrgRole", "orgRole", "adminRoles", "targetOrgId"]) {
       expect(ids, `scan did not reach ${expected}`).toContain(expected);
     }
     const nameLike = [...ids].filter(isNameLike);

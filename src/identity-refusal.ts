@@ -1,7 +1,7 @@
 /**
  * Typed refusal shared by the 0.10.0 primitives (role policy, membership,
- * org-admin proof, namespace write, secret comparison) and the 0.11.0
- * principal-by-id resolver and target check.
+ * org-admin proof, namespace write, secret comparison), the 0.11.0
+ * principal-by-id resolver and target check, and the 0.12.0 org-admin check.
  *
  * A refusal is a value carrying its own code, reason and door, so a caller
  * branches on content rather than on the mere presence of an exception, and an
@@ -52,7 +52,9 @@ export type IdentityRefusalReason =
   | "acting-agent-other-organisation"
   | "target-unstamped"
   | "target-other-organisation"
-  | "target-owner-mismatch";
+  | "target-owner-mismatch"
+  // org admin by id (0.12.0)
+  | "principal-not-a-person";
 
 export type IdentityRefusal = {
   code: IdentityRefusalCode;

@@ -594,7 +594,7 @@ resolved to `orgId: "org_a"`. The target check refuses it with
 
 Async. Returns `{ ok: true, principal }` or `{ ok: false, refusal }`
 (`ResolveActingPrincipalResult`). The `principal` (`ActingPrincipal`) is
-`{ principalId, orgId, kind, viaServiceAccountId? }`, where `kind` is
+`{ principalId, orgId, kind, viaServiceAccountId?, orgRole? }`, where `kind` is
 `"agent" | "person" | "service" | "fleet"` (`ActingPrincipalKind`).
 
 `credential` (`ActingCredential`, validated by `actingCredentialSchema`) is one
@@ -604,9 +604,12 @@ of three shapes, every identity field an ID:
   own bearer, already verified by you (for example with
   `validatePresentedBearer`). The agent row's stored `orgId` must equal
   `verifiedOrgId`.
-- `{ kind: "person", personId, verifiedOrgId }` — the human path: a person's
-  token, already verified by you. The person's row in that organisation is read
-  by `(personId, verifiedOrgId)`.
+- `{ kind: "person", personId, verifiedOrgId, verifiedOrgRole? }` — the human
+  path: a person's token, already verified by you. The person's row in that
+  organisation is read by `(personId, verifiedOrgId)`. `verifiedOrgRole`
+  (0.12.0, optional) is the role the SAME verified token carries in that
+  organisation (Clerk: `org_role`); it is copied onto the principal as
+  `orgRole` and read only by `assertOrgAdmin`.
 - `{ kind: "service", serviceAccountId, actingForAgentId? }` — the service
   account. Alone it acts as itself (`kind: "service"`, or `kind: "fleet"` if
   `orgKindOf` reports its organisation as `"operator"`). With `actingForAgentId` it acts for that
@@ -654,6 +657,40 @@ adapter as above, and is required (a missing or throwing adapter refuses with
   treated as a master row.
 - An absent principal, or one with an empty ID, is refused
   (`credential-invalid`).
+
+**`assertOrgAdmin(principal, targetOrgId, opts)`** (`./principal-by-id`, 0.12.0)
+
+Synchronous. Returns `{ ok: true }` or `{ ok: false, refusal }`
+(`AssertOrgAdminResult`). `opts` (`AssertOrgAdminOptions`) is
+`{ adminRoles, door? }`: `adminRoles` is your list of admin role values exactly
+as the verified claim spells them (Clerk: `["org:admin"]`). Decided by ID, no
+lookup:
+
+- only a `kind: "person"` principal can be an organisation admin; an agent, a
+  service account and the fleet principal are refused
+  (`principal-not-a-person`);
+- `targetOrgId` must be present (`target-unstamped`) and byte-equal to the
+  principal's `orgId` (`target-other-organisation`): an admin of A is not an
+  admin of B;
+- the principal's `orgRole` must be byte-equal to an entry of `adminRoles`
+  (`role-not-admin`): an absent role, a member role, an empty or malformed
+  `adminRoles` all refuse. No case folding, no default role;
+- an absent principal, or one with an empty ID, is refused
+  (`credential-invalid`).
+
+```js
+const who = await resolveActingPrincipal(
+  { kind: "person", personId: claims.sub, verifiedOrgId: claims.org_id, verifiedOrgRole: claims.org_role },
+  lookups,
+  "owners:startBinding",
+);
+if (!who.ok) throw toHttpError(who.refusal);
+const admin = assertOrgAdmin(who.principal, who.principal.orgId, {
+  adminRoles: ["org:admin"],
+  door: "owners:startBinding",
+});
+if (!admin.ok) throw toHttpError(admin.refusal);
+```
 
 **The fleet is the operator organisation.** The fleet is not a reserved ID: it
 is the organisation your `orgKindOf` adapter reports as `"operator"` (for
