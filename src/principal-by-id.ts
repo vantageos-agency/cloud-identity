@@ -58,6 +58,9 @@ import { type IdentityRefusal, refusal } from "./identity-refusal.js";
  *     row is stamped with.
  *   - `person`: a person's token, verified by the consumer: the stored person
  *     ID (the verified subject) and the organisation the token is bound to.
+ *     Optionally (0.12.0) the role the SAME token carries in that organisation
+ *     (`verifiedOrgRole`, for example Clerk's `org_role`), read by
+ *     `assertOrgAdmin`. Only a verified claim belongs here, never an argument.
  *   - `service`: the service account, verified by the consumer. When it acts
  *     for an agent it names that agent BY ID (`actingForAgentId`); the agent
  *     is resolved within the service account's own organisation.
@@ -72,6 +75,7 @@ export const actingCredentialSchema = z.discriminatedUnion("kind", [
     kind: z.literal("person"),
     personId: z.string().min(1),
     verifiedOrgId: z.string().min(1),
+    verifiedOrgRole: z.string().min(1).optional(),
   }),
   z.strictObject({
     kind: z.literal("service"),
@@ -150,6 +154,11 @@ export type ActingPrincipal = {
   kind: ActingPrincipalKind;
   /** Set when a service account acts for an agent: the service account's ID. */
   viaServiceAccountId?: string;
+  /**
+   * `kind: "person"` only, and only when the credential carried
+   * `verifiedOrgRole`: the verified role in `orgId`. Read by `assertOrgAdmin`.
+   */
+  orgRole?: string;
 };
 
 export type ResolveActingPrincipalResult =
@@ -359,6 +368,14 @@ export async function resolveActingPrincipal(
     }
     const orgRefusal = await checkOrganisation(rowOrg, look, door);
     if (orgRefusal !== null) return orgRefusal;
+    if (cred.kind === "person" && cred.verifiedOrgRole !== undefined) {
+      return served({
+        principalId: loaded.row.id,
+        orgId: rowOrg,
+        kind: cred.kind,
+        orgRole: cred.verifiedOrgRole,
+      });
+    }
     return served({ principalId: loaded.row.id, orgId: rowOrg, kind: cred.kind });
   }
 
@@ -493,6 +510,81 @@ export async function assertTargetBelongsTo(
     if (!nonEmpty(owner) || owner !== principal.principalId) {
       return denied("target-owner-mismatch", door, "Only the target's owner may act on it.");
     }
+  }
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// assertOrgAdmin (0.12.0)
+// ---------------------------------------------------------------------------
+
+export type AssertOrgAdminOptions = {
+  /**
+   * The role values that count as organisation admin, exactly as the verified
+   * claim spells them (for Clerk: `["org:admin"]`). Data supplied by the
+   * consumer; an empty or malformed list admits nobody.
+   */
+  adminRoles: readonly string[];
+  /** The consumer's name for the door; carried on every refusal. */
+  door?: string;
+};
+
+export type AssertOrgAdminResult = { ok: true } | { ok: false; refusal: IdentityRefusal };
+
+/**
+ * Admits a principal as ADMIN of the target organisation, deciding by ID only.
+ * The principal must come from `resolveActingPrincipal`; the role is the
+ * verified claim its person credential carried (`verifiedOrgRole`), so no host
+ * lookup is needed and none is read here.
+ *
+ *   - An absent principal, or one with an empty ID, is refused.
+ *   - Only a PERSON is an organisation admin. An agent, a service account and
+ *     the fleet principal are refused `principal-not-a-person`, whatever they
+ *     carry: the service account keeps its own rules and never becomes an
+ *     admin through this check.
+ *   - The target organisation must be present and byte-equal to the
+ *     principal's stored organisation: an admin of A is not an admin of B.
+ *   - The role must be byte-equal to one entry of `adminRoles`. An absent
+ *     role, an unknown role, and an empty or malformed `adminRoles` refuse.
+ *     No case folding, no prefix stripping, no default role.
+ */
+export function assertOrgAdmin(
+  principal: ActingPrincipal | null | undefined,
+  targetOrgId: string | null | undefined,
+  opts: AssertOrgAdminOptions,
+): AssertOrgAdminResult {
+  const door = opts?.door ?? "assertOrgAdmin";
+  if (
+    principal === null ||
+    typeof principal !== "object" ||
+    !nonEmpty(principal.principalId) ||
+    !nonEmpty(principal.orgId)
+  ) {
+    return denied("credential-invalid", door, "No resolved principal stands behind this call.");
+  }
+  if (principal.kind !== "person") {
+    return denied(
+      "principal-not-a-person",
+      door,
+      "Only a person is an organisation admin; this principal is not a person.",
+    );
+  }
+  if (!nonEmpty(targetOrgId)) {
+    return denied("target-unstamped", door, "No target organisation was named, so none is administered.");
+  }
+  if (targetOrgId !== principal.orgId) {
+    return denied(
+      "target-other-organisation",
+      door,
+      "The target organisation is not the principal's organisation.",
+    );
+  }
+  const adminRoles = opts?.adminRoles;
+  const rolesValid =
+    Array.isArray(adminRoles) && adminRoles.length > 0 && adminRoles.every((r) => nonEmpty(r));
+  const role = principal.orgRole;
+  if (!rolesValid || !nonEmpty(role) || !adminRoles.includes(role)) {
+    return denied("role-not-admin", door, "The principal's role is not an organisation-admin role.");
   }
   return { ok: true };
 }

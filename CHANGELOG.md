@@ -3,6 +3,34 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0]
+
+**Additive — the organisation-admin proof, decided by ID
+(`./principal-by-id`).** A door that requires "the caller is an ADMIN of its
+organisation" reads the verified role from the principal the package resolved,
+instead of re-reading the session in a local helper. No existing function
+changes behaviour for an existing input.
+
+### Added
+
+- `verifiedOrgRole` (optional, non-empty string) on the `kind: "person"`
+  credential of `resolveActingPrincipal`: the role the same verified token
+  carries in `verifiedOrgId` (Clerk: `org_role`). It is copied onto the
+  resolved principal as `orgRole`; a person credential without it resolves
+  exactly as in 0.11.0, with no `orgRole` key. The agent and service
+  credentials stay strict: a role on them is refused whole
+  (`credential-invalid`).
+- `assertOrgAdmin(principal, targetOrgId, { adminRoles, door? })`:
+  synchronous, returns `{ ok: true }` or a typed refusal. Only a person is an
+  organisation admin (an agent, a service account and the fleet principal are
+  refused); the target organisation must be present and byte-equal to the
+  principal's stored organisation; the role must be byte-equal to an entry of
+  the consumer's `adminRoles`. An absent role, an unknown role and an empty or
+  malformed `adminRoles` refuse. No lookup, no case folding, no default role.
+- Types `AssertOrgAdminOptions`, `AssertOrgAdminResult`; `orgRole?` on
+  `ActingPrincipal`.
+- New `IdentityRefusalReason` value: `principal-not-a-person`.
+
 ## [0.11.0]
 
 **Additive — the acting principal by ID, and the target checked by ID

@@ -201,12 +201,14 @@ export { timingSafeEqualSync, assertSecretSync } from "./secret-compare-sync.js"
 
 // 0.11.0 — The acting principal by ID and the target checked by ID. A name is
 // a display label: it never selects a row and never authorises one.
+// 0.12.0 — assertOrgAdmin: the org-admin proof on a principal resolved by ID.
 export {
   actingCredentialSchema,
   principalRowSchema,
   organisationRowSchema,
   resolveActingPrincipal,
   assertTargetBelongsTo,
+  assertOrgAdmin,
 } from "./principal-by-id.js";
 export type {
   ActingCredential,
@@ -221,4 +223,6 @@ export type {
   TargetIds,
   AssertTargetOptions,
   AssertTargetResult,
+  AssertOrgAdminOptions,
+  AssertOrgAdminResult,
 } from "./principal-by-id.js";
