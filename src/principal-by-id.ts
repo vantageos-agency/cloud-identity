@@ -542,6 +542,10 @@ const ROW_NOT_OURS: ReadonlySet<string> = new Set([
  *     unresolved principal, or a failed organisation-kind lookup for it,
  *     returns `{ ok: false, refusal }` naming the door, even for an empty
  *     list: a refusal is never an `ok: true` with no rows.
+ *   - `fleetCrossOrg: true` from a principal that is not `kind: "fleet"` is a
+ *     misconfigured door and is refused `reserved-fleet-scope` up front, for
+ *     any list. Per row, `reserved-fleet-scope` therefore only means "this row
+ *     is in the operator scope" and the row is dropped.
  *   - A resolved principal whose rows all belong elsewhere gets
  *     `{ ok: true, rows: [] }`: an absence, distinguishable from a refusal.
  *   - A row that does not belong (other organisation, operator-org row,
@@ -560,6 +564,16 @@ export async function filterTargetsBelongingTo<T extends TargetIds>(
 ): Promise<FilterTargetsResult<T>> {
   const door = opts.door ?? "filterTargetsBelongingTo";
   const doorOpts: AssertTargetOptions = { ...opts, door };
+
+  // A door asking for cross-organisation reach that the principal does not
+  // hold is a misconfigured door: refused, never an absence of rows.
+  if (opts.fleetCrossOrg === true && principal != null && principal.kind !== "fleet") {
+    return denied(
+      "reserved-fleet-scope",
+      door,
+      "Cross-organisation reach is held only by the operator organisation's service account.",
+    );
+  }
 
   // Prove the principal on a target that is its own organisation's, owner
   // check off: only a principal-level fault can refuse this.
