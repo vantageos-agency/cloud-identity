@@ -3,6 +3,27 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0]
+
+**Additive: admission by membership of a stored list, by agent ID only
+(`./principal-by-id`).** A client roster used to be checked by comparing names.
+`assertPrincipalListed` is the single primitive that replaces it: the caller's
+agent ID must be byte-equal to an entry of a stored ID list. No existing
+function changes behaviour for an existing input.
+
+### Added
+
+- `assertPrincipalListed(principal, list, { door? })`: synchronous, returns
+  `{ ok: true }` or a typed `RBAC_DENIED` refusal naming the door. Refused by
+  default: an absent principal or one without an ID, a principal that is not
+  `kind: "agent"`, an absent list, a list without an organisation or stored
+  under another organisation, an empty or malformed `principalIds`, and an ID
+  not on the list. A name never matches and `"*"` is not a wildcard.
+- Types `PrincipalIdList`, `AssertPrincipalListedOptions`,
+  `AssertPrincipalListedResult`.
+- New `IdentityRefusalReason` values: `list-absent`, `list-empty`,
+  `principal-not-an-agent`, `principal-not-listed`.
+
 ## [0.12.0]
 
 **Additive — the organisation-admin proof, decided by ID

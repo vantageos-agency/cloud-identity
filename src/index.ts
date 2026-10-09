@@ -209,6 +209,7 @@ export {
   resolveActingPrincipal,
   assertTargetBelongsTo,
   assertOrgAdmin,
+  assertPrincipalListed,
 } from "./principal-by-id.js";
 export type {
   ActingCredential,
@@ -225,4 +226,7 @@ export type {
   AssertTargetResult,
   AssertOrgAdminOptions,
   AssertOrgAdminResult,
+  PrincipalIdList,
+  AssertPrincipalListedOptions,
+  AssertPrincipalListedResult,
 } from "./principal-by-id.js";

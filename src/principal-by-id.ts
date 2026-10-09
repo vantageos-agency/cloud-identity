@@ -588,3 +588,93 @@ export function assertOrgAdmin(
   }
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// assertPrincipalListed (0.13.0)
+// ---------------------------------------------------------------------------
+
+/**
+ * A stored list of principal IDs scoped to one organisation, for example a
+ * client's roster of agents. Every entry is an ID; a name is never an entry.
+ */
+export type PrincipalIdList = {
+  /** The organisation the list is stored under. */
+  orgId: string;
+  /** Stored principal (agent) IDs, compared byte for byte. */
+  principalIds: readonly string[];
+};
+
+export type AssertPrincipalListedOptions = {
+  /** The consumer's name for the door; carried on every refusal. */
+  door?: string;
+};
+
+export type AssertPrincipalListedResult = { ok: true } | { ok: false; refusal: IdentityRefusal };
+
+/**
+ * Admits a principal only when its AGENT ID is an entry of a stored list that
+ * belongs to its own organisation. The principal must come from
+ * `resolveActingPrincipal`; synchronous, no lookup, no name read anywhere.
+ *
+ * Refusal by default. Each of these refuses with a typed `RBAC_DENIED`
+ * carrying the door (default `"assertPrincipalListed"`):
+ *
+ *   - an absent principal, or one with an empty ID or organisation
+ *     (`credential-invalid`). A principal carrying only a name has no ID.
+ *   - a principal that is not `kind: "agent"` (`principal-not-an-agent`): the
+ *     list holds agent IDs, so a person, a service account and the fleet
+ *     principal are not admitted by it. An agent acting through a service
+ *     account is `kind: "agent"` and is judged by its own ID.
+ *   - an absent list (`list-absent`).
+ *   - a list with a missing or empty `orgId` (`target-unstamped`), or one
+ *     stored under another organisation (`target-other-organisation`).
+ *   - an empty or malformed `principalIds` (`list-empty`).
+ *   - an ID that is not byte-equal to an entry (`principal-not-listed`). No
+ *     case folding, no trimming, no prefix match.
+ *
+ * There is no wildcard: a `"*"` entry is an ordinary string, never "everyone".
+ * The fleet sentinel is out of scope here.
+ */
+export function assertPrincipalListed(
+  principal: ActingPrincipal | null | undefined,
+  list: PrincipalIdList | null | undefined,
+  opts?: AssertPrincipalListedOptions,
+): AssertPrincipalListedResult {
+  const door = opts?.door ?? "assertPrincipalListed";
+  if (
+    principal === null ||
+    typeof principal !== "object" ||
+    !nonEmpty(principal.principalId) ||
+    !nonEmpty(principal.orgId)
+  ) {
+    return denied("credential-invalid", door, "No resolved principal stands behind this call.");
+  }
+  if (principal.kind !== "agent") {
+    return denied(
+      "principal-not-an-agent",
+      door,
+      "The list holds agent IDs; this principal is not an agent.",
+    );
+  }
+  if (list === null || list === undefined || typeof list !== "object") {
+    return denied("list-absent", door, "No list was supplied, so nobody is listed.");
+  }
+  if (!nonEmpty(list.orgId)) {
+    return denied("target-unstamped", door, "The list carries no organisation, so it admits nobody.");
+  }
+  if (list.orgId !== principal.orgId) {
+    return denied(
+      "target-other-organisation",
+      door,
+      "The list belongs to another organisation than the principal.",
+    );
+  }
+  const ids = list.principalIds;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return denied("list-empty", door, "The list holds no principal IDs, so nobody is listed.");
+  }
+  if (!ids.some((id) => id === principal.principalId)) {
+    return denied("principal-not-listed", door, "The principal's ID is not on the list.");
+  }
+  return { ok: true };
+}

@@ -692,6 +692,34 @@ const admin = assertOrgAdmin(who.principal, who.principal.orgId, {
 if (!admin.ok) throw toHttpError(admin.refusal);
 ```
 
+**`assertPrincipalListed(principal, list, opts)`** (`./principal-by-id`, 0.13.0)
+
+Synchronous. Returns `{ ok: true }` or `{ ok: false, refusal }`
+(`AssertPrincipalListedResult`). `list` is a `PrincipalIdList`,
+`{ orgId, principalIds }`, the stored roster of agent IDs; `opts`
+(`AssertPrincipalListedOptions`) is `{ door? }`. The single admission check
+for "is this caller on that stored list", decided by agent ID only, no lookup:
+
+- the principal's `principalId` must be byte-equal to an entry of
+  `principalIds` (`principal-not-listed`). No case folding, no trimming, no
+  prefix match, and no name matching anywhere: a name in the list never
+  matches, and a principal carrying only a name has no ID
+  (`credential-invalid`);
+- only a `kind: "agent"` principal is admitted (`principal-not-an-agent`),
+  an agent acting through a service account included, judged by its own ID;
+- `list.orgId` must be present (`target-unstamped`) and equal the principal's
+  `orgId` (`target-other-organisation`);
+- an absent list (`list-absent`) and an empty or malformed `principalIds`
+  (`list-empty`) refuse;
+- there is no wildcard: `"*"` is an ordinary string and admits nobody.
+
+```js
+const listed = assertPrincipalListed(who.principal, { orgId: row.orgId, principalIds: row.allowedAgentIds }, {
+  door: "tasks:complete",
+});
+if (!listed.ok) throw toHttpError(listed.refusal);
+```
+
 **The fleet is the operator organisation.** The fleet is not a reserved ID: it
 is the organisation your `orgKindOf` adapter reports as `"operator"` (for
 example the organisation whose mapping row carries `orgKind: "operator"`),
