@@ -720,6 +720,31 @@ const listed = assertPrincipalListed(who.principal, { orgId: row.orgId, principa
 if (!listed.ok) throw toHttpError(listed.refusal);
 ```
 
+**`assertRecipientAddressable(sender, recipient, lookups, opts)`** (`./principal-by-id`, 0.13.0)
+
+Async. Returns `{ ok: true }` or `{ ok: false, refusal }`. `recipient` is
+`{ agentId, orgId }`; `lookups` is `{ orgKindOf, rosterOf }` where
+`rosterOf(orgId)` returns the stored `{ orgId, principalIds }` roster of that
+client organisation; `opts` is `{ door? }`. Decided by agent ID only:
+
+- same organisation: admitted;
+- client sender to operator recipient: the recipient's ID must be on the
+  SENDER organisation's roster;
+- operator sender to client recipient: the sender's ID must be on the
+  RECIPIENT organisation's roster;
+- client to client across organisations, a missing sender or recipient, a
+  sender that is not an agent, an unknown organisation kind and an
+  unresolvable roster all refuse. A name never matches. Types: `RecipientIds`,
+`RecipientLookups`, `AssertRecipientAddressableOptions`,
+`AssertRecipientAddressableResult`.
+
+```js
+const may = await assertRecipientAddressable(who.principal, { agentId: to.id, orgId: to.orgId }, {
+  orgKindOf, rosterOf,
+}, { door: "send_message" });
+if (!may.ok) throw toHttpError(may.refusal);
+```
+
 **The fleet is the operator organisation.** The fleet is not a reserved ID: it
 is the organisation your `orgKindOf` adapter reports as `"operator"` (for
 example the organisation whose mapping row carries `orgKind: "operator"`),
