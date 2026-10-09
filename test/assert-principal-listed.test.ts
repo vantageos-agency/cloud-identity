@@ -97,6 +97,18 @@ describe("assertPrincipalListed", () => {
     expect(assertPrincipalListed(via, LIST)).toEqual({ ok: true });
   });
 
+  it("never admits an agent because its service account's ID is on the list", () => {
+    const via: ActingPrincipal = {
+      principalId: "agent-x",
+      orgId: "org_a",
+      kind: "agent",
+      viaServiceAccountId: "sa-1",
+    };
+    const r = refusedWith(assertPrincipalListed(via, { orgId: "org_a", principalIds: ["sa-1"] }));
+    expect(r.code).toBe("RBAC_DENIED");
+    expect(r.reason).toBe("principal-not-listed");
+  });
+
   it("refuses a principal that is not an agent, even if its ID is listed", () => {
     for (const kind of ["person", "service", "fleet"] as const) {
       const r = refusedWith(assertPrincipalListed({ ...AGENT, kind }, LIST));
