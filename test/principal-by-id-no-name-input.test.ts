@@ -145,7 +145,7 @@ describe("principal-by-id — no exported function accepts a name as identity", 
       .filter((s) => s.flags & ts.SymbolFlags.Function)
       .map((s) => s.getName())
       .sort();
-    expect(fns).toEqual(["assertOrgAdmin", "assertPrincipalListed", "assertTargetBelongsTo", "resolveActingPrincipal"]);
+    expect(fns).toEqual(["assertOrgAdmin", "assertPrincipalListed", "assertRecipientAddressable", "assertTargetBelongsTo", "resolveActingPrincipal"]);
   });
 
   it("every identifier reachable from their inputs is an ID, a kind, an option or a door", () => {
