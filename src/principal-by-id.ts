@@ -678,3 +678,120 @@ export function assertPrincipalListed(
   }
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// assertRecipientAddressable (0.13.0)
+// ---------------------------------------------------------------------------
+
+/** The recipient of a message, named by its stored agent ID and organisation ID. */
+export type RecipientIds = {
+  /** The recipient agent's stored ID. */
+  agentId: string;
+  /** The recipient agent's stored organisation ID. */
+  orgId: string;
+};
+
+/**
+ * The lookups `assertRecipientAddressable` reads: the organisation kind, and
+ * the stored roster of agent IDs of one organisation (a client's list of the
+ * fleet agents it may reach). `null`, a miss or a throw is an unresolvable
+ * roster and refuses.
+ */
+export type RecipientLookups = OrgKindLookups & {
+  rosterOf?: Lookup<[orgId: string], PrincipalIdList>;
+};
+
+export type AssertRecipientAddressableOptions = {
+  /** The consumer's name for the door; carried on every refusal. */
+  door?: string;
+};
+
+export type AssertRecipientAddressableResult = { ok: true } | { ok: false; refusal: IdentityRefusal };
+
+/**
+ * Decides whether a sender may address a recipient, across organisations
+ * included, by AGENT ID only. The sender must come from
+ * `resolveActingPrincipal`. No name is read anywhere; a name never matches.
+ *
+ * Admitted iff one of these holds:
+ *   (a) same organisation: the sender's `orgId` equals the recipient's;
+ *   (b) client to operator: the sender is in a client organisation, the
+ *       recipient is in the operator organisation, and the RECIPIENT's ID is
+ *       on the SENDER organisation's roster;
+ *   (c) operator to client: the sender is in the operator organisation, the
+ *       recipient is in a client organisation, and the SENDER's ID is on the
+ *       RECIPIENT organisation's roster.
+ *
+ * Everything else is refused with a typed `RBAC_DENIED` carrying the door
+ * (default `"assertRecipientAddressable"`): an absent sender or one without an
+ * ID (`credential-invalid`), a sender that is not `kind: "agent"`
+ * (`principal-not-an-agent`), an absent recipient or one without an agent ID
+ * or organisation (`target-unstamped`), client to client across organisations
+ * and an organisation kind that is neither operator nor client
+ * (`target-other-organisation`), a missing or throwing `orgKindOf` /
+ * `rosterOf` (`principal-lookup-failed`), an absent roster (`list-absent`), and
+ * a roster that is empty, stored under the wrong organisation or does not list
+ * the ID (the refusals of {@link assertPrincipalListed}, which is reused for
+ * that check).
+ */
+export async function assertRecipientAddressable(
+  sender: ActingPrincipal | null | undefined,
+  recipient: RecipientIds | null | undefined,
+  lookups: RecipientLookups,
+  opts?: AssertRecipientAddressableOptions,
+): Promise<AssertRecipientAddressableResult> {
+  const door = opts?.door ?? "assertRecipientAddressable";
+  if (
+    sender === null ||
+    typeof sender !== "object" ||
+    !nonEmpty(sender.principalId) ||
+    !nonEmpty(sender.orgId)
+  ) {
+    return denied("credential-invalid", door, "No resolved sender stands behind this call.");
+  }
+  if (sender.kind !== "agent") {
+    return denied("principal-not-an-agent", door, "Only an agent addresses a recipient; the sender is not an agent.");
+  }
+  if (
+    recipient === null ||
+    typeof recipient !== "object" ||
+    !nonEmpty(recipient.agentId) ||
+    !nonEmpty(recipient.orgId)
+  ) {
+    return denied("target-unstamped", door, "The recipient carries no agent ID and organisation.");
+  }
+  if (recipient.orgId === sender.orgId) return { ok: true };
+
+  const senderKind = await loadOrgKind(lookups, sender.orgId, door);
+  if (!senderKind.ok) return senderKind;
+  const recipientKind = await loadOrgKind(lookups, recipient.orgId, door);
+  if (!recipientKind.ok) return recipientKind;
+
+  let clientOrgId: string;
+  let listed: { principalId: string };
+  if (senderKind.kind === "client" && recipientKind.kind === "operator") {
+    clientOrgId = sender.orgId;
+    listed = { principalId: recipient.agentId };
+  } else if (senderKind.kind === "operator" && recipientKind.kind === "client") {
+    clientOrgId = recipient.orgId;
+    listed = { principalId: sender.principalId };
+  } else {
+    return denied(
+      "target-other-organisation",
+      door,
+      "The recipient belongs to another organisation that this sender may not reach.",
+    );
+  }
+
+  const rosterOf = lookups?.rosterOf;
+  if (typeof rosterOf !== "function") {
+    return denied("principal-lookup-failed", door, "No lookup was supplied for the roster.");
+  }
+  let roster: PrincipalIdList | null | undefined;
+  try {
+    roster = await rosterOf(clientOrgId);
+  } catch {
+    return denied("principal-lookup-failed", door, "The roster could not be read, so none is resolved.");
+  }
+  return assertPrincipalListed({ ...listed, orgId: clientOrgId, kind: "agent" }, roster, { door });
+}
