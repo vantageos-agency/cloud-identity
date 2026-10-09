@@ -106,4 +106,30 @@ describe("filterTargetsBelongingTo", () => {
     if (!r.ok) throw new Error("expected rows");
     expect(r.rows.map((x) => x.id)).toEqual(["1"]);
   });
+
+  it("fleetCrossOrg from a non-fleet principal is refused, for a non-empty and an empty list", async () => {
+    for (const rows of [[{ id: "r1", orgId: "org_a" }, { id: "r2", orgId: "org_b" }], []] as Row[][]) {
+      const r = await filterTargetsBelongingTo(AGENT_A, rows, lookups, { fleetCrossOrg: true, door: "export" });
+      if (r.ok) throw new Error("expected a refusal");
+      expect(r.refusal.code).toBe("RBAC_DENIED");
+      expect(r.refusal.reason).toBe("reserved-fleet-scope");
+      expect(r.refusal.door).toBe("export");
+    }
+  });
+
+  it("a fleet principal with fleetCrossOrg reads client-org rows; without it they are dropped", async () => {
+    const FLEET: ActingPrincipal = { principalId: "svc_fleet", orgId: "org_fleet", kind: "fleet" };
+    const rows: Row[] = [
+      { id: "1", orgId: "org_a" },
+      { id: "2", orgId: "org_fleet" },
+      { id: "3", orgId: "org_b" },
+      { id: "4" },
+    ];
+    const cross = await filterTargetsBelongingTo(FLEET, rows, lookups, { fleetCrossOrg: true });
+    if (!cross.ok) throw new Error("expected rows");
+    expect(cross.rows.map((x) => x.id)).toEqual(["1", "2", "3"]);
+    const plain = await filterTargetsBelongingTo(FLEET, rows, lookups);
+    if (!plain.ok) throw new Error("expected rows");
+    expect(plain.rows.map((x) => x.id)).toEqual(["2"]);
+  });
 });

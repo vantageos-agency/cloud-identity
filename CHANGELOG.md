@@ -32,7 +32,9 @@ input.
   success. A resolved principal whose rows all belong elsewhere gets
   `{ ok: true, rows: [] }`. Rows of other organisations, unstamped rows and a
   same-NAME row of another organisation are dropped. A lookup failure on any
-  row refuses the whole call, never a silent drop. Input order is kept. Type
+  row refuses the whole call, never a silent drop. `fleetCrossOrg: true` from a
+  principal that is not `kind: "fleet"` is refused `reserved-fleet-scope` for
+  any list. Input order is kept. Type
   `FilterTargetsResult`.
 
 ## [0.13.0]
