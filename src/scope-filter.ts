@@ -162,9 +162,10 @@ function grantFieldMatches(value: unknown, fromAllowList: string[]): boolean {
  * @deprecated Since 0.11.0. A `createdBy` name matched against
  * `fromAllowList` selects the row, which backend standard R-53 clause 1
  * forbids: a name never selects or authorises a row. Use
- * `resolveActingPrincipal` and `assertTargetBelongsTo`, which compare stored
- * IDs. Behaviour unchanged; it stays exported until consumers migrate off it,
- * and is removed in a major release.
+ * `resolveActingPrincipal` and `assertTargetBelongsTo` (one row) or
+ * `filterTargetsBelongingTo` (a list), which compare stored IDs. Behaviour
+ * unchanged; it stays exported until consumers migrate off it, and is removed
+ * in a major release.
  */
 export function passesScopeFilter<T extends ScopeFilterable>(
   oauthCtx: OAuthCtx,
@@ -195,9 +196,10 @@ export function passesScopeFilter<T extends ScopeFilterable>(
  *
  * @deprecated Since 0.11.0. It selects rows through `passesScopeFilter`,
  * where a `createdBy` name selects the row, which backend standard R-53
- * clause 1 forbids. Use `resolveActingPrincipal` and `assertTargetBelongsTo`,
- * which compare stored IDs. Behaviour unchanged; it stays exported until
- * consumers migrate off it, and is removed in a major release.
+ * clause 1 forbids. Use `resolveActingPrincipal` and `assertTargetBelongsTo`
+ * (one row) or `filterTargetsBelongingTo` (a list), which compare stored IDs.
+ * Behaviour unchanged; it stays exported until consumers migrate off it, and
+ * is removed in a major release.
  */
 export function scopeFilterList<T extends ScopeFilterable>(
   oauthCtx: OAuthCtx,
@@ -218,9 +220,10 @@ export function scopeFilterList<T extends ScopeFilterable>(
  *
  * @deprecated Since 0.11.0. It admits the row through `passesScopeFilter`,
  * where a `createdBy` name selects the row, which backend standard R-53
- * clause 1 forbids. Use `resolveActingPrincipal` and `assertTargetBelongsTo`,
- * which compare stored IDs. Behaviour unchanged; it stays exported until
- * consumers migrate off it, and is removed in a major release.
+ * clause 1 forbids. Use `resolveActingPrincipal` and `assertTargetBelongsTo`
+ * (one row) or `filterTargetsBelongingTo` (a list), which compare stored IDs.
+ * Behaviour unchanged; it stays exported until consumers migrate off it, and
+ * is removed in a major release.
  */
 export function scopeFilterGet<T extends ScopeFilterable>(
   oauthCtx: OAuthCtx,

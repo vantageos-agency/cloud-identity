@@ -183,7 +183,7 @@ await resolveTenant({ session: null }); // throws Error("Unauthenticated: no ses
   unrestricted access. Useful for skipping filtering you know is pointless;
   never as a substitute for it.
 
-**Deprecated since 0.11.0: `passesScopeFilter`, `scopeFilterGet` and
+**Deprecated since 0.11.0 (pointing to `filterTargetsBelongingTo` since 0.13.0): `passesScopeFilter`, `scopeFilterGet` and
 `scopeFilterList`.** All three (the last two through the first) admit a row
 when its `createdBy` NAME appears in the caller's `fromAllowList`, so a name
 selects the row, which backend standard R-53 clause 1 forbids. For a target
@@ -743,6 +743,27 @@ const may = await assertRecipientAddressable(who.principal, { agentId: to.id, or
   orgKindOf, rosterOf,
 }, { door: "send_message" });
 if (!may.ok) throw toHttpError(may.refusal);
+```
+
+**`filterTargetsBelongingTo(principal, rows, lookups, opts)`** (`./principal-by-id`, 0.13.0)
+
+Async. The ID-keyed replacement for `scopeFilterList`. Returns
+`{ ok: true, rows }` (the rows `assertTargetBelongsTo` admits, in input order)
+or `{ ok: false, refusal }`. `lookups` and `opts` are those of
+`assertTargetBelongsTo`. Type: `FilterTargetsResult`.
+
+- an absent or unresolved principal is a refusal naming the door, even for an
+  empty list; it is never `{ ok: true, rows: [] }`;
+- a resolved principal whose rows all belong elsewhere gets
+  `{ ok: true, rows: [] }`, so a refusal is distinguishable from an absence;
+- rows of other organisations, unstamped rows and a same-NAME row of another
+  organisation are dropped; a name never decides;
+- a lookup failure is a refusal of the whole call, never a silent drop.
+
+```js
+const out = await filterTargetsBelongingTo(who.principal, rows, { orgKindOf }, { door: "tasks:list" });
+if (!out.ok) throw toHttpError(out.refusal);
+return out.rows;
 ```
 
 **The fleet is the operator organisation.** The fleet is not a reserved ID: it

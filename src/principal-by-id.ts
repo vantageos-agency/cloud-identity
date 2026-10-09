@@ -515,6 +515,75 @@ export async function assertTargetBelongsTo(
 }
 
 // ---------------------------------------------------------------------------
+// filterTargetsBelongingTo (0.13.0, CI-3)
+// ---------------------------------------------------------------------------
+
+export type FilterTargetsResult<T> =
+  | { ok: true; rows: T[] }
+  | { ok: false; refusal: IdentityRefusal };
+
+/** Refusal reasons that say only "this ROW is not the principal's". */
+const ROW_NOT_OURS: ReadonlySet<string> = new Set([
+  "target-unstamped",
+  "target-other-organisation",
+  "target-owner-mismatch",
+  "reserved-fleet-scope",
+]);
+
+/**
+ * Keeps the rows that belong to the principal, deciding by STORED ID only.
+ * The ID-keyed replacement for the name-keyed `scopeFilterList`.
+ *
+ * Each row is judged by `assertTargetBelongsTo` (never re-derived here), so
+ * the same organisation, operator-org, unstamped, `ownerOnly` and
+ * `fleetCrossOrg` rules apply.
+ *
+ *   - The principal is proved FIRST, before any row is read. An absent or
+ *     unresolved principal, or a failed organisation-kind lookup for it,
+ *     returns `{ ok: false, refusal }` naming the door, even for an empty
+ *     list: a refusal is never an `ok: true` with no rows.
+ *   - A resolved principal whose rows all belong elsewhere gets
+ *     `{ ok: true, rows: [] }`: an absence, distinguishable from a refusal.
+ *   - A row that does not belong (other organisation, operator-org row,
+ *     unstamped, owner mismatch) is dropped. A same-NAME row of another
+ *     organisation is dropped: no name field is read.
+ *   - A lookup failure on any row refuses the whole call. It is never a
+ *     silent drop and never a pass; any refusal reason not known to mean
+ *     "this row is not yours" refuses too.
+ *   - The order of the kept rows is the order of the input.
+ */
+export async function filterTargetsBelongingTo<T extends TargetIds>(
+  principal: ActingPrincipal | null | undefined,
+  rows: readonly T[],
+  lookups: OrgKindLookups,
+  opts: AssertTargetOptions = {},
+): Promise<FilterTargetsResult<T>> {
+  const door = opts.door ?? "filterTargetsBelongingTo";
+  const doorOpts: AssertTargetOptions = { ...opts, door };
+
+  // Prove the principal on a target that is its own organisation's, owner
+  // check off: only a principal-level fault can refuse this.
+  const proof = await assertTargetBelongsTo(
+    principal,
+    { orgId: principal?.orgId },
+    lookups,
+    { ...doorOpts, ownerOnly: false, fleetCrossOrg: false },
+  );
+  if (!proof.ok) return proof;
+
+  const kept: T[] = [];
+  for (const row of rows) {
+    const verdict = await assertTargetBelongsTo(principal, row, lookups, doorOpts);
+    if (verdict.ok) {
+      kept.push(row);
+    } else if (!ROW_NOT_OURS.has(verdict.refusal.reason)) {
+      return verdict;
+    }
+  }
+  return { ok: true, rows: kept };
+}
+
+// ---------------------------------------------------------------------------
 // assertOrgAdmin (0.12.0)
 // ---------------------------------------------------------------------------
 
