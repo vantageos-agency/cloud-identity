@@ -32,6 +32,13 @@ export type FromAllowListEntry = string;
  * - `scope`: optional scope profile name. `"master"` triggers wildcard pass.
  */
 export type OAuthCtx = {
+  /**
+   * Names a non-master caller may see rows of (`row.createdBy`).
+   *
+   * @deprecated Since 0.13.0. A list of NAMES selects rows, and a name must
+   * never select or authorise one. Use `filterTargetsBelongingTo`, which
+   * compares stored IDs. Behaviour unchanged; removed when consumers migrate.
+   */
   fromAllowList: FromAllowListEntry[];
   namespaceReadPrefixes: NamespacePrefix[];
   namespaceWritePrefixes: NamespacePrefix[];
