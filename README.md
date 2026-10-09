@@ -814,6 +814,34 @@ left in the tables the door reads, then switch the door.
 takes a name as an identity input, and a test reads the exported signatures to
 keep it that way.
 
+### A caller's standing (0.13.0)
+
+`resolveCallerStanding(credential, lookups, { adminRoles, door? })` names which
+of the four callers is asking. It is built on `resolveActingPrincipal` and
+`assertOrgAdmin`; it is not a second path.
+
+| Credential (verified by you) | Standing |
+|---|---|
+| none, garbled, unknown or inactive principal | `anonymous`, with the typed `refusal` |
+| `{ kind: "person-no-org", personId }` | `pre-org` (signed in, no organisation) |
+| person or agent, or a non-operator service account, without the admin role | `member`, with `principal` |
+| person whose `verifiedOrgRole` is in `adminRoles` | `admin`, with `principal` |
+| service account of the operator organisation (`orgKindOf` is `"operator"`) | `fleet`, with `principal` |
+
+Types: `CallerCredential`, `AssertCallerStandingOptions`, `CallerStanding`.
+
+- A master token reaches `fleet` by your mapping it to the operator service
+  account: `validateMasterBearer` proves the secret, then you pass
+  `{ kind: "service", serviceAccountId }`. The package never mints a fleet
+  credential from a bearer.
+- A Clerk session reaches the function through `verifyClerkSessionToken`: with
+  an `org_id` claim, pass a `person` credential carrying `verifiedOrgId` and
+  `verifiedOrgRole`; without one, pass `person-no-org`. A person credential
+  that merely lacks `verifiedOrgId` is garbled and is `anonymous`, never `pre-org`.
+- Branch on `standing`, never on the absence of a field. `pre-org` is not
+  `anonymous`: refuse it where an organisation is needed, but answer it as a
+  signed-in caller (see the refusal rules of your read doors).
+
 ## What this package does not do
 
 Worth reading before you rely on it.

@@ -878,3 +878,70 @@ export async function assertRecipientAddressable(
   }
   return assertPrincipalListed({ ...listed, orgId: clientOrgId, kind: "agent" }, roster, { door });
 }
+
+// ---------------------------------------------------------------------------
+// resolveCallerStanding (0.13.0)
+// ---------------------------------------------------------------------------
+
+/**
+ * A verified session that carries a person but NO organisation (a signed-in
+ * user who has not joined one). `resolveActingPrincipal` cannot express this:
+ * a person credential requires `verifiedOrgId`, so a no-organisation session
+ * is refused there exactly as a garbled credential is. This kind exists so
+ * the consumer can say "verified, and no organisation" on purpose; an absent
+ * `verifiedOrgId` on a `person` credential stays a garbled credential.
+ */
+const preOrgCredentialSchema = z.strictObject({
+  kind: z.literal("person-no-org"),
+  personId: z.string().min(1),
+});
+
+export type CallerCredential =
+  | ActingCredential
+  | z.input<typeof preOrgCredentialSchema>;
+
+export type AssertCallerStandingOptions = {
+  /** Role values that make a person an organisation admin; see `assertOrgAdmin`. */
+  adminRoles: readonly string[];
+  /** The consumer's name for the door; carried on every refusal. */
+  door?: string;
+};
+
+/**
+ * The four callers, said apart. `anonymous` means no caller could be
+ * resolved (no credential, a garbled one, a miss, an inactive row) and carries
+ * the typed refusal; it is never what a signed-in session without an
+ * organisation becomes.
+ */
+export type CallerStanding =
+  | { standing: "anonymous"; refusal: IdentityRefusal }
+  | { standing: "pre-org"; personId: string }
+  | { standing: "member"; principal: ActingPrincipal }
+  | { standing: "admin"; principal: ActingPrincipal }
+  | { standing: "fleet"; principal: ActingPrincipal };
+
+/**
+ * Derives a caller's STANDING from a verified credential. It adds one case to
+ * the existing primitives, the signed-in session with no organisation, and
+ * reuses them for everything else: `resolveActingPrincipal` decides who the
+ * caller is (and `fleet`), `assertOrgAdmin` decides `admin` against the
+ * principal's own organisation. Any other resolved principal (a person
+ * without the admin role, an agent, a non-operator service account) is a
+ * `member`; read `principal.kind` to tell them apart.
+ */
+export async function resolveCallerStanding(
+  credential: CallerCredential | null | undefined,
+  lookups: PrincipalLookups,
+  opts: AssertCallerStandingOptions,
+): Promise<CallerStanding> {
+  const door = opts?.door ?? "resolveCallerStanding";
+  const preOrg = preOrgCredentialSchema.safeParse(credential);
+  if (preOrg.success) return { standing: "pre-org", personId: preOrg.data.personId };
+
+  const resolved = await resolveActingPrincipal(credential as ActingCredential | null | undefined, lookups, door);
+  if (!resolved.ok) return { standing: "anonymous", refusal: resolved.refusal };
+  const { principal } = resolved;
+  if (principal.kind === "fleet") return { standing: "fleet", principal };
+  const admin = assertOrgAdmin(principal, principal.orgId, { adminRoles: opts?.adminRoles, door });
+  return { standing: admin.ok ? "admin" : "member", principal };
+}
