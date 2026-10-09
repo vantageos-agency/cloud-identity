@@ -22,6 +22,18 @@ input.
   check reuses `assertPrincipalListed`. Types `RecipientIds`,
   `RecipientLookups`, `AssertRecipientAddressableOptions`,
   `AssertRecipientAddressableResult`.
+- `filterTargetsBelongingTo(principal, rows, lookups, opts?)` (CI-3): the
+  ID-keyed row filter that replaces the name-keyed `scopeFilterList`. Async;
+  returns `{ ok: true, rows }` or `{ ok: false, refusal }`. Each row is kept
+  exactly when `assertTargetBelongsTo` admits it (same `lookups` and options,
+  including `door`, `ownerOnly`, `fleetCrossOrg`); that function is reused, not
+  re-derived. The principal is proved first: an absent or unresolved principal
+  is a refusal naming the door, even for an empty list, never an empty
+  success. A resolved principal whose rows all belong elsewhere gets
+  `{ ok: true, rows: [] }`. Rows of other organisations, unstamped rows and a
+  same-NAME row of another organisation are dropped. A lookup failure on any
+  row refuses the whole call, never a silent drop. Input order is kept. Type
+  `FilterTargetsResult`.
 
 ## [0.13.0]
 
@@ -43,6 +55,13 @@ function changes behaviour for an existing input.
   `AssertPrincipalListedResult`.
 - New `IdentityRefusalReason` values: `list-absent`, `list-empty`,
   `principal-not-an-agent`, `principal-not-listed`.
+
+### Deprecated
+
+- `scopeFilterList`, `scopeFilterGet`, `passesScopeFilter` and the name-keyed
+  `OAuthCtx.fromAllowList` field now point to `filterTargetsBelongingTo` in
+  their TSDoc. Behaviour is unchanged; they are removed when the consumer
+  migrates.
 
 ## [0.12.0]
 

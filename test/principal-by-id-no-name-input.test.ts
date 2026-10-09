@@ -140,12 +140,12 @@ describe("principal-by-id — no exported function accepts a name as identity", 
     checker = program.getTypeChecker();
   }, 60_000);
 
-  it("the exported functions are the four expected, so the scan is not vacuous", () => {
+  it("the exported functions are the six expected, so the scan is not vacuous", () => {
     const fns = moduleExports("src/principal-by-id.ts")
       .filter((s) => s.flags & ts.SymbolFlags.Function)
       .map((s) => s.getName())
       .sort();
-    expect(fns).toEqual(["assertOrgAdmin", "assertPrincipalListed", "assertRecipientAddressable", "assertTargetBelongsTo", "resolveActingPrincipal"]);
+    expect(fns).toEqual(["assertOrgAdmin", "assertPrincipalListed", "assertRecipientAddressable", "assertTargetBelongsTo", "filterTargetsBelongingTo", "resolveActingPrincipal"]);
   });
 
   it("every identifier reachable from their inputs is an ID, a kind, an option or a door", () => {
