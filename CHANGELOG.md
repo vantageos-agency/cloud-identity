@@ -22,6 +22,14 @@ input.
   check reuses `assertPrincipalListed`. Types `RecipientIds`,
   `RecipientLookups`, `AssertRecipientAddressableOptions`,
   `AssertRecipientAddressableResult`.
+- `resolveCallerStanding(credential, lookups, { adminRoles, door? })` (CI-4):
+  names a caller's standing as `anonymous` (with the typed refusal), `pre-org`
+  (a verified session with no organisation, via the new
+  `{ kind: "person-no-org", personId }` credential), `member`, `admin` or
+  `fleet`. Built on `resolveActingPrincipal` and `assertOrgAdmin`; the only
+  case the existing primitives could not say was `pre-org`, which they refuse
+  like a garbled credential. Types `CallerCredential`,
+  `AssertCallerStandingOptions`, `CallerStanding`.
 - `filterTargetsBelongingTo(principal, rows, lookups, opts?)` (CI-3): the
   ID-keyed row filter that replaces the name-keyed `scopeFilterList`. Async;
   returns `{ ok: true, rows }` or `{ ok: false, refusal }`. Each row is kept
