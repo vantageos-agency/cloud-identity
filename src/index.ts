@@ -212,6 +212,7 @@ export {
   assertOrgAdmin,
   assertPrincipalListed,
   assertRecipientAddressable,
+  resolveCallerStanding,
 } from "./principal-by-id.js";
 export type {
   ActingCredential,
@@ -236,4 +237,7 @@ export type {
   RecipientLookups,
   AssertRecipientAddressableOptions,
   AssertRecipientAddressableResult,
+  CallerCredential,
+  AssertCallerStandingOptions,
+  CallerStanding,
 } from "./principal-by-id.js";
