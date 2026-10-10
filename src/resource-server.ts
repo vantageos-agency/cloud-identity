@@ -33,6 +33,18 @@ function requireAbsoluteUrl(fn: string, name: string, value: unknown): URL {
   }
 }
 
+/**
+ * A resource identifier (RFC 8707 section 2, RFC 9728): an absolute URL with no
+ * fragment. The one validator for the metadata `resource` and the token audience.
+ */
+function requireResourceIdentifier(fn: string, name: string, value: unknown): URL {
+  const url = requireAbsoluteUrl(fn, name, value);
+  if (url.hash !== "" || (value as string).includes("#")) {
+    throw new Error(`cloud-identity: ${fn}: ${name} must not carry a fragment`);
+  }
+  return url;
+}
+
 // ---------------------------------------------------------------------------
 // RFC 9728 Protected Resource Metadata
 // ---------------------------------------------------------------------------
@@ -71,10 +83,7 @@ export function buildProtectedResourceMetadata(
   config: ProtectedResourceMetadataConfig,
 ): ProtectedResourceMetadata {
   const fn = "buildProtectedResourceMetadata";
-  const resource = requireAbsoluteUrl(fn, "resource", config.resource);
-  if (resource.hash !== "" || config.resource.includes("#")) {
-    throw new Error(`cloud-identity: ${fn}: resource must not carry a fragment`);
-  }
+  requireResourceIdentifier(fn, "resource", config.resource);
   if (!Array.isArray(config.authorizationServers) || config.authorizationServers.length === 0) {
     throw new Error(`cloud-identity: ${fn} requires at least one authorizationServer`);
   }
@@ -210,7 +219,7 @@ export type VerifyMcpAccessTokenResult =
  * - key set unreachable: `503`, no challenge, `jwks-unavailable` (an outage is
  *   never reported as a bad credential)
  *
- * A missing issuer or audience in the config throws: the check is never skipped.
+ * A missing issuer, or a missing or non-URL audience, in the config throws: the check is never skipped.
  * `nowMs` is injectable for tests. The token never appears in a result.
  */
 export async function verifyMcpAccessToken(
@@ -220,7 +229,7 @@ export async function verifyMcpAccessToken(
 ): Promise<VerifyMcpAccessTokenResult> {
   const fn = "verifyMcpAccessToken";
   requireNonEmpty(fn, "issuer", config.issuer);
-  requireNonEmpty(fn, "audience", config.audience);
+  requireResourceIdentifier(fn, "audience", config.audience);
   requireNonEmpty(fn, "realm", config.realm);
   requireAbsoluteUrl(fn, "resourceMetadataUrl", config.resourceMetadataUrl);
   const door = config.door ?? DEFAULT_DOOR;
