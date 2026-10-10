@@ -264,8 +264,8 @@ export type {
 
 // 0.16.0 — An organisation is its permanent ID: the credential's org_id claim to
 // the org's mapping row, the ID comparisons and the operator org. Labels
-// (slugs) never select or prove an org, except through the opt-in transitional
-// `labelFallback`. The label-to-ID derivation is exported only as
+// (slugs) never select or prove an org; no option turns that on. The
+// label-to-ID derivation is exported only as
 // `resolveOrgIdForLabelBackfillOnly`, for a one-off backfill.
 export {
   sameOrg,
@@ -278,7 +278,6 @@ export {
 } from "./org-by-id.js";
 export type {
   OrgRef,
-  OrgKeyOptions,
   OrgMappingRow,
   OrgMappingLookups,
   ResolvedOrg,

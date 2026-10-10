@@ -68,8 +68,7 @@ export type IdentityRefusalReason =
   // organisation by ID (0.16.0)
   | "org-mapping-lookup-failed"
   | "org-mapping-not-found"
-  | "org-mapping-record-invalid"
-  | "org-id-contradicts-label";
+  | "org-mapping-record-invalid";
 
 export type IdentityRefusal = {
   code: IdentityRefusalCode;

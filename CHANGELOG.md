@@ -22,7 +22,7 @@ existing function changes behaviour for an existing input.
 
 ### Added
 
-- `resolveOrgFromClaim(claims, lookups, { door?, labelFallback? })`: a verified
+- `resolveOrgFromClaim(claims, lookups, { door? })`: a verified
   credential's `org_id` claim to the org's mapping row (roster, scopes, kind).
 - `sameOrg`, `isFleetStamp`, `sameTenantStamp`: comparisons over `OrgRef`
   (`{ id?, label? }`). Unstamped is never a match.
@@ -31,16 +31,23 @@ existing function changes behaviour for an existing input.
   or a typed `ORG_ID_ABSENT` absence. For the one-off backfill only; it must
   never be called on a request path, and the name says so. (Developed as
   `resolveOrgIdForLabel`; that name was never published.)
-- `orgMappingRowSchema` and the types `OrgRef`, `OrgKeyOptions`, `OrgMappingRow`,
+- `orgMappingRowSchema` and the types `OrgRef`, `OrgMappingRow`,
   `OrgMappingLookups`, `ResolvedOrg`, `ResolveOrgFromClaimOptions`,
   `ResolveOrgFromClaimResult`, `OrgIdAbsence`, `OrgIdAbsenceReason`,
   `OrgIdResolution`, `OperatorOrgLookups`, `FindOperatorOrgOptions`,
   `OperatorOrgResult`.
-- `labelFallback: true` (default off): transitional comparison by label while
-  either side has no ID.
 - New `IdentityRefusalReason` values: `org-mapping-lookup-failed`,
-  `org-mapping-not-found`, `org-mapping-record-invalid`,
-  `org-id-contradicts-label`.
+  `org-mapping-not-found`, `org-mapping-record-invalid`.
+
+### No label resolution
+
+An organisation is never resolved from its label on a request path, and no
+option turns that on. A transitional `labelFallback` option was developed and
+removed before publication: `sameOrg`, `isFleetStamp`, `sameTenantStamp` and
+`resolveOrgFromClaim` compare and select by org ID only, a label-only input
+refuses, and the `org-id-contradicts-label` reason and the `source` field of
+`ResolvedOrg` went with it. The label adapter is read only by
+`resolveOrgIdForLabelBackfillOnly`.
 
 ## [0.15.0]
 
