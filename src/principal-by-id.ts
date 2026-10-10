@@ -515,7 +515,7 @@ export async function assertTargetBelongsTo(
 }
 
 // ---------------------------------------------------------------------------
-// filterTargetsBelongingTo (0.13.0, CI-3)
+// filterTargetsBelongingTo (0.14.0, CI-3)
 // ---------------------------------------------------------------------------
 
 export type FilterTargetsResult<T> =
@@ -763,7 +763,7 @@ export function assertPrincipalListed(
 }
 
 // ---------------------------------------------------------------------------
-// assertRecipientAddressable (0.13.0)
+// assertRecipientAddressable (0.14.0)
 // ---------------------------------------------------------------------------
 
 /** The recipient of a message, named by its stored agent ID and organisation ID. */
@@ -880,7 +880,7 @@ export async function assertRecipientAddressable(
 }
 
 // ---------------------------------------------------------------------------
-// resolveCallerStanding (0.13.0)
+// resolveCallerStanding (0.14.0)
 // ---------------------------------------------------------------------------
 
 /**

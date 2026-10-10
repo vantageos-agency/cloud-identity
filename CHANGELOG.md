@@ -5,8 +5,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [0.14.0]
 
-**Additive: who may address whom, decided by agent ID only
-(`./principal-by-id`).** No existing function changes behaviour for an existing
+**Additive: who may address whom, which rows a caller may see, and a caller's
+standing, decided by agent ID only (`./principal-by-id`).** No existing function changes behaviour for an existing
 input.
 
 ### Added
@@ -45,6 +45,13 @@ input.
   any list. Input order is kept. Type
   `FilterTargetsResult`.
 
+### Deprecated
+
+- `scopeFilterList`, `scopeFilterGet`, `passesScopeFilter` and the name-keyed
+  `OAuthCtx.fromAllowList` field now point to `filterTargetsBelongingTo` in
+  their TSDoc. Behaviour is unchanged; they are removed when the consumer
+  migrates.
+
 ## [0.13.0]
 
 **Additive: admission by membership of a stored list, by agent ID only
@@ -65,13 +72,6 @@ function changes behaviour for an existing input.
   `AssertPrincipalListedResult`.
 - New `IdentityRefusalReason` values: `list-absent`, `list-empty`,
   `principal-not-an-agent`, `principal-not-listed`.
-
-### Deprecated
-
-- `scopeFilterList`, `scopeFilterGet`, `passesScopeFilter` and the name-keyed
-  `OAuthCtx.fromAllowList` field now point to `filterTargetsBelongingTo` in
-  their TSDoc. Behaviour is unchanged; they are removed when the consumer
-  migrates.
 
 ## [0.12.0]
 
