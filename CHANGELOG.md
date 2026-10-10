@@ -94,7 +94,6 @@ resource-server package is no longer needed.
 - `IdentityRefusalReason` gains `bearer-missing`, `bearer-malformed`,
   `token-invalid`, `jwks-unavailable`.
 
-
 ### Fixed
 
 - `verifyMcpAccessToken` now validates `audience` as an absolute URL with no
