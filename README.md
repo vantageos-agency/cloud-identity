@@ -183,7 +183,7 @@ await resolveTenant({ session: null }); // throws Error("Unauthenticated: no ses
   unrestricted access. Useful for skipping filtering you know is pointless;
   never as a substitute for it.
 
-**Deprecated since 0.11.0 (pointing to `filterTargetsBelongingTo` since 0.13.0): `passesScopeFilter`, `scopeFilterGet` and
+**Deprecated since 0.11.0 (pointing to `filterTargetsBelongingTo` since 0.14.0): `passesScopeFilter`, `scopeFilterGet` and
 `scopeFilterList`.** All three (the last two through the first) admit a row
 when its `createdBy` NAME appears in the caller's `fromAllowList`, so a name
 selects the row, which backend standard R-53 clause 1 forbids. For a target
@@ -720,7 +720,7 @@ const listed = assertPrincipalListed(who.principal, { orgId: row.orgId, principa
 if (!listed.ok) throw toHttpError(listed.refusal);
 ```
 
-**`assertRecipientAddressable(sender, recipient, lookups, opts)`** (`./principal-by-id`, 0.13.0)
+**`assertRecipientAddressable(sender, recipient, lookups, opts)`** (`./principal-by-id`, 0.14.0)
 
 Async. Returns `{ ok: true }` or `{ ok: false, refusal }`. `recipient` is
 `{ agentId, orgId }`; `lookups` is `{ orgKindOf, rosterOf }` where
@@ -745,7 +745,7 @@ const may = await assertRecipientAddressable(who.principal, { agentId: to.id, or
 if (!may.ok) throw toHttpError(may.refusal);
 ```
 
-**`filterTargetsBelongingTo(principal, rows, lookups, opts)`** (`./principal-by-id`, 0.13.0)
+**`filterTargetsBelongingTo(principal, rows, lookups, opts)`** (`./principal-by-id`, 0.14.0)
 
 Async. The ID-keyed replacement for `scopeFilterList`. Returns
 `{ ok: true, rows }` (the rows `assertTargetBelongsTo` admits, in input order)
@@ -814,7 +814,7 @@ left in the tables the door reads, then switch the door.
 takes a name as an identity input, and a test reads the exported signatures to
 keep it that way.
 
-### A caller's standing (0.13.0)
+### A caller's standing (0.14.0)
 
 `resolveCallerStanding(credential, lookups, { adminRoles, door? })` names which
 of the four callers is asking. It is built on `resolveActingPrincipal` and

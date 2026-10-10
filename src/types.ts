@@ -35,7 +35,7 @@ export type OAuthCtx = {
   /**
    * Names a non-master caller may see rows of (`row.createdBy`).
    *
-   * @deprecated Since 0.13.0. A list of NAMES selects rows, and a name must
+   * @deprecated Since 0.14.0. A list of NAMES selects rows, and a name must
    * never select or authorise one. Use `filterTargetsBelongingTo`, which
    * compares stored IDs. Behaviour unchanged; removed when consumers migrate.
    */
