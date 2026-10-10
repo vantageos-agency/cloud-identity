@@ -107,12 +107,6 @@ export interface AuthorizeConfig {
    * auto-picked.
    */
   requireConsent?: boolean;
-  /**
-   * The issuer identifier of THIS authorization server (RFC 9207). When set, it
-   * is returned as `iss` on the denial redirect. It is the consumer's own
-   * issuer URL, never the Clerk session issuer. Omitted: no `iss` is sent.
-   */
-  issuer?: string;
 }
 
 export interface AuthorizeDeps {
@@ -395,25 +389,25 @@ async function bindAndIssue(
   } catch {
     return refused("code-store-unavailable");
   }
-  return clientRedirect(req, { code }, cfg);
+  return clientRedirect(req, { code });
 }
 
 /**
  * The one place the redirect to the client's registered `redirect_uri` is
  * built: the success redirect (`code`) and the denial redirect (`error`) share
- * it, so `state` and `iss` are handled identically.
+ * it, so `state` is handled identically. The RFC 9207 `iss` is NOT added
+ * here: the consumer, which owns the issuer, appends it to every
+ * `redirect-to-client` outcome.
  */
 function clientRedirect(
   req: ValidatedRequest,
   result: { code: string } | { error: "access_denied" },
-  cfg: AuthorizeConfig,
 ): AuthorizeOutcome {
   const back = new URL(req.redirectUri);
   if ("code" in result) {
     back.searchParams.set("code", result.code);
   } else {
     back.searchParams.set("error", result.error);
-    if (cfg.issuer !== undefined) back.searchParams.set("iss", cfg.issuer);
   }
   if (req.state !== null) back.searchParams.set("state", req.state);
   return { kind: "redirect-to-client", url: back.toString() };
@@ -541,7 +535,7 @@ export async function resumeAuthorize(
     // Everything above verified: the state, the client and the session. Only
     // now is the person's refusal answered with the OAuth error redirect.
     if (input.approved === true) return refused("invalid-request");
-    return clientRedirect(v.req, { error: "access_denied" }, cfg);
+    return clientRedirect(v.req, { error: "access_denied" });
   }
 
   return bindAndIssue(

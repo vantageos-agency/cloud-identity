@@ -798,9 +798,8 @@ describe("consent cannot be minted by the client", () => {
 });
 
 describe("picker redirect origin and person denial", () => {
-  const AS_ISSUER = "https://mcp.example.test";
   const denySetup = (memberships = [orgA, orgB]) =>
-    setup(memberships, { requireConsent: true, issuer: AS_ISSUER });
+    setup(memberships, { requireConsent: true });
   const stateFor = async (cfg: AuthorizeConfig, deps: AuthorizeDeps) => {
     const out = await startAuthorize(await params(), undefined, cfg, deps);
     if (out.kind !== "redirect-to-sign-in") throw new Error("setup");
@@ -815,7 +814,7 @@ describe("picker redirect origin and person denial", () => {
     expect(out.model.redirectOrigin).toBe(new URL(REDIRECT).origin);
   });
 
-  it("a denial with verified state and a valid session redirects with access_denied, state and iss", async () => {
+  it("a denial with verified state and a valid session redirects with access_denied and state, and no iss", async () => {
     const { cfg, deps, store } = denySetup();
     const state = await stateFor(cfg, deps);
     const out = await resumeAuthorize(
@@ -829,7 +828,8 @@ describe("picker redirect origin and person denial", () => {
     expect(`${u.origin}${u.pathname}`).toBe(REDIRECT);
     expect(u.searchParams.get("error")).toBe("access_denied");
     expect(u.searchParams.get("state")).toBe("client-state");
-    expect(u.searchParams.get("iss")).toBe(AS_ISSUER);
+    // the consumer appends RFC 9207 `iss` to every redirect-to-client outcome
+    expect(u.searchParams.has("iss")).toBe(false);
     expect(u.searchParams.has("code")).toBe(false);
     expect(store.rows.size).toBe(0);
   });

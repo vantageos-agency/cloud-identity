@@ -336,9 +336,10 @@ const res = await exchangeAuthorizationCode(
   (display-only; it grants nothing).
   Denial: post `denied: true` (an explicit flag, never inferred from a missing
   `approved`). Once the state, the client and the session verify,
-  `resumeAuthorize` returns `redirect-to-client` carrying `error=access_denied`,
-  the client's `state` and, when `AuthorizeConfig.issuer` is set, `iss`
-  (RFC 9207). A tampered or expired state, an unknown client or a failed
+  `resumeAuthorize` returns `redirect-to-client` carrying `error=access_denied`
+  and the client's `state`. This package never adds `iss`: the RFC 9207 `iss`
+  is appended by the consumer (the authorization server that owns the issuer)
+  to every `redirect-to-client` outcome, success and denial alike. A tampered or expired state, an unknown client or a failed
   session is a refusal, never a redirect; `denied` with `approved: true` is
   refused as `invalid-request`.
   A posted `orgId` is honoured only if the verified user's own membership list

@@ -12,12 +12,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   (display-only).
 - Person denial: `ResumeInput.denied: true`. After the signed state, the
   client and the Clerk session all verify, `resumeAuthorize` returns
-  `redirect-to-client` with `error=access_denied`, the client's `state` and,
-  when `AuthorizeConfig.issuer` is set, `iss` (RFC 9207). A tampered or
+  `redirect-to-client` with `error=access_denied` and the client's `state`
+  (no `iss`: the consumer appends RFC 9207 `iss` to every `redirect-to-client`
+  outcome, success and denial alike). A tampered or
   expired state, an unknown client or a failed session stays a refusal;
   `denied` together with `approved: true` is refused (`invalid-request`).
-- `AuthorizeConfig.issuer`: the issuer identifier of the consumer's own
-  authorization server, used for `iss` on the denial redirect.
 
 ### Changed
 
