@@ -3,7 +3,28 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.17.0]
+
+### Added
+
+- `OrgPickerModel.redirectOrigin`: the origin of the `redirect_uri` that was
+  validated against the registered client, for the consent page to display
+  (display-only).
+- Person denial: `ResumeInput.denied: true`. After the signed state, the
+  client and the Clerk session all verify, `resumeAuthorize` returns
+  `redirect-to-client` with `error=access_denied`, the client's `state` and,
+  when `AuthorizeConfig.issuer` is set, `iss` (RFC 9207). A tampered or
+  expired state, an unknown client or a failed session stays a refusal;
+  `denied` together with `approved: true` is refused (`invalid-request`).
+- `AuthorizeConfig.issuer`: the issuer identifier of the consumer's own
+  authorization server, used for `iss` on the denial redirect.
+
+### Changed
+
+- `prepublishOnly` now runs `npm run build` only; the test suite is not part
+  of the publish step.
+
+## [0.15.0]
 
 ### Fixed
 

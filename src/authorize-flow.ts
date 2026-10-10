@@ -107,6 +107,12 @@ export interface AuthorizeConfig {
    * auto-picked.
    */
   requireConsent?: boolean;
+  /**
+   * The issuer identifier of THIS authorization server (RFC 9207). When set, it
+   * is returned as `iss` on the denial redirect. It is the consumer's own
+   * issuer URL, never the Clerk session issuer. Omitted: no `iss` is sent.
+   */
+  issuer?: string;
 }
 
 export interface AuthorizeDeps {
@@ -130,6 +136,12 @@ export interface OrgPickerModel {
   client: { clientId: string; clientName: string | null };
   resource: string;
   scope: string;
+  /**
+   * The origin of the `redirect_uri` that was validated against the registered
+   * client, so the consent page can show where the person will be sent.
+   * Display-only: it grants nothing and is never read back.
+   */
+  redirectOrigin: string;
   /** Only organisations the verified user is a member of. */
   organizations: readonly {
     id: string;
@@ -164,6 +176,12 @@ export interface ResumeInput {
   approved?: boolean;
   /** The `consentToken` of the picker the person was shown. Required with `approved: true` when consent is on. */
   consentToken?: string;
+  /**
+   * The person explicitly refused. An explicit flag, never inferred from
+   * `approved` being absent. Honoured only after the state, the client and the
+   * session all verify; combined with `approved: true` it is refused.
+   */
+  denied?: true;
 }
 
 // ---------------------------------------------------------------------------
@@ -345,6 +363,7 @@ async function bindAndIssue(
         client: { clientId: req.clientId, clientName },
         resource: req.resource,
         scope: req.scope,
+        redirectOrigin: new URL(req.redirectUri).origin,
         organizations: memberships.map((m) => ({
           id: m.organization.id,
           slug: m.organization.slug,
@@ -376,8 +395,26 @@ async function bindAndIssue(
   } catch {
     return refused("code-store-unavailable");
   }
+  return clientRedirect(req, { code }, cfg);
+}
+
+/**
+ * The one place the redirect to the client's registered `redirect_uri` is
+ * built: the success redirect (`code`) and the denial redirect (`error`) share
+ * it, so `state` and `iss` are handled identically.
+ */
+function clientRedirect(
+  req: ValidatedRequest,
+  result: { code: string } | { error: "access_denied" },
+  cfg: AuthorizeConfig,
+): AuthorizeOutcome {
   const back = new URL(req.redirectUri);
-  back.searchParams.set("code", code);
+  if ("code" in result) {
+    back.searchParams.set("code", result.code);
+  } else {
+    back.searchParams.set("error", result.error);
+    if (cfg.issuer !== undefined) back.searchParams.set("iss", cfg.issuer);
+  }
   if (req.state !== null) back.searchParams.set("state", req.state);
   return { kind: "redirect-to-client", url: back.toString() };
 }
@@ -499,6 +536,13 @@ export async function resumeAuthorize(
     nowOf(deps),
   );
   if (!verified.ok) return { kind: "refused", refusal: verified.refusal };
+
+  if (input.denied === true) {
+    // Everything above verified: the state, the client and the session. Only
+    // now is the person's refusal answered with the OAuth error redirect.
+    if (input.approved === true) return refused("invalid-request");
+    return clientRedirect(v.req, { error: "access_denied" }, cfg);
+  }
 
   return bindAndIssue(
     v.req,

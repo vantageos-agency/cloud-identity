@@ -331,6 +331,16 @@ const res = await exchangeAuthorizationCode(
   `redirect-to-sign-in`, `org-picker` (an `OrgPickerModel` the consumer renders;
   it lists only the user's own organisations), `redirect-to-client` (the URL
   carrying the code and the client's `state`) or `refused`.
+  `OrgPickerModel.redirectOrigin` is the origin of the registered
+  `redirect_uri` the person will be sent to, for the consent page to display
+  (display-only; it grants nothing).
+  Denial: post `denied: true` (an explicit flag, never inferred from a missing
+  `approved`). Once the state, the client and the session verify,
+  `resumeAuthorize` returns `redirect-to-client` carrying `error=access_denied`,
+  the client's `state` and, when `AuthorizeConfig.issuer` is set, `iss`
+  (RFC 9207). A tampered or expired state, an unknown client or a failed
+  session is a refusal, never a redirect; `denied` with `approved: true` is
+  refused as `invalid-request`.
   A posted `orgId` is honoured only if the verified user's own membership list
   contains it.
   Consent is ON by default (`requireConsent` defaults to true). What it
