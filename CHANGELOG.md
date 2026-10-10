@@ -12,6 +12,36 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `buildProtectedResourceMetadata`. A whitespace-only, non-URL or
   fragment-bearing audience throws the config error instead of being accepted.
 
+## [0.16.0]
+
+**Additive: an organisation is its permanent ID (`./org-by-id`).** A consumer
+used to keep its own copy of "which org is this credential", "are these two
+rows one org", "which org is the operator" and "what is this slug's org ID".
+Those decisions are now the package's, keyed on IDs, refusing by default. No
+existing function changes behaviour for an existing input.
+
+### Added
+
+- `resolveOrgFromClaim(claims, lookups, { door?, labelFallback? })`: a verified
+  credential's `org_id` claim to the org's mapping row (roster, scopes, kind).
+- `sameOrg`, `isFleetStamp`, `sameTenantStamp`: comparisons over `OrgRef`
+  (`{ id?, label? }`). Unstamped is never a match.
+- `findOperatorOrg(lookups, { cap? })`: `one | none | many | overCap | unreadable`.
+- `resolveOrgIdForLabelBackfillOnly(label, lookups)`: label to permanent ID,
+  or a typed `ORG_ID_ABSENT` absence. For the one-off backfill only; it must
+  never be called on a request path, and the name says so. (Developed as
+  `resolveOrgIdForLabel`; that name was never published.)
+- `orgMappingRowSchema` and the types `OrgRef`, `OrgKeyOptions`, `OrgMappingRow`,
+  `OrgMappingLookups`, `ResolvedOrg`, `ResolveOrgFromClaimOptions`,
+  `ResolveOrgFromClaimResult`, `OrgIdAbsence`, `OrgIdAbsenceReason`,
+  `OrgIdResolution`, `OperatorOrgLookups`, `FindOperatorOrgOptions`,
+  `OperatorOrgResult`.
+- `labelFallback: true` (default off): transitional comparison by label while
+  either side has no ID.
+- New `IdentityRefusalReason` values: `org-mapping-lookup-failed`,
+  `org-mapping-not-found`, `org-mapping-record-invalid`,
+  `org-id-contradicts-label`.
+
 ## [0.15.0]
 
 **Additive: resource-server primitives (`./resource-server`).** No existing
