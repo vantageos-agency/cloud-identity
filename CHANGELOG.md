@@ -3,6 +3,15 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `verifyMcpAccessToken` now validates `audience` as an absolute URL with no
+  fragment (RFC 8707 section 2), with the same validator as the `resource` of
+  `buildProtectedResourceMetadata`. A whitespace-only, non-URL or
+  fragment-bearing audience throws the config error instead of being accepted.
+
 ## [0.15.0]
 
 **Additive: resource-server primitives (`./resource-server`).** No existing
