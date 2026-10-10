@@ -242,7 +242,7 @@ export type {
   CallerStanding,
 } from "./principal-by-id.js";
 
-// Unreleased (version fixed by the owner at release) — Resource-server primitives: RFC 9728 protected resource metadata,
+// 0.15.0 — Resource-server primitives: RFC 9728 protected resource metadata,
 // the RFC 6750 401 challenge, issuer discovery URLs and MCP access-token
 // verification bound to this resource. Replaces the standalone resource-server
 // package; one identity layer.
