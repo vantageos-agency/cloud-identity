@@ -108,7 +108,7 @@ describe("buildProtectedResourceMetadata", () => {
       resource: AUDIENCE,
       authorizationServers: [ISSUER],
       scopesSupported: ["mcp:read", "mcp:write"],
-      resourceName: "Tenant A MCP",
+      resourceLabel: "Tenant A MCP",
       resourceDocumentation: "https://docs.example.com/mcp",
       bearerMethodsSupported: ["header"],
     });

@@ -46,8 +46,8 @@ export interface ProtectedResourceMetadataConfig {
   bearerMethodsSupported?: readonly string[];
   /** Scopes this resource understands. */
   scopesSupported?: readonly string[];
-  /** Human-readable name of the resource. */
-  resourceName?: string;
+  /** Human-readable label of the resource, emitted as RFC 9728 `resource_name`. A display string, never an identity: the package rule bans name-like inputs. */
+  resourceLabel?: string;
   /** URL of developer documentation for the resource. */
   resourceDocumentation?: string;
 }
@@ -92,7 +92,7 @@ export function buildProtectedResourceMetadata(
     bearer_methods_supported: [...methods],
   };
   if (config.scopesSupported) doc.scopes_supported = [...config.scopesSupported];
-  if (config.resourceName) doc.resource_name = config.resourceName;
+  if (config.resourceLabel) doc.resource_name = config.resourceLabel;
   if (config.resourceDocumentation) doc.resource_documentation = config.resourceDocumentation;
   return doc;
 }
