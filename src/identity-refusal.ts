@@ -59,7 +59,12 @@ export type IdentityRefusalReason =
   | "list-absent"
   | "list-empty"
   | "principal-not-an-agent"
-  | "principal-not-listed";
+  | "principal-not-listed"
+  // resource server: MCP access token (0.15.0)
+  | "bearer-missing"
+  | "bearer-malformed"
+  | "token-invalid"
+  | "jwks-unavailable";
 
 export type IdentityRefusal = {
   code: IdentityRefusalCode;

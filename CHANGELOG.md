@@ -3,6 +3,40 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+**Additive: resource-server primitives (`./resource-server`).** No existing
+function changes behaviour for an existing input. This is the identity layer an
+MCP server needs as an OAuth 2.1 protected resource, so a separate
+resource-server package is no longer needed.
+
+### Added
+
+- `buildProtectedResourceMetadata(config)`: the RFC 9728 document served at
+  `/.well-known/oauth-protected-resource` (`resource`, `authorization_servers`,
+  `bearer_methods_supported`, optional `scopes_supported`, `resource_name`,
+  `resource_documentation`). Throws on a relative or fragment-bearing resource,
+  an empty or relative authorization server list, or empty bearer methods.
+- `unauthorizedChallenge(config)`: the `401` status and a `WWW-Authenticate:
+  Bearer` value that always carries `resource_metadata` (RFC 9728 section 5.1),
+  with optional `error`, `error_description` and `scope` (RFC 6750). Values are
+  quoted and escaped; a line break throws.
+- `deriveClerkDiscoveryUrls(issuer)`: the OIDC discovery and JWKS URLs of an
+  `https` issuer.
+- `verifyMcpAccessToken(authorization, config, nowMs?)`: reads the `Authorization`
+  header and verifies the token for this resource by delegating to
+  `verifyClerkSessionToken` (RS256 only; signature, `iss`, `aud`, `exp`, `nbf`),
+  with the audience mandatory. Returns the verified session, or a typed
+  `CREDENTIAL_REFUSED` refusal with the `401` envelope (`bearer-missing` and
+  `bearer-malformed` answer `invalid_request`; `token-invalid` answers
+  `invalid_token`), or `503` with no challenge when the key set is unreachable
+  (`jwks-unavailable`). A missing issuer or audience throws.
+- Types `ProtectedResourceMetadataConfig`, `ProtectedResourceMetadata`,
+  `UnauthorizedChallengeConfig`, `UnauthorizedChallenge`, `ClerkDiscoveryUrls`,
+  `McpResourceServerConfig`, `VerifyMcpAccessTokenResult`.
+- `IdentityRefusalReason` gains `bearer-missing`, `bearer-malformed`,
+  `token-invalid`, `jwks-unavailable`.
+
 ## [0.14.0]
 
 **Additive: who may address whom, which rows a caller may see, and a caller's

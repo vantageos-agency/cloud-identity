@@ -241,3 +241,23 @@ export type {
   AssertCallerStandingOptions,
   CallerStanding,
 } from "./principal-by-id.js";
+
+// 0.15.0 — Resource-server primitives: RFC 9728 protected resource metadata,
+// the RFC 6750 401 challenge, issuer discovery URLs and MCP access-token
+// verification bound to this resource. Replaces the standalone resource-server
+// package; one identity layer.
+export {
+  buildProtectedResourceMetadata,
+  unauthorizedChallenge,
+  deriveClerkDiscoveryUrls,
+  verifyMcpAccessToken,
+} from "./resource-server.js";
+export type {
+  ProtectedResourceMetadataConfig,
+  ProtectedResourceMetadata,
+  UnauthorizedChallengeConfig,
+  UnauthorizedChallenge,
+  ClerkDiscoveryUrls,
+  McpResourceServerConfig,
+  VerifyMcpAccessTokenResult,
+} from "./resource-server.js";

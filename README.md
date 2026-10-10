@@ -842,6 +842,59 @@ Types: `CallerCredential`, `AssertCallerStandingOptions`, `CallerStanding`.
   `anonymous`: refuse it where an organisation is needed, but answer it as a
   signed-in caller (see the refusal rules of your read doors).
 
+## Protecting an MCP server as an OAuth resource (`/resource-server`)
+
+An MCP server that requires a bearer token is an OAuth 2.1 protected resource.
+These primitives are the whole resource side; they fetch nothing and call no
+network.
+
+```ts
+import {
+  buildProtectedResourceMetadata,
+  unauthorizedChallenge,
+  deriveClerkDiscoveryUrls,
+  verifyMcpAccessToken,
+} from "@vantageos/cloud-identity/resource-server";
+
+// GET /.well-known/oauth-protected-resource  (RFC 9728)
+const metadata = buildProtectedResourceMetadata({
+  resource: "https://mcp.example.com/mcp",
+  authorizationServers: ["https://clerk.example.com"],
+  scopesSupported: ["mcp:read", "mcp:write"],
+});
+
+// On every MCP request
+const r = await verifyMcpAccessToken(req.headers.authorization, {
+  realm: "mcp",
+  resourceMetadataUrl: "https://mcp.example.com/.well-known/oauth-protected-resource",
+  issuer: "https://clerk.example.com",
+  audience: "https://mcp.example.com/mcp", // this resource: required
+  jwks: () => fetchJwks(deriveClerkDiscoveryUrls("https://clerk.example.com").jwksUrl),
+});
+if (!r.ok) return respond(r.status, "headers" in r ? r.headers : {});
+// r.session.userId, r.session.claims
+```
+
+- `buildProtectedResourceMetadata` returns the RFC 9728 document
+  (`ProtectedResourceMetadataConfig` in, `ProtectedResourceMetadata` out).
+- `unauthorizedChallenge` returns `{ status: 401, headers }` whose
+  `WWW-Authenticate` always carries `resource_metadata`, plus `error`,
+  `error_description` and `scope` when given (`UnauthorizedChallengeConfig`,
+  `UnauthorizedChallenge`). Values are escaped; a line break throws.
+- `deriveClerkDiscoveryUrls` returns `ClerkDiscoveryUrls`
+  (`discoveryUrl`, `jwksUrl`) for an `https` issuer.
+- `verifyMcpAccessToken` reuses `verifyClerkSessionToken` (RS256 only) and
+  requires the token's `aud` to contain `audience`. It returns the verified
+  session, or a `CREDENTIAL_REFUSED` refusal with the `401` envelope
+  (`McpResourceServerConfig`, `VerifyMcpAccessTokenResult`):
+  `bearer-missing` and `bearer-malformed` answer `invalid_request`,
+  `token-invalid` answers `invalid_token` (wrong signature, issuer, audience,
+  expiry or not-before are one answer), and an unreachable key set is `503`
+  with no challenge (`jwks-unavailable`). A missing issuer or audience throws.
+- Limits, stated: the token needs a `sub` and a `kid` (the Clerk session shape);
+  the consumer fetches and caches the key set; no scope check is made on the
+  token (read `r.session.claims`).
+
 ## What this package does not do
 
 Worth reading before you rely on it.
