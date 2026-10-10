@@ -52,6 +52,16 @@ describe("resolveOrgFromClaim: by ID", () => {
     expect(refusedWith(slugInIdClaim).reason).toBe("no-verified-organisation");
   });
 
+  it("refuses an ID-shaped slug claim alone, even when an org with that ID exists (F1)", async () => {
+    // The other slug tests use "acme", which no ID shape matches. This one is spelled like an
+    // org ID, so it goes red if org_slug ever joins the claims read as an ID.
+    const r = await resolveOrgFromClaim(
+      { org_slug: "org_victim" },
+      byId({ org_victim: mapping({ id: "org_victim", label: "victim" }) }),
+    );
+    expect(refusedWith(r).reason).toBe("no-verified-organisation");
+  });
+
   it("ignores a stale label: after a rename the ID still selects the org, under its CURRENT label", async () => {
     const r = await resolveOrgFromClaim(
       { org_id: "org_a", org_slug: "old-name" },
