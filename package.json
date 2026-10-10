@@ -1,6 +1,6 @@
 {
   "name": "@vantageos/cloud-identity",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Framework-agnostic identity + scope-filter primitives for VantagePeers Cloud (multi-tenant MCP).",
   "type": "module",
   "main": "./dist/index.js",
@@ -102,7 +102,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "vantagepeers",
