@@ -181,4 +181,25 @@ describe("assertRecipientAddressable", () => {
       ).reason,
     ).toBe("principal-lookup-failed");
   });
+  it("an operator agent acting through a service account is matched on its own ID, never the carrier's", async () => {
+    const viaSa: ActingPrincipal = {
+      principalId: "agent-x",
+      orgId: FLEET,
+      kind: "agent",
+      viaServiceAccountId: "sa-1",
+    };
+    const saRoster = {
+      ...lookups,
+      rosterOf: () => ({ orgId: "org_a", principalIds: ["sa-1"] }),
+    };
+    const r = refusedWith(await assertRecipientAddressable(viaSa, { agentId: "a_1", orgId: "org_a" }, saRoster));
+    expect(r.reason).toBe("principal-not-listed");
+  });
+
+  it("the same-org shortcut is byte-equal: org_a and ORG_A are not the same organisation", async () => {
+    const r = refusedWith(
+      await assertRecipientAddressable(CLIENT_AGENT, { agentId: "a_2", orgId: "ORG_A" }, lookups),
+    );
+    expect(r.reason).toBe("target-other-organisation");
+  });
 });
