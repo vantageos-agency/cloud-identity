@@ -23,15 +23,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `prepublishOnly` now runs `npm run build` only; the test suite is not part
   of the publish step.
 
-## [0.15.0]
-
-### Fixed
-
-- `verifyMcpAccessToken` now validates `audience` as an absolute URL with no
-  fragment (RFC 8707 section 2), with the same validator as the `resource` of
-  `buildProtectedResourceMetadata`. A whitespace-only, non-URL or
-  fragment-bearing audience throws the config error instead of being accepted.
-
 ## [0.16.0]
 
 **Additive: an organisation is its permanent ID (`./org-by-id`).** A consumer
@@ -102,6 +93,14 @@ resource-server package is no longer needed.
   `McpResourceServerConfig`, `VerifyMcpAccessTokenResult`.
 - `IdentityRefusalReason` gains `bearer-missing`, `bearer-malformed`,
   `token-invalid`, `jwks-unavailable`.
+
+
+### Fixed
+
+- `verifyMcpAccessToken` now validates `audience` as an absolute URL with no
+  fragment (RFC 8707 section 2), with the same validator as the `resource` of
+  `buildProtectedResourceMetadata`. A whitespace-only, non-URL or
+  fragment-bearing audience throws the config error instead of being accepted.
 
 ## [0.14.0]
 
