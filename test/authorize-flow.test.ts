@@ -796,3 +796,125 @@ describe("consent cannot be minted by the client", () => {
     expect(out).toMatchObject({ refusal: { reason: "consent-required" } });
   });
 });
+
+describe("picker redirect origin and person denial", () => {
+  const AS_ISSUER = "https://mcp.example.test";
+  const denySetup = (memberships = [orgA, orgB]) =>
+    setup(memberships, { requireConsent: true, issuer: AS_ISSUER });
+  const stateFor = async (cfg: AuthorizeConfig, deps: AuthorizeDeps) => {
+    const out = await startAuthorize(await params(), undefined, cfg, deps);
+    if (out.kind !== "redirect-to-sign-in") throw new Error("setup");
+    return stateOf(out.url);
+  };
+
+  it("the picker model carries the origin of the registered redirect_uri", async () => {
+    const { cfg, deps } = denySetup();
+    const out = await startAuthorize(await params(), await mintSession(), cfg, deps);
+    expect(out.kind).toBe("org-picker");
+    if (out.kind !== "org-picker") return;
+    expect(out.model.redirectOrigin).toBe(new URL(REDIRECT).origin);
+  });
+
+  it("a denial with verified state and a valid session redirects with access_denied, state and iss", async () => {
+    const { cfg, deps, store } = denySetup();
+    const state = await stateFor(cfg, deps);
+    const out = await resumeAuthorize(
+      { state, sessionToken: await mintSession(), denied: true },
+      cfg,
+      deps,
+    );
+    expect(out.kind).toBe("redirect-to-client");
+    if (out.kind !== "redirect-to-client") return;
+    const u = new URL(out.url);
+    expect(`${u.origin}${u.pathname}`).toBe(REDIRECT);
+    expect(u.searchParams.get("error")).toBe("access_denied");
+    expect(u.searchParams.get("state")).toBe("client-state");
+    expect(u.searchParams.get("iss")).toBe(AS_ISSUER);
+    expect(u.searchParams.has("code")).toBe(false);
+    expect(store.rows.size).toBe(0);
+  });
+
+  it("a denial of a request that carried no client state omits state", async () => {
+    const { cfg, deps } = denySetup();
+    const start = await startAuthorize(await params({ state: undefined }), undefined, cfg, deps);
+    if (start.kind !== "redirect-to-sign-in") throw new Error("setup");
+    const out = await resumeAuthorize(
+      { state: stateOf(start.url), sessionToken: await mintSession(), denied: true },
+      cfg,
+      deps,
+    );
+    expect(out.kind).toBe("redirect-to-client");
+    if (out.kind !== "redirect-to-client") return;
+    expect(new URL(out.url).searchParams.has("state")).toBe(false);
+  });
+
+  it("a denial with a tampered state is refused and carries no url", async () => {
+    const { cfg, deps } = denySetup();
+    const state = await stateFor(cfg, deps);
+    const out = await resumeAuthorize(
+      { state: `${state}x`, sessionToken: await mintSession(), denied: true },
+      cfg,
+      deps,
+    );
+    expect(out.kind).toBe("refused");
+    expect(out).not.toHaveProperty("url");
+  });
+
+  it("a denial with an expired state is refused", async () => {
+    const { cfg, deps } = denySetup();
+    const state = await stateFor(cfg, deps);
+    deps.now = () => NOW + 3_600_000;
+    const out = await resumeAuthorize(
+      { state, sessionToken: await mintSession({ exp: NOW / 1000 + 7200 }), denied: true },
+      cfg,
+      deps,
+    );
+    expect(out).toMatchObject({ kind: "refused", refusal: { reason: "state-expired" } });
+  });
+
+  it("a denial without a session is refused", async () => {
+    const { cfg, deps } = denySetup();
+    const state = await stateFor(cfg, deps);
+    const out = await resumeAuthorize({ state, sessionToken: undefined, denied: true }, cfg, deps);
+    expect(out).toMatchObject({ kind: "refused", refusal: { reason: "session-required" } });
+  });
+
+  it("a denial for a client revoked mid-flow is refused", async () => {
+    const { cfg, deps } = denySetup();
+    const state = await stateFor(cfg, deps);
+    deps.lookupClient = async () => null;
+    const out = await resumeAuthorize(
+      { state, sessionToken: await mintSession(), denied: true },
+      cfg,
+      deps,
+    );
+    expect(out).toMatchObject({ kind: "refused", refusal: { reason: "unknown-client" } });
+  });
+
+  it("denied together with approved:true is refused, never a redirect", async () => {
+    const { cfg, deps, store } = denySetup();
+    const state = await stateFor(cfg, deps);
+    const out = await resumeAuthorize(
+      { state, sessionToken: await mintSession(), denied: true, approved: true, orgId: "org_A" },
+      cfg,
+      deps,
+    );
+    expect(out).toMatchObject({ kind: "refused", refusal: { reason: "invalid-request" } });
+    expect(store.rows.size).toBe(0);
+  });
+
+  it("approval without denied still behaves as before (no iss on the code redirect)", async () => {
+    const { cfg, deps } = denySetup([orgA]);
+    const model = await startAuthorize(await params(), await mintSession(), cfg, deps);
+    if (model.kind !== "org-picker") throw new Error("setup");
+    const out = await resumeAuthorize(
+      { state: model.model.state, sessionToken: await mintSession(), orgId: "org_A", approved: true, consentToken: model.model.consentToken ?? undefined },
+      cfg,
+      deps,
+    );
+    expect(out.kind).toBe("redirect-to-client");
+    if (out.kind !== "redirect-to-client") return;
+    expect(new URL(out.url).searchParams.has("code")).toBe(true);
+    expect(new URL(out.url).searchParams.has("error")).toBe(false);
+  });
+});
