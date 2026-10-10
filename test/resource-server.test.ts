@@ -362,6 +362,21 @@ describe("verifyMcpAccessToken", () => {
     ).rejects.toThrow();
   });
 
+  it.each([
+    ["whitespace-only", "   "],
+    ["not a URL", "not-a-url"],
+    ["an absolute URL with a fragment", "https://x/mcp#frag"],
+  ])("throws the config error when the audience is %s (RFC 8707 section 2)", async (_n, audience) => {
+    await expect(
+      verifyMcpAccessToken(`Bearer ${await mint({ aud: audience })}`, cfg({ audience }), NOW),
+    ).rejects.toThrow(/verifyMcpAccessToken.*audience/);
+  });
+
+  it("still verifies with a valid absolute https audience (positive control)", async () => {
+    const r = await verifyMcpAccessToken(`Bearer ${await mint()}`, cfg(), NOW);
+    expect(r.ok).toBe(true);
+  });
+
   it("never echoes the token in a refusal or a header", async () => {
     const t = await mint({ aud: OTHER_AUDIENCE });
     const r = await verifyMcpAccessToken(`Bearer ${t}`, cfg(), NOW);
