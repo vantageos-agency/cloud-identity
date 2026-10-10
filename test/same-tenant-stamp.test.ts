@@ -7,8 +7,6 @@ import { sameTenantStamp } from "../src/index.js";
  */
 
 const OPERATOR = { id: "org_op", label: "operator" } as const;
-const FALLBACK = { labelFallback: true } as const;
-
 describe("sameTenantStamp", () => {
   it("is true for two unstamped rows (the fleet), and for unstamped against operator-stamped", () => {
     expect(sameTenantStamp({}, {}, OPERATOR)).toBe(true);
@@ -37,15 +35,13 @@ describe("sameTenantStamp", () => {
       sameTenantStamp(
         { id: "org_c1", label: "acme" },
         { id: "org_c2", label: "acme" },
-        OPERATOR,
-        FALLBACK,
+        OPERATOR
       ),
     ).toBe(false);
   });
 
-  it("compares labels of two client stamps only under the fallback", () => {
+  it("never compares the labels of two client stamps", () => {
     expect(sameTenantStamp({ label: "acme" }, { label: "acme" }, OPERATOR)).toBe(false);
-    expect(sameTenantStamp({ label: "acme" }, { label: "acme" }, OPERATOR, FALLBACK)).toBe(true);
   });
 
   it("is false for an empty-string stamp against anything", () => {

@@ -6,12 +6,9 @@
  * renamed to) is display text: it never selects an org and never proves two
  * references are one org.
  *
- * Refusal by default. The ONE exception is a transitional, opt-in fallback
- * (`labelFallback: true`) for a store that has not filled every ID yet: while
- * either side of a comparison has no ID, labels are compared; two IDs that
- * differ are two orgs whatever the labels say, and an ID a mapping already
- * holds is never overridden by a label. Turn the option off, and the fallback
- * is gone, the day the store reports no ID missing.
+ * Refusal, always. There is no option that compares or resolves by label: a
+ * reference or credential without an org ID names no organisation, and a
+ * mapping is reached only by an ID.
  *
  * The store is the consumer's: every read is an adapter it supplies, called
  * with the key as presented, byte for byte. A missing, throwing or malformed
@@ -35,16 +32,8 @@ import type { OrgKind } from "./principal-by-id.js";
 export type OrgRef = {
   /** The permanent org ID. */
   id?: string | null;
-  /** The renamable label (slug). Compared only under `labelFallback`. */
+  /** The renamable label (slug). Display text; never compared. */
   label?: string | null;
-};
-
-export type OrgKeyOptions = {
-  /**
-   * Transitional. Compare labels while either side has no ID. Default `false`:
-   * IDs only.
-   */
-  labelFallback?: boolean;
 };
 
 function nonEmpty(value: unknown): value is string {
@@ -65,19 +54,16 @@ function isUnstamped(ref: OrgRef | null | undefined): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Do two references name the same organisation? By ID when both carry one.
- * Under `labelFallback`, by label while either side has no ID. Absence is not
- * a match: two unstamped references are NOT the same organisation here.
+ * Do two references name the same organisation? Only by ID, when both carry
+ * one. A label never matches, and absence is not a match: two unstamped
+ * references are NOT the same organisation here.
  */
 export function sameOrg(
   a: OrgRef | null | undefined,
   b: OrgRef | null | undefined,
-  options?: OrgKeyOptions,
 ): boolean {
   if (!a || !b) return false;
-  if (nonEmpty(a.id) && nonEmpty(b.id)) return a.id === b.id;
-  if (options?.labelFallback !== true) return false;
-  return nonEmpty(a.label) && a.label === b.label;
+  return nonEmpty(a.id) && nonEmpty(b.id) && a.id === b.id;
 }
 
 /**
@@ -89,10 +75,9 @@ export function sameOrg(
 export function isFleetStamp(
   stamp: OrgRef | null | undefined,
   operator: OrgRef | null | undefined,
-  options?: OrgKeyOptions,
 ): boolean {
   if (isUnstamped(stamp)) return true;
-  return operator !== null && operator !== undefined && sameOrg(stamp, operator, options);
+  return operator !== null && operator !== undefined && sameOrg(stamp, operator);
 }
 
 /**
@@ -103,10 +88,9 @@ export function sameTenantStamp(
   a: OrgRef | null | undefined,
   b: OrgRef | null | undefined,
   operator: OrgRef | null | undefined,
-  options?: OrgKeyOptions,
 ): boolean {
-  if (isFleetStamp(a, operator, options) && isFleetStamp(b, operator, options)) return true;
-  return sameOrg(a, b, options);
+  if (isFleetStamp(a, operator) && isFleetStamp(b, operator)) return true;
+  return sameOrg(a, b);
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +120,7 @@ type Lookup<A extends unknown[], R> = (
 export type OrgMappingLookups = {
   /** The mapping row whose permanent ID is exactly the one asked for. */
   orgById?: Lookup<[orgId: string], OrgMappingRow>;
-  /** The mapping row whose label is exactly the one asked for. */
+  /** The mapping row whose label is exactly the one asked for. Read only by `resolveOrgIdForLabelBackfillOnly`. */
   orgByLabel?: Lookup<[label: string], OrgMappingRow>;
 };
 
@@ -167,18 +151,16 @@ async function call<A extends unknown[], R>(
 
 /** The org a credential resolves to, with the roster and scopes of its mapping row. */
 export type ResolvedOrg = {
-  /** The permanent org ID; absent only for a label-resolved mapping with no ID yet. */
-  id: string | undefined;
+  /** The permanent org ID: the one the credential carried and the mapping holds. */
+  id: string;
   /** The org's CURRENT label. Display text. */
   label: string;
   allowedOrchestrators: string[];
   scopes: string[];
   orgKind: OrgKind | null;
-  /** How the mapping was reached: by the credential's ID, or by the fallback label. */
-  source: "id" | "label";
 };
 
-export type ResolveOrgFromClaimOptions = OrgKeyOptions & {
+export type ResolveOrgFromClaimOptions = {
   /** The consumer's name for the door; carried on every refusal. */
   door?: string;
 };
@@ -189,7 +171,6 @@ export type ResolveOrgFromClaimResult =
 
 const CLERK_ORG_ID_SHAPE = /^org_[A-Za-z0-9]+$/;
 const ID_CLAIMS = ["org_id", "organizationId", "orgId"] as const;
-const LABEL_CLAIMS = ["organizationSlug", "org_slug", "organizationId", "org_id"] as const;
 
 /** The first claim that is shaped like a Clerk org ID and resolves as a tenant. */
 function claimedOrgId(claims: Record<string, unknown>): string | undefined {
@@ -202,26 +183,15 @@ function claimedOrgId(claims: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
-/** The first non-empty string label claim, slug spellings before legacy id spellings. */
-function claimedLabel(claims: Record<string, unknown>): string | undefined {
-  for (const name of LABEL_CLAIMS) {
-    const value = claims[name];
-    if (nonEmpty(value)) return value;
-  }
-  return undefined;
-}
-
 /**
  * Resolves a VERIFIED credential's claims to the stored mapping row of its
  * organisation, or refuses. The claim's org ID selects the row; nothing the
  * request supplies does.
  *
- * With `labelFallback` off (the default) a credential carrying no usable org ID
- * is refused (`no-verified-organisation`) and an ID no mapping holds is refused
- * (`org-mapping-not-found`). With it on, a credential with no ID, or one whose
- * ID no mapping holds yet, may be served by the mapping its label names, but
- * only while that mapping has no ID filled; a filled ID that is not the
- * credential's is refused (`org-id-contradicts-label`).
+ * A credential carrying no usable org ID is refused
+ * (`no-verified-organisation`) and an ID no mapping holds is refused
+ * (`org-mapping-not-found`). A label claim (a slug) is never read: it neither
+ * selects a mapping nor rescues a missing ID.
  *
  * `claims` is the verified identity's own claim record, never a request field.
  */
@@ -231,7 +201,6 @@ export async function resolveOrgFromClaim(
   options?: ResolveOrgFromClaimOptions,
 ): Promise<ResolveOrgFromClaimResult> {
   const door = options?.door ?? "resolveOrgFromClaim";
-  const fallback = options?.labelFallback === true;
   const deny = (
     reason: Parameters<typeof refusal>[1],
     detail: string,
@@ -242,24 +211,22 @@ export async function resolveOrgFromClaim(
 
   const record = claims && typeof claims === "object" ? claims : {};
   const orgId = claimedOrgId(record);
-  const label = fallback ? claimedLabel(record) : undefined;
-  if (orgId === undefined && label === undefined) {
+  if (orgId === undefined) {
     return deny("no-verified-organisation", "The credential carries no verified organisation.");
   }
 
-  const served = (row: ParsedRow, source: "id" | "label"): ResolveOrgFromClaimResult => {
+  const served = (row: ParsedRow, id: string): ResolveOrgFromClaimResult => {
     if (row.active !== true) {
       return deny("organisation-not-active", "The organisation is not mapped or not active.");
     }
     return {
       ok: true,
       org: {
-        id: row.id ?? undefined,
+        id,
         label: row.label,
         allowedOrchestrators: row.allowedOrchestrators,
         scopes: row.scopes,
         orgKind: kindOf(row.orgKind),
-        source,
       },
     };
   };
@@ -269,37 +236,14 @@ export async function resolveOrgFromClaim(
     "The organisation mapping could not be read, so none is resolved.",
   );
 
-  if (orgId !== undefined) {
-    const found = await call(lookups?.orgById, orgId);
-    if (!found.called) return unreadable;
-    if (found.row !== null) {
-      const parsed = orgMappingRowSchema.safeParse(found.row);
-      if (!parsed.success || parsed.data.id !== orgId) return invalid;
-      return served(parsed.data, "id");
-    }
-    if (!fallback) {
-      return deny("org-mapping-not-found", "No organisation mapping holds the credential's organisation ID.");
-    }
+  const found = await call(lookups?.orgById, orgId);
+  if (!found.called) return unreadable;
+  if (found.row === null) {
+    return deny("org-mapping-not-found", "No organisation mapping holds the credential's organisation ID.");
   }
-
-  // Transitional label path: reached only under `labelFallback`.
-  if (label === undefined) {
-    return deny("no-verified-organisation", "The credential carries no verified organisation.");
-  }
-  const byLabel = await call(lookups?.orgByLabel, label);
-  if (!byLabel.called) return unreadable;
-  if (byLabel.row === null) {
-    return deny("org-mapping-not-found", "No organisation mapping holds this organisation label.");
-  }
-  const parsed = orgMappingRowSchema.safeParse(byLabel.row);
-  if (!parsed.success || parsed.data.label !== label) return invalid;
-  if (orgId !== undefined && parsed.data.id !== undefined && parsed.data.id !== null) {
-    return deny(
-      "org-id-contradicts-label",
-      "The credential's organisation ID is not the organisation this label names.",
-    );
-  }
-  return served(parsed.data, "label");
+  const parsed = orgMappingRowSchema.safeParse(found.row);
+  if (!parsed.success || parsed.data.id !== orgId) return invalid;
+  return served(parsed.data, orgId);
 }
 
 // ---------------------------------------------------------------------------

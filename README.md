@@ -903,7 +903,7 @@ as adapters, and refuse by default. All are in `./org-by-id` and the root.
 
 **`resolveOrgFromClaim(claims, lookups, opts)`** takes the claim record of a
 VERIFIED credential (never a request field) and returns
-`{ ok: true, org: { id, label, allowedOrchestrators, scopes, orgKind, source } }`
+`{ ok: true, org: { id, label, allowedOrchestrators, scopes, orgKind } }`
 or a typed `RBAC_DENIED` refusal. The `org_id` claim (also read from
 `organizationId` and `orgId`, only when shaped like a Clerk org ID) selects the
 mapping row through `lookups.orgById`; a stale label in the token is ignored,
@@ -942,16 +942,16 @@ It never invents an ID.
 **`orgMappingRowSchema`** is the Zod shape of a mapping row an adapter returns
 (`id`, `label`, `active`, `allowedOrchestrators`, `scopes`, `orgKind`).
 
-Types: `OrgRef`, `OrgKeyOptions`, `OrgMappingRow`, `OrgMappingLookups`,
+Types: `OrgRef`, `OrgMappingRow`, `OrgMappingLookups`,
 `ResolvedOrg`, `ResolveOrgFromClaimOptions`, `ResolveOrgFromClaimResult`,
 `OrgIdAbsence`, `OrgIdAbsenceReason`, `OrgIdResolution`, `OperatorOrgLookups`,
 `FindOperatorOrgOptions`, `OperatorOrgResult`.
 
-**Transitional label fallback.** Every function above takes
-`{ labelFallback: true }` for a store that has not filled every ID yet: labels
-are then compared while either side has no ID. Two IDs that differ are two
-orgs whatever the labels say, and an ID a mapping holds is never overridden by
-a label (`org-id-contradicts-label`). The default is off.
+**No label resolution.** No function above compares or selects by label, and
+no option turns that on: a reference or credential without an org ID names no
+organisation and is refused. A store that has not filled every ID is filled
+once, with `resolveOrgIdForLabelBackfillOnly`, before the consumer relies on
+these functions.
 
 ## What this package does not do
 

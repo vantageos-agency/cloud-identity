@@ -4,8 +4,7 @@ import { resolveOrgFromClaim } from "../src/index.js";
 /**
  * A verified credential's org_id claim -> the org's stored mapping row (roster
  * and scopes). The ID selects the row. A label (slug) claim never selects an
- * org unless the caller opts into the transitional fallback, and even then it
- * never overrides an ID the mapping already holds.
+ * org and never rescues a missing ID (see no-label-resolution.test.ts).
  */
 
 const mapping = (over: Record<string, unknown> = {}) => ({
@@ -21,8 +20,6 @@ const mapping = (over: Record<string, unknown> = {}) => ({
 const byId = (rows: Record<string, unknown>) => ({
   orgById: (id: string) => rows[id] as never,
 });
-
-const FALLBACK = { labelFallback: true } as const;
 
 function refusedWith(r: Awaited<ReturnType<typeof resolveOrgFromClaim>>) {
   expect(r.ok).toBe(false);
@@ -41,7 +38,6 @@ describe("resolveOrgFromClaim: by ID", () => {
         allowedOrchestrators: ["alpha", "beta"],
         scopes: ["read", "write"],
         orgKind: "client",
-        source: "id",
       },
     });
   });
@@ -60,10 +56,8 @@ describe("resolveOrgFromClaim: by ID", () => {
     const r = await resolveOrgFromClaim(
       { org_id: "org_a", org_slug: "old-name" },
       byId({ org_a: mapping({ label: "new-name" }) }),
-      FALLBACK,
     );
     expect(r.ok && r.org.label).toBe("new-name");
-    expect(r.ok && r.org.source).toBe("id");
   });
 
   it("refuses when there is no claim at all", async () => {
@@ -139,70 +133,23 @@ describe("resolveOrgFromClaim: by ID", () => {
   });
 });
 
-describe("resolveOrgFromClaim: transitional label fallback", () => {
-  it("does not resolve by label alone unless opted in", async () => {
+describe("resolveOrgFromClaim: label claims", () => {
+  it("does not resolve by label alone", async () => {
     const r = await resolveOrgFromClaim({ org_slug: "acme" }, { orgByLabel: () => mapping() });
     expect(refusedWith(r).reason).toBe("no-verified-organisation");
   });
 
-  it("resolves by label when the credential carries no ID and the fallback is on", async () => {
-    const r = await resolveOrgFromClaim({ org_slug: "acme" }, { orgByLabel: () => mapping() }, FALLBACK);
-    expect(r.ok && r.org.source).toBe("label");
-    expect(r.ok && r.org.id).toBe("org_a");
-  });
-
-  it("reads the label from organizationSlug, org_slug, then the legacy id-spelled claims", async () => {
-    const seen: string[] = [];
+  it("reads no label spelling: a slug in any claim is not an organisation", async () => {
+    let calls = 0;
     const lookups = {
-      orgByLabel: (label: string) => {
-        seen.push(label);
+      orgByLabel: () => {
+        calls += 1;
         return mapping();
       },
     };
-    await resolveOrgFromClaim({ organizationSlug: "a", org_slug: "b" }, lookups, FALLBACK);
-    await resolveOrgFromClaim({ org_slug: "b", organizationId: "c" }, lookups, FALLBACK);
-    await resolveOrgFromClaim({ organizationId: "c", org_id: "d" }, lookups, FALLBACK);
-    expect(seen).toEqual(["a", "b", "c"]);
-  });
-
-  it("serves a label mapping that has no ID yet, even when the credential carries an unknown ID", async () => {
-    const r = await resolveOrgFromClaim(
-      { org_id: "org_new", org_slug: "acme" },
-      { orgById: () => null, orgByLabel: () => mapping({ id: undefined }) },
-      FALLBACK,
-    );
-    expect(r.ok && r.org.source).toBe("label");
-    expect(r.ok && r.org.id).toBeUndefined();
-  });
-
-  it("refuses when the credential's ID contradicts the ID the labelled mapping holds", async () => {
-    const r = await resolveOrgFromClaim(
-      { org_id: "org_new", org_slug: "acme" },
-      { orgById: () => null, orgByLabel: () => mapping({ id: "org_a" }) },
-      FALLBACK,
-    );
-    expect(refusedWith(r).reason).toBe("org-id-contradicts-label");
-  });
-
-  it("refuses an unmapped label and an inactive labelled org", async () => {
-    const miss = await resolveOrgFromClaim({ org_slug: "acme" }, { orgByLabel: () => null }, FALLBACK);
-    expect(refusedWith(miss).reason).toBe("org-mapping-not-found");
-    const off = await resolveOrgFromClaim(
-      { org_slug: "acme" },
-      { orgByLabel: () => mapping({ active: false }) },
-      FALLBACK,
-    );
-    expect(refusedWith(off).reason).toBe("organisation-not-active");
-  });
-
-  it("refuses when the label adapter is missing or the label row is under another label", async () => {
-    const missing = await resolveOrgFromClaim({ org_slug: "acme" }, {}, FALLBACK);
-    expect(refusedWith(missing).reason).toBe("org-mapping-lookup-failed");
-    const other = await resolveOrgFromClaim(
-      { org_slug: "acme" },
-      { orgByLabel: () => mapping({ label: "other" }) },
-      FALLBACK,
-    );
-    expect(refusedWith(other).reason).toBe("org-mapping-record-invalid");
+    for (const claims of [{ organizationSlug: "a" }, { org_slug: "b" }, { organizationId: "c" }]) {
+      expect(refusedWith(await resolveOrgFromClaim(claims, lookups)).reason).toBe("no-verified-organisation");
+    }
+    expect(calls).toBe(0);
   });
 });
