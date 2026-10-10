@@ -3,6 +3,26 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0]
+
+**Additive: who may address whom, decided by agent ID only
+(`./principal-by-id`).** No existing function changes behaviour for an existing
+input.
+
+### Added
+
+- `assertRecipientAddressable(sender, recipient, lookups, { door? })` (CI-2):
+  decides, by agent ID only, whether a sender may address a recipient,
+  across organisations included. Admits same organisation; client to operator
+  when the recipient's ID is on the sender organisation's roster; operator to
+  client when the sender's ID is on the recipient organisation's roster.
+  `lookups` is `{ orgKindOf, rosterOf }`. Everything else refuses with a typed
+  `RBAC_DENIED` naming the door: client to client, a missing sender or
+  recipient, a sender that is not an agent, an unresolvable roster. The roster
+  check reuses `assertPrincipalListed`. Types `RecipientIds`,
+  `RecipientLookups`, `AssertRecipientAddressableOptions`,
+  `AssertRecipientAddressableResult`.
+
 ## [0.13.0]
 
 **Additive: admission by membership of a stored list, by agent ID only
@@ -21,17 +41,6 @@ function changes behaviour for an existing input.
   not on the list. A name never matches and `"*"` is not a wildcard.
 - Types `PrincipalIdList`, `AssertPrincipalListedOptions`,
   `AssertPrincipalListedResult`.
-- `assertRecipientAddressable(sender, recipient, lookups, { door? })` (CI-2):
-  decides, by agent ID only, whether a sender may address a recipient,
-  across organisations included. Admits same organisation; client to operator
-  when the recipient's ID is on the sender organisation's roster; operator to
-  client when the sender's ID is on the recipient organisation's roster.
-  `lookups` is `{ orgKindOf, rosterOf }`. Everything else refuses with a typed
-  `RBAC_DENIED` naming the door: client to client, a missing sender or
-  recipient, a sender that is not an agent, an unresolvable roster. The roster
-  check reuses `assertPrincipalListed`. Types `RecipientIds`,
-  `RecipientLookups`, `AssertRecipientAddressableOptions`,
-  `AssertRecipientAddressableResult`.
 - New `IdentityRefusalReason` values: `list-absent`, `list-empty`,
   `principal-not-an-agent`, `principal-not-listed`.
 
