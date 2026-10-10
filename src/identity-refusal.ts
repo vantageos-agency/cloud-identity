@@ -64,7 +64,12 @@ export type IdentityRefusalReason =
   | "bearer-missing"
   | "bearer-malformed"
   | "token-invalid"
-  | "jwks-unavailable";
+  | "jwks-unavailable"
+  // organisation by ID (0.16.0)
+  | "org-mapping-lookup-failed"
+  | "org-mapping-not-found"
+  | "org-mapping-record-invalid"
+  | "org-id-contradicts-label";
 
 export type IdentityRefusal = {
   code: IdentityRefusalCode;

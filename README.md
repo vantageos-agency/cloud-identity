@@ -895,6 +895,64 @@ if (!r.ok) return respond(r.status, "headers" in r ? r.headers : {});
   the consumer fetches and caches the key set; no scope check is made on the
   token (read `r.session.claims`).
 
+## An organisation is its permanent ID (0.16.0)
+
+A label (the slug an org can be renamed to) is display text. These functions
+decide "which organisation" from the permanent org ID, with the store supplied
+as adapters, and refuse by default. All are in `./org-by-id` and the root.
+
+**`resolveOrgFromClaim(claims, lookups, opts)`** takes the claim record of a
+VERIFIED credential (never a request field) and returns
+`{ ok: true, org: { id, label, allowedOrchestrators, scopes, orgKind, source } }`
+or a typed `RBAC_DENIED` refusal. The `org_id` claim (also read from
+`organizationId` and `orgId`, only when shaped like a Clerk org ID) selects the
+mapping row through `lookups.orgById`; a stale label in the token is ignored,
+so a rename never changes who the caller is. Refused: no claim, an ID no
+mapping holds, an inactive org, a row that does not repeat the ID asked for, a
+malformed row, a missing or throwing adapter.
+
+```ts
+const r = await resolveOrgFromClaim(identity, {
+  orgById: (id) => db.mappingByClerkOrgId(id),
+}, { door: "tasks:list" });
+if (!r.ok) throw new IdentityRefusalError(r.refusal);
+```
+
+**`sameOrg(a, b, opts)`**, **`isFleetStamp(stamp, operator, opts)`** and
+**`sameTenantStamp(a, b, operator, opts)`** compare `OrgRef` values
+(`{ id?, label? }`). Two IDs are equal or they are not; unstamped is never
+a match; `isFleetStamp` is true for an unstamped stamp or the operator's, and
+`sameTenantStamp` is true for the same org or when both are the fleet's.
+
+**`findOperatorOrg(lookups, opts)`** finds the operator organisation from
+`lookups.activeOrganisations(limit)`: `one`, `none`, `many`, `overCap`
+(`cap` defaults to 1000, the read is `cap + 1`) or `unreadable`. Only `one` is
+an operator; pass `undefined` as `operator` otherwise and only unstamped rows
+are the fleet's.
+
+**`resolveOrgIdForLabelBackfillOnly(label, lookups)`** derives the permanent
+ID of the org a label names, for a ONE-OFF BACKFILL that stamps rows written
+before IDs existed. It must never be called on a request path: a request
+decides its organisation from the verified `org_id` claim
+(`resolveOrgFromClaim`), and a miss there is a refusal, never a retry by label.
+It returns `{ present: true, orgId }` or a typed `ORG_ID_ABSENT` absence
+(`no-label`, `lookup-failed`, `not-mapped`, `record-invalid`, `id-not-filled`).
+It never invents an ID.
+
+**`orgMappingRowSchema`** is the Zod shape of a mapping row an adapter returns
+(`id`, `label`, `active`, `allowedOrchestrators`, `scopes`, `orgKind`).
+
+Types: `OrgRef`, `OrgKeyOptions`, `OrgMappingRow`, `OrgMappingLookups`,
+`ResolvedOrg`, `ResolveOrgFromClaimOptions`, `ResolveOrgFromClaimResult`,
+`OrgIdAbsence`, `OrgIdAbsenceReason`, `OrgIdResolution`, `OperatorOrgLookups`,
+`FindOperatorOrgOptions`, `OperatorOrgResult`.
+
+**Transitional label fallback.** Every function above takes
+`{ labelFallback: true }` for a store that has not filled every ID yet: labels
+are then compared while either side has no ID. Two IDs that differ are two
+orgs whatever the labels say, and an ID a mapping holds is never overridden by
+a label (`org-id-contradicts-label`). The default is off.
+
 ## What this package does not do
 
 Worth reading before you rely on it.

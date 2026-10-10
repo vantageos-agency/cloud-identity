@@ -261,3 +261,33 @@ export type {
   McpResourceServerConfig,
   VerifyMcpAccessTokenResult,
 } from "./resource-server.js";
+
+// 0.16.0 — An organisation is its permanent ID: the credential's org_id claim to
+// the org's mapping row, the ID comparisons and the operator org. Labels
+// (slugs) never select or prove an org, except through the opt-in transitional
+// `labelFallback`. The label-to-ID derivation is exported only as
+// `resolveOrgIdForLabelBackfillOnly`, for a one-off backfill.
+export {
+  sameOrg,
+  isFleetStamp,
+  sameTenantStamp,
+  resolveOrgFromClaim,
+  resolveOrgIdForLabelBackfillOnly,
+  findOperatorOrg,
+  orgMappingRowSchema,
+} from "./org-by-id.js";
+export type {
+  OrgRef,
+  OrgKeyOptions,
+  OrgMappingRow,
+  OrgMappingLookups,
+  ResolvedOrg,
+  ResolveOrgFromClaimOptions,
+  ResolveOrgFromClaimResult,
+  OrgIdAbsence,
+  OrgIdAbsenceReason,
+  OrgIdResolution,
+  OperatorOrgLookups,
+  FindOperatorOrgOptions,
+  OperatorOrgResult,
+} from "./org-by-id.js";
