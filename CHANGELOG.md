@@ -25,6 +25,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   where a provisioning label is translated to the permanent org ID —
   `mapped` / `unmapped` / `mapped-without-id` / `unreadable`; an unreadable
   store is never `unmapped`.
+- `@callerResolver` JSDoc tag, kept in the published declarations, on the
+  caller resolvers (`resolveActingPrincipal`, `resolvePersonPrincipal`,
+  `resolveCallerFromClaims`): an analyser derives its accepted sinks for a
+  verified identity from the tag instead of a hand-typed list.
 
 ## [0.19.1]
 

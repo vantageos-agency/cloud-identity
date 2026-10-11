@@ -88,6 +88,13 @@ export function claimsAnOrganisation(claims: Record<string, unknown>): boolean {
   return ORG_CLAIM_KEYS.some((key) => claims[key] !== undefined && claims[key] !== null);
 }
 
+/**
+ * Resolves the caller behind a verified claim record: organisation by `org_id`,
+ * the person stored in it, the role claim and whether that role is an admin
+ * role there; or a typed refusal with `claimsOrg`.
+ *
+ * @callerResolver — resolves a verified caller; consumers may derive their accepted sinks from this tag.
+ */
 export async function resolveCallerFromClaims(
   claims: Record<string, unknown> | null | undefined,
   deps: CallerFromClaimsDeps,
