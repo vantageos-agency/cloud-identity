@@ -120,7 +120,7 @@ type Lookup<A extends unknown[], R> = (
 export type OrgMappingLookups = {
   /** The mapping row whose permanent ID is exactly the one asked for. */
   orgById?: Lookup<[orgId: string], OrgMappingRow>;
-  /** The mapping row whose label is exactly the one asked for. Read only by `resolveOrgIdForLabelBackfillOnly`. */
+  /** The mapping row whose label is exactly the one asked for. Read only by `resolveOrgIdForLabelBackfillOnly` and `resolveProvisioningLabel`. */
   orgByLabel?: Lookup<[label: string], OrgMappingRow>;
 };
 
@@ -281,6 +281,46 @@ export async function resolveOrgIdForLabelBackfillOnly(
   if (!parsed.success || parsed.data.label !== label) return absent("record-invalid");
   if (parsed.data.id === undefined || parsed.data.id === null) return absent("id-not-filled");
   return { present: true, orgId: parsed.data.id };
+}
+
+// ---------------------------------------------------------------------------
+// resolveProvisioningLabel — the provisioning boundary (0.20.0)
+// ---------------------------------------------------------------------------
+
+export type ProvisioningLabelResult =
+  /** No mapping holds this label: the organisation does not exist yet. */
+  | { kind: "unmapped" }
+  /** A mapping holds this label; every decision after this point is by `orgId`. */
+  | { kind: "mapped"; orgId: string; active: boolean }
+  /** A mapping holds this label but its permanent ID is not filled yet. */
+  | { kind: "mapped-without-id"; active: boolean }
+  /** No answer could be read: never treated as "unmapped". */
+  | { kind: "unreadable"; reason: "no-label" | "lookup-failed" | "record-invalid" };
+
+/**
+ * The ONE place a provisioning input (an operator typing an organisation's
+ * label to create or configure it) is translated to the organisation's
+ * permanent ID. A label is accepted here and nowhere after: the caller decides
+ * from `orgId`, and from `kind` whether the organisation already exists.
+ *
+ * Request paths decide their organisation from the verified credential
+ * (`resolveOrgFromClaim`), never from a label. An unreadable store is its own
+ * answer, never "unmapped", so a failing read can never authorise a creation.
+ */
+export async function resolveProvisioningLabel(
+  label: string | null | undefined,
+  lookups: OrgMappingLookups | null | undefined,
+): Promise<ProvisioningLabelResult> {
+  if (!nonEmpty(label)) return { kind: "unreadable", reason: "no-label" };
+  const found = await call(lookups?.orgByLabel, label);
+  if (!found.called) return { kind: "unreadable", reason: "lookup-failed" };
+  if (found.row === null) return { kind: "unmapped" };
+  const parsed = orgMappingRowSchema.safeParse(found.row);
+  if (!parsed.success || parsed.data.label !== label) return { kind: "unreadable", reason: "record-invalid" };
+  if (parsed.data.id === undefined || parsed.data.id === null) {
+    return { kind: "mapped-without-id", active: parsed.data.active };
+  }
+  return { kind: "mapped", orgId: parsed.data.id, active: parsed.data.active };
 }
 
 // ---------------------------------------------------------------------------

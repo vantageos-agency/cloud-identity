@@ -990,6 +990,34 @@ if (hasFleetRead(scope)) { /* unfiltered read: fleet or operator-admin */ }
   meaning of `isMaster`.
 - Types: `ScopeStanding`, `StandingScope`.
 
+### From verified claims to the caller (`/caller-from-claims`, 0.20.0)
+
+`resolveCallerFromClaims(claims, { orgLookups, principalLookups }, { adminRoles, door })`
+is the one call from a VERIFIED identity's claim record to the caller. It chains
+the existing primitives, deciding nothing new: `resolveOrgFromClaim` (the
+organisation by the verified `org_id`; a slug never selects one), then
+`resolveActingPrincipal` (the person as stored in that organisation), then
+`assertOrgAdmin` (is that person an admin there).
+
+```ts
+import { resolveCallerFromClaims } from "@vantageos/cloud-identity/caller-from-claims";
+
+const c = await resolveCallerFromClaims(identity, { orgLookups, principalLookups }, { adminRoles: ["org:admin"], door: "withOrgScope" });
+if (!c.ok) {
+  // c.refusal: typed RBAC_DENIED (no-verified-organisation, org-mapping-not-found, other-organisation, credential-invalid, ...)
+  // c.claimsOrg: the claims NAME an organisation they could not prove (refuse loudly), vs none at all
+} else {
+  // c.subject, c.actorName ("user:<sub>"), c.org { id, label, orgKind, ... }, c.principal, c.role, c.isOrgAdmin
+}
+```
+
+- The role claim is read as `orgRole`, `org_role` or `organizationRole`
+  (`readOrgRoleClaim`); none is `null`, and `null` is never an admin.
+- `claimsAnOrganisation(claims)` only chooses a refusal's shape; it never names
+  an organisation.
+- An empty `adminRoles` is a `TypeError`, never a silent non-admin.
+- Types: `CallerFromClaimsDeps`, `CallerFromClaimsOptions`, `CallerFromClaimsResult`.
+
 ## An organisation is its permanent ID (0.16.0)
 
 A label (the slug an org can be renamed to) is display text. These functions
@@ -1047,6 +1075,15 @@ no option turns that on: a reference or credential without an org ID names no
 organisation and is refused. A store that has not filled every ID is filled
 once, with `resolveOrgIdForLabelBackfillOnly`, before the consumer relies on
 these functions.
+
+**`resolveProvisioningLabel(label, lookups)`** (0.20.0) is the one boundary
+where an operator's provisioning input names an organisation by label. It
+returns `{ kind: "mapped", orgId, active }`, `{ kind: "unmapped" }` (the
+organisation does not exist yet), `{ kind: "mapped-without-id", active }` or
+`{ kind: "unreadable", reason }` (`no-label`, `lookup-failed`,
+`record-invalid`). Every decision after it is by `orgId`; an unreadable store
+is never "unmapped", so a failing read cannot authorise a creation. Type:
+`ProvisioningLabelResult`.
 
 ## What this package does not do
 

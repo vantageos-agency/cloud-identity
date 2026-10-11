@@ -101,6 +101,10 @@
     "./scope-standing": {
       "types": "./dist/scope-standing.d.ts",
       "import": "./dist/scope-standing.js"
+    },
+    "./caller-from-claims": {
+      "types": "./dist/caller-from-claims.d.ts",
+      "import": "./dist/caller-from-claims.js"
     }
   },
   "files": [

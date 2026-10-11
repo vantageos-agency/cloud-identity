@@ -16,6 +16,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `masterSource` must agree, otherwise `"refused"`. Types `ScopeStanding`,
   `StandingScope`. New `IdentityRefusalReason` members `scope-not-resolved`,
   `standing-not-allowed`.
+- `./caller-from-claims`: `resolveCallerFromClaims(claims, deps, { adminRoles, door })`,
+  the one call from a verified claim record to `{ subject, actorName, org, principal,
+  role, isOrgAdmin }` or a typed refusal with `claimsOrg`. It chains
+  `resolveOrgFromClaim` -> `resolveActingPrincipal` (person) -> `assertOrgAdmin`
+  and decides nothing new. Helpers `readOrgRoleClaim`, `claimsAnOrganisation`.
+- `resolveProvisioningLabel(label, lookups)` (`./org-by-id`): the one boundary
+  where a provisioning label is translated to the permanent org ID —
+  `mapped` / `unmapped` / `mapped-without-id` / `unreadable`; an unreadable
+  store is never `unmapped`.
 
 ## [0.19.1]
 
