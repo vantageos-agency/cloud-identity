@@ -3,6 +3,30 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0]
+
+### Added
+
+- `resolveTenantFromAccessToken(authorization, config, nowMs?)`
+  (`./tenant-from-token`): the session-to-tenant helper. From an
+  `Authorization` header it returns `{ ok: true, principal, orgId }` for a
+  VERIFIED access token, or a typed refusal. Built on `verifyMcpAccessToken`
+  (no second verifier): a forged, expired, wrong-audience or wrong-issuer
+  token never yields a tenant (`401` with the challenge, `503` when the key set
+  is unreachable). The org is the `org_id` claim of the verified token; a
+  verified token without a usable one is refused `no-verified-organisation`
+  (`403`). Lets a downstream server stop reading raw claims. New types
+  `ResolveTenantFromAccessTokenResult`, `TokenPrincipal`.
+
+### Security
+
+- Denial path: `resumeAuthorize` with `denied: true` now verifies the
+  `consentToken` exactly as the approve path does (same function, same
+  `consent-required` refusal) when consent is on. Before, a forged or missing
+  consent token on a denial was accepted. **Behaviour change for consumers:**
+  the denial POST must carry the picker's `consentToken`, as the approval POST
+  already must. With `requireConsent: false` nothing changes.
+
 ## [0.17.0]
 
 ### Added

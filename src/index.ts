@@ -290,3 +290,12 @@ export type {
   FindOperatorOrgOptions,
   OperatorOrgResult,
 } from "./org-by-id.js";
+
+// 0.18.0 — Session to tenant: `{ principal, orgId }` from a verified access token,
+// built on `verifyMcpAccessToken`, or a typed refusal. A downstream server never
+// reads a raw claim.
+export { resolveTenantFromAccessToken } from "./tenant-from-token.js";
+export type {
+  TokenPrincipal,
+  ResolveTenantFromAccessTokenResult,
+} from "./tenant-from-token.js";

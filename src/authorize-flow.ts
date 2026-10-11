@@ -168,7 +168,7 @@ export interface ResumeInput {
   orgId?: string;
   /** The person's explicit approval, when `requireConsent` is on. */
   approved?: boolean;
-  /** The `consentToken` of the picker the person was shown. Required with `approved: true` when consent is on. */
+  /** The `consentToken` of the picker the person was shown. Required with `approved: true` and with `denied: true` when consent is on. */
   consentToken?: string;
   /**
    * The person explicitly refused. An explicit flag, never inferred from
@@ -342,12 +342,9 @@ async function bindAndIssue(
     // `approved: true` is a CLAIM in a POST body. An attacker client can mint
     // its own state and replay it with a victim's session; only a token the
     // server issued to this user for this state proves the picker was shown.
-    const presented = choice.consentToken;
-    const ok =
-      typeof presented === "string" &&
-      expectedToken !== null &&
-      (await timingSafeEqual(utf8(presented), utf8(expectedToken)));
-    if (!ok) return refused("consent-required");
+    if (!(await consentTokenMatches(choice.consentToken, expectedToken))) {
+      return refused("consent-required");
+    }
   }
   if (!picked || (consentRequired && choice.approved !== true)) {
     return {
@@ -428,6 +425,23 @@ async function consentTokenFor(
 ): Promise<string> {
   const set = [...orgIds].sort().join(",");
   return signMac(`consent-v1\0${state}\0${userId}\0${set}`, secret);
+}
+
+/**
+ * The ONE consent-token check, shared by the approve path and the denial path:
+ * the presented value must be a string and must equal the token the server
+ * would have issued for this exact picker, compared in constant time. A missing,
+ * empty, forged or foreign token never matches.
+ */
+async function consentTokenMatches(
+  presented: unknown,
+  expected: string | null,
+): Promise<boolean> {
+  return (
+    typeof presented === "string" &&
+    expected !== null &&
+    (await timingSafeEqual(utf8(presented), utf8(expected)))
+  );
 }
 
 function randomCode(): string {
@@ -532,9 +546,31 @@ export async function resumeAuthorize(
   if (!verified.ok) return { kind: "refused", refusal: verified.refusal };
 
   if (input.denied === true) {
-    // Everything above verified: the state, the client and the session. Only
-    // now is the person's refusal answered with the OAuth error redirect.
     if (input.approved === true) return refused("invalid-request");
+    // A denial is a CLAIM in a POST body exactly as an approval is: without a
+    // proof that this picker was shown to this verified user for this state, an
+    // attacker can post it for a victim's session. When consent is on it is
+    // verified with the same token, by the same function, as the approve path.
+    if (cfg.requireConsent !== false) {
+      let memberships: readonly ClerkOrgMembership[];
+      try {
+        memberships = await deps.listMemberships(verified.session.userId);
+      } catch {
+        return refused("membership-lookup-unavailable");
+      }
+      const expectedToken = await consentTokenFor(
+        cfg.stateSecret,
+        input.state,
+        verified.session.userId,
+        memberships.map((m) => m.organization.id),
+      );
+      if (!(await consentTokenMatches(input.consentToken, expectedToken))) {
+        return refused("consent-required");
+      }
+    }
+    // Everything above verified: the state, the client, the session and the
+    // consent proof. Only now is the person's refusal answered with the OAuth
+    // error redirect.
     return clientRedirect(v.req, { error: "access_denied" });
   }
 
