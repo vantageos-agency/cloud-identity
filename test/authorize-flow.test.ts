@@ -806,6 +806,13 @@ describe("picker redirect origin and person denial", () => {
     return stateOf(out.url);
   };
 
+  /** The picker the person was actually shown: its state and its consent token. */
+  const shownPicker = async (cfg: AuthorizeConfig, deps: AuthorizeDeps) => {
+    const out = await startAuthorize(await params(), await mintSession(), cfg, deps);
+    if (out.kind !== "org-picker") throw new Error("setup");
+    return out.model;
+  };
+
   it("the picker model carries the origin of the registered redirect_uri", async () => {
     const { cfg, deps } = denySetup();
     const out = await startAuthorize(await params(), await mintSession(), cfg, deps);
@@ -816,9 +823,14 @@ describe("picker redirect origin and person denial", () => {
 
   it("a denial with verified state and a valid session redirects with access_denied and state, and no iss", async () => {
     const { cfg, deps, store } = denySetup();
-    const state = await stateFor(cfg, deps);
+    const model = await shownPicker(cfg, deps);
     const out = await resumeAuthorize(
-      { state, sessionToken: await mintSession(), denied: true },
+      {
+        state: model.state,
+        sessionToken: await mintSession(),
+        denied: true,
+        consentToken: model.consentToken ?? undefined,
+      },
       cfg,
       deps,
     );
@@ -836,10 +848,15 @@ describe("picker redirect origin and person denial", () => {
 
   it("a denial of a request that carried no client state omits state", async () => {
     const { cfg, deps } = denySetup();
-    const start = await startAuthorize(await params({ state: undefined }), undefined, cfg, deps);
-    if (start.kind !== "redirect-to-sign-in") throw new Error("setup");
+    const start = await startAuthorize(await params({ state: undefined }), await mintSession(), cfg, deps);
+    if (start.kind !== "org-picker") throw new Error("setup");
     const out = await resumeAuthorize(
-      { state: stateOf(start.url), sessionToken: await mintSession(), denied: true },
+      {
+        state: start.model.state,
+        sessionToken: await mintSession(),
+        denied: true,
+        consentToken: start.model.consentToken ?? undefined,
+      },
       cfg,
       deps,
     );
@@ -877,6 +894,99 @@ describe("picker redirect origin and person denial", () => {
     const state = await stateFor(cfg, deps);
     const out = await resumeAuthorize({ state, sessionToken: undefined, denied: true }, cfg, deps);
     expect(out).toMatchObject({ kind: "refused", refusal: { reason: "session-required" } });
+  });
+
+  describe("a denial verifies the consent token exactly as an approval does", () => {
+    for (const [label, token] of [
+      ["missing", undefined],
+      ["empty", ""],
+      ["forged", "forged-consent-token"],
+    ] as const) {
+      it(`a denial with a ${label} consent token is refused with consent-required, never a redirect`, async () => {
+        const { cfg, deps, store } = denySetup();
+        const model = await shownPicker(cfg, deps);
+        const out = await resumeAuthorize(
+          { state: model.state, sessionToken: await mintSession(), denied: true, consentToken: token },
+          cfg,
+          deps,
+        );
+        expect(out).toMatchObject({ kind: "refused", refusal: { reason: "consent-required" } });
+        expect(out).not.toHaveProperty("url");
+        expect(store.rows.size).toBe(0);
+      });
+    }
+
+    it("the refusal is the same outcome the approve path returns for the same forged token", async () => {
+      const { cfg, deps } = denySetup();
+      const model = await shownPicker(cfg, deps);
+      const base = { state: model.state, sessionToken: await mintSession(), consentToken: "forged" };
+      const approve = await resumeAuthorize({ ...base, orgId: "org_A", approved: true }, cfg, deps);
+      const deny = await resumeAuthorize({ ...base, denied: true }, cfg, deps);
+      expect(approve).toMatchObject({ kind: "refused", refusal: { reason: "consent-required" } });
+      expect(deny).toEqual(approve);
+    });
+
+    it("a consent token minted for another user's picker is refused on a denial", async () => {
+      const { cfg, deps } = denySetup();
+      const model = await shownPicker(cfg, deps);
+      const out = await resumeAuthorize(
+        {
+          state: model.state,
+          sessionToken: await mintSession({ sub: "user_B" }),
+          denied: true,
+          consentToken: model.consentToken ?? undefined,
+        },
+        cfg,
+        deps,
+      );
+      expect(out).toMatchObject({ kind: "refused", refusal: { reason: "consent-required" } });
+    });
+
+    it("a consent token minted for another state is refused on a denial", async () => {
+      const { cfg, deps } = denySetup();
+      const m1 = await shownPicker(cfg, deps);
+      const other = await startAuthorize(await params({ state: "other-state" }), await mintSession(), cfg, deps);
+      if (other.kind !== "org-picker") throw new Error("setup");
+      const out = await resumeAuthorize(
+        {
+          state: other.model.state,
+          sessionToken: await mintSession(),
+          denied: true,
+          consentToken: m1.consentToken ?? undefined,
+        },
+        cfg,
+        deps,
+      );
+      expect(out).toMatchObject({ kind: "refused", refusal: { reason: "consent-required" } });
+    });
+
+    it("with consent switched off no token exists, and a denial still redirects with access_denied", async () => {
+      const { cfg, deps } = setup([orgA, orgB], { requireConsent: false });
+      const state = await stateFor(cfg, deps);
+      const out = await resumeAuthorize({ state, sessionToken: await mintSession(), denied: true }, cfg, deps);
+      expect(out.kind).toBe("redirect-to-client");
+      if (out.kind !== "redirect-to-client") return;
+      expect(new URL(out.url).searchParams.get("error")).toBe("access_denied");
+    });
+
+    it("a denial whose membership list cannot be read is refused, never a redirect", async () => {
+      const { cfg, deps } = denySetup();
+      const model = await shownPicker(cfg, deps);
+      deps.listMemberships = async () => {
+        throw new Error("down");
+      };
+      const out = await resumeAuthorize(
+        {
+          state: model.state,
+          sessionToken: await mintSession(),
+          denied: true,
+          consentToken: model.consentToken ?? undefined,
+        },
+        cfg,
+        deps,
+      );
+      expect(out).toMatchObject({ kind: "refused", refusal: { reason: "membership-lookup-unavailable" } });
+    });
   });
 
   it("a denial for a client revoked mid-flow is refused", async () => {
