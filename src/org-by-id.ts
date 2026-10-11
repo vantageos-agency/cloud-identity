@@ -17,7 +17,7 @@
 
 import { z } from "zod";
 import { type IdentityRefusal, refusal } from "./identity-refusal.js";
-import { resolveTenantIdOrAbsent } from "./org-guard.js";
+import { claimedOrgId } from "./claimed-org-id.js";
 import type { OrgKind } from "./principal-by-id.js";
 
 // ---------------------------------------------------------------------------
@@ -168,23 +168,6 @@ export type ResolveOrgFromClaimOptions = {
 export type ResolveOrgFromClaimResult =
   | { ok: true; org: ResolvedOrg }
   | { ok: false; refusal: IdentityRefusal };
-
-const CLERK_ORG_ID_SHAPE = /^org_[A-Za-z0-9]+$/;
-const ID_CLAIMS = ["org_id", "organizationId", "orgId"] as const;
-
-/**
- * The first claim that is shaped like a Clerk org ID and resolves as a tenant.
- * @internal Not exported from the package; shared with `resolveTenantFromAccessToken`.
- */
-export function claimedOrgId(claims: Record<string, unknown>): string | undefined {
-  for (const name of ID_CLAIMS) {
-    const value = claims[name];
-    if (typeof value !== "string" || !CLERK_ORG_ID_SHAPE.test(value)) continue;
-    const resolved = resolveTenantIdOrAbsent({ kind: "session", identity: { orgId: value } });
-    if (resolved.present) return resolved.tenantId;
-  }
-  return undefined;
-}
 
 /**
  * Resolves a VERIFIED credential's claims to the stored mapping row of its
