@@ -167,6 +167,8 @@ export type PersonPrincipalResult<O extends OrganisationState> =
  * the token is live (present, unrevoked, unexpired); it acts for a PERSON;
  * it is bound to an organisation; that organisation exists and is active.
  * The only organisation ever looked up is the token's own.
+ *
+ * @callerResolver — resolves a verified caller; consumers may derive their accepted sinks from this tag.
  */
 export async function resolvePersonPrincipal<O extends OrganisationState>(
   token: PersonTokenRecord | null | undefined,

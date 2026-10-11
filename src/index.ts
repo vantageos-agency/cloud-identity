@@ -119,6 +119,27 @@ export type {
   ClerkSessionFromRequestOptions,
   ResumeFromRequestOutcome,
 } from "./clerk-handshake.js";
+
+// 0.20.0 — the standing of a resolved org scope: one reading of "isMaster".
+export {
+  scopeStanding,
+  hasFleetRead,
+  requireStanding,
+  requireFleetStanding,
+} from "./scope-standing.js";
+export type { ScopeStanding, StandingScope } from "./scope-standing.js";
+
+// 0.20.0 — one entry from verified claims to org + person + role + admin.
+export {
+  resolveCallerFromClaims,
+  readOrgRoleClaim,
+  claimsAnOrganisation,
+} from "./caller-from-claims.js";
+export type {
+  CallerFromClaimsDeps,
+  CallerFromClaimsOptions,
+  CallerFromClaimsResult,
+} from "./caller-from-claims.js";
 export { exchangeAuthorizationCode } from "./token-exchange.js";
 export type {
   AuthorizedTokenClaims,
@@ -275,13 +296,16 @@ export type {
 // the org's mapping row, the ID comparisons and the operator org. Labels
 // (slugs) never select or prove an org; no option turns that on. The
 // label-to-ID derivation is exported only as
-// `resolveOrgIdForLabelBackfillOnly`, for a one-off backfill.
+// `resolveOrgIdForLabelBackfillOnly`, for a one-off backfill, and as
+// `resolveProvisioningLabel` (0.20.0), the one boundary where an operator's
+// provisioning input names an organisation by label.
 export {
   sameOrg,
   isFleetStamp,
   sameTenantStamp,
   resolveOrgFromClaim,
   resolveOrgIdForLabelBackfillOnly,
+  resolveProvisioningLabel,
   findOperatorOrg,
   orgMappingRowSchema,
 } from "./org-by-id.js";
@@ -295,6 +319,7 @@ export type {
   OrgIdAbsence,
   OrgIdAbsenceReason,
   OrgIdResolution,
+  ProvisioningLabelResult,
   OperatorOrgLookups,
   FindOperatorOrgOptions,
   OperatorOrgResult,

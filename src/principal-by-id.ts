@@ -311,6 +311,8 @@ function served(principal: ActingPrincipal): ResolveActingPrincipalResult {
  *     its stored org as `"operator"`). With `actingForAgentId`, the agent row is read by
  *     ID and must be stamped with the service account's own org; the principal
  *     is that agent, with `viaServiceAccountId` recording the carrier.
+ *
+ * @callerResolver — resolves a verified caller; consumers may derive their accepted sinks from this tag.
  */
 export async function resolveActingPrincipal(
   credential: ActingCredential | null | undefined,
