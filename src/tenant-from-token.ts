@@ -1,5 +1,5 @@
 import { refusal, type IdentityRefusal } from "./identity-refusal.js";
-import { claimedOrgId } from "./org-by-id.js";
+import { claimedOrgId } from "./claimed-org-id.js";
 import { personActorName } from "./person-principal.js";
 import {
   verifyMcpAccessToken,
