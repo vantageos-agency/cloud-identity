@@ -1,6 +1,6 @@
 {
   "name": "@vantageos/cloud-identity",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "Framework-agnostic identity + scope-filter primitives for VantagePeers Cloud (multi-tenant MCP).",
   "type": "module",
   "main": "./dist/index.js",
@@ -49,6 +49,10 @@
     "./clerk-session": {
       "types": "./dist/clerk-session.d.ts",
       "import": "./dist/clerk-session.js"
+    },
+    "./clerk-handshake": {
+      "types": "./dist/clerk-handshake.d.ts",
+      "import": "./dist/clerk-handshake.js"
     },
     "./oidc": {
       "types": "./dist/oidc.d.ts",
@@ -138,6 +142,7 @@
     "vitest": "^1.6.0"
   },
   "dependencies": {
+    "@clerk/backend": "^3.23.2",
     "zod": "^4.4.3"
   }
 }
