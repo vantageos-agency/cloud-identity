@@ -12,7 +12,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   request with Clerk's own handshake, `@clerk/backend` `authenticateRequest()`
   (no hand-written handshake). Returns `signed-in` (`sessionToken`, `userId`,
   `sessionId`), `handshake` (`status` + the `Location` / `Set-Cookie` headers
-  to return as they are) or `signed-out` (`reason`). On a development instance
+  to return as they are) or `signed-out` (`reason`). The return from the
+  handshake (`__clerk_handshake`) is also answered as `handshake`: the SDK
+  hands back the `__session` cookies and a `Location` that strips the handshake
+  parameters, and the next request is plain `signed-in`. On a development instance
   this is what carries the session from the hosted sign-in domain to the app
   host; a return with only `__clerk_db_jwt` used to end in `session-required`.
 - `resumeAuthorizeFromRequest(request, input, clerk, cfg, deps)`: the resume

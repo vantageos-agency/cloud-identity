@@ -81,6 +81,26 @@ describe("resolveClerkSessionFromRequest", () => {
     expect(r.sessionId).toBe("sess_1");
   });
 
+  it("the return carrying __clerk_handshake -> handshake: Set-Cookie __session + Location without the parameter", async () => {
+    const t = mint();
+    const iat = Math.floor(Date.now() / 1000);
+    const h = b64u(JSON.stringify({ alg: "RS256", kid: "ins_test", typ: "JWT" }));
+    const p = b64u(
+      JSON.stringify({ iss: `https://${FAPI}`, iat, nbf: iat, exp: iat + 60, handshake: [`__session=${t}; Path=/; HttpOnly`, "__client_uat=1; Path=/"] }),
+    );
+    const hs = `${h}.${p}.${b64u(createSign("RSA-SHA256").update(`${h}.${p}`).sign(privatePem))}`;
+    const r = await resolveClerkSessionFromRequest(
+      new Request(`${HOST}/authorize/callback?authorize_state=s&__clerk_handshake=${hs}`, { headers: doc }),
+      opts(),
+    );
+    expect(r.kind).toBe("handshake");
+    if (r.kind !== "handshake") return;
+    expect(r.headers.getSetCookie().some((c) => c.startsWith("__session="))).toBe(true);
+    const loc = r.headers.get("location") ?? "";
+    expect(loc).toContain("/authorize/callback?authorize_state=s");
+    expect(loc).not.toContain("__clerk_handshake");
+  });
+
   it("a valid Bearer session token still resolves signed-in", async () => {
     const t = mint();
     const r = await resolveClerkSessionFromRequest(

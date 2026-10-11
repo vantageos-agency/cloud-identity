@@ -67,6 +67,13 @@ export async function resolveClerkSessionFromRequest(
     return { kind: "handshake", status: 307, headers: state.headers };
   }
   if (state.status === "signed-in") {
+    // The return from the handshake (`__clerk_handshake`) is signed-in AND carries the cookies to
+    // set plus a `Location` that strips the handshake parameters. The SDK's contract is to answer
+    // that redirect with those headers, as they are: the browser then holds `__session` on this
+    // host and the next request is plain signed-in.
+    if (state.headers.get("location")) {
+      return { kind: "handshake", status: 307, headers: state.headers };
+    }
     const auth = state.toAuth();
     return {
       kind: "signed-in",
