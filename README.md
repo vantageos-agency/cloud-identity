@@ -912,6 +912,19 @@ if (!r.ok) return respond(r.status, "headers" in r ? r.headers : {});
   the consumer fetches and caches the key set; no scope check is made on the
   token (read `r.session.claims`).
 
+### The session from the raw request, with Clerk's own handshake (`/clerk-handshake`, 0.19.0)
+
+On a development instance the Clerk session lives on the hosted sign-in domain;
+only Clerk's handshake brings it to your host. `resolveClerkSessionFromRequest(request, { secretKey, publishableKey, authorizedParties?, jwtKey? })`
+is built on `@clerk/backend` `authenticateRequest()` and returns a
+`ClerkSessionFromRequest`: `signed-in` (`sessionToken`, `userId`, `sessionId`),
+`handshake` (`status` + the `Location` / `Set-Cookie` headers to return as they
+are) or `signed-out` (`reason`). `resumeAuthorizeFromRequest(request, input, clerk, cfg, deps)`
+feeds the resume path from the request and returns a `ResumeFromRequestOutcome`
+(an `AuthorizeOutcome` or the `handshake`). Options type:
+`ClerkSessionFromRequestOptions`. Behind a proxy, forward `x-forwarded-host`
+and `x-forwarded-proto`.
+
 ### From a token to `{ principal, orgId }` (`/tenant-from-token`, 0.18.0)
 
 A downstream server never reads a raw claim off a token. It hands the

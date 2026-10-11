@@ -3,6 +3,30 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0]
+
+### Added
+
+- `resolveClerkSessionFromRequest(request, { secretKey, publishableKey, authorizedParties?, jwtKey? })`
+  (`./clerk-handshake`): resolves the person's Clerk session from the raw
+  request with Clerk's own handshake, `@clerk/backend` `authenticateRequest()`
+  (no hand-written handshake). Returns `signed-in` (`sessionToken`, `userId`,
+  `sessionId`), `handshake` (`status` + the `Location` / `Set-Cookie` headers
+  to return as they are) or `signed-out` (`reason`). The return from the
+  handshake (`__clerk_handshake`) is also answered as `handshake`: the SDK
+  hands back the `__session` cookies and a `Location` that strips the handshake
+  parameters, and the next request is plain `signed-in`. On a development instance
+  this is what carries the session from the hosted sign-in domain to the app
+  host; a return with only `__clerk_db_jwt` used to end in `session-required`.
+- `resumeAuthorizeFromRequest(request, input, clerk, cfg, deps)`: the resume
+  path fed with the raw request; a `handshake` is returned untouched.
+- Dependency: `@clerk/backend` `^3.23.2` (resolved 3.23.2).
+
+### Unchanged
+
+- `resumeAuthorize` / `startAuthorize` keep taking a `sessionToken` string; a
+  Bearer or `__session` token remains the signed-in case.
+
 ## [0.18.0]
 
 ### Added

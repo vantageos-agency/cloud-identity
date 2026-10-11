@@ -110,6 +110,15 @@ export type {
   OrgPickerModel,
   ResumeInput,
 } from "./authorize-flow.js";
+export {
+  resolveClerkSessionFromRequest,
+  resumeAuthorizeFromRequest,
+} from "./clerk-handshake.js";
+export type {
+  ClerkSessionFromRequest,
+  ClerkSessionFromRequestOptions,
+  ResumeFromRequestOutcome,
+} from "./clerk-handshake.js";
 export { exchangeAuthorizationCode } from "./token-exchange.js";
 export type {
   AuthorizedTokenClaims,
