@@ -3,6 +3,16 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.1]
+
+### Fixed
+
+- `resolveClerkSessionFromRequest`: a `__clerk_handshake` that does not verify (not a JWT, or
+  signed by another key) resolves to `signed-out` with reason `handshake-invalid` and no headers.
+  The SDK threw on these forms, so a consumer callback answered 500. Any other SDK error still
+  propagates. Measured: a Clerk-signed handshake past its own `exp` is still answered by the SDK
+  (its cookies are Clerk-signed; the `__session` among them is verified on its own).
+
 ## [0.19.0]
 
 ### Added

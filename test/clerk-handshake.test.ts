@@ -143,6 +143,71 @@ describe("resolveClerkSessionFromRequest", () => {
   });
 });
 
+describe("an invalid __clerk_handshake is signed-out, never a throw", () => {
+  // The forms of a `__clerk_handshake` that does not verify: not a JWT, signed by another key.
+  const iat = () => Math.floor(Date.now() / 1000);
+  const hsHeader = () => b64u(JSON.stringify({ alg: "RS256", kid: "ins_test", typ: "JWT" }));
+  const signed = (payload: Record<string, unknown>, pemKey: string) => {
+    const h = hsHeader();
+    const p = b64u(JSON.stringify(payload));
+    return `${h}.${p}.${b64u(createSign("RSA-SHA256").update(`${h}.${p}`).sign(pemKey))}`;
+  };
+  const cookies = () => [`__session=${mint()}; Path=/; HttpOnly`, "__client_uat=1; Path=/"];
+  const forms: Array<[string, () => string]> = [
+    ["not a JWT", () => "forged.not.a.jwt"],
+    [
+      "signed by another key",
+      () => {
+        const other = generateKeyPairSync("rsa", { modulusLength: 2048 });
+        const t = iat();
+        return signed(
+          { iss: `https://${FAPI}`, iat: t, nbf: t, exp: t + 60, handshake: cookies() },
+          other.privateKey.export({ type: "pkcs8", format: "pem" }) as string,
+        );
+      },
+    ],
+  ];
+
+  for (const [name, make] of forms) {
+    it(`${name} -> signed-out "handshake-invalid", no __session set`, async () => {
+      const r = await resolveClerkSessionFromRequest(
+        new Request(`${HOST}/authorize/callback?authorize_state=s&__clerk_handshake=${make()}`, { headers: doc }),
+        opts(),
+      );
+      expect(r.kind).toBe("signed-out");
+      if (r.kind !== "signed-out") return;
+      expect(r.reason).toBe("handshake-invalid");
+      expect(r.headers.getSetCookie().some((c) => c.startsWith("__session="))).toBe(false);
+    });
+  }
+
+  // Measured, not assumed: the SDK does not refuse a handshake token past its own `exp` when the
+  // signature is Clerk's. It answers the handshake and applies the cookies the token carries. Those
+  // cookies are Clerk-signed, and the `__session` among them is verified on its own at the next
+  // request. Declared divergence from "expired -> signed-out": the property held is "never a throw".
+  it("an expired but Clerk-signed handshake is answered by the SDK, never a throw", async () => {
+    const t = iat() - 3600;
+    const hs = signed({ iss: `https://${FAPI}`, iat: t, nbf: t, exp: t + 60, handshake: cookies() }, privatePem);
+    const r = await resolveClerkSessionFromRequest(
+      new Request(`${HOST}/authorize/callback?authorize_state=s&__clerk_handshake=${hs}`, { headers: doc }),
+      opts(),
+    );
+    expect(r.kind).toBe("handshake");
+  });
+
+  it("resumeAuthorizeFromRequest continues signed out on a forged handshake instead of throwing", async () => {
+    const out = await resumeAuthorizeFromRequest(
+      new Request(`${HOST}/authorize/callback?authorize_state=s&__clerk_handshake=forged.not.a.jwt`, { headers: doc }),
+      { state: "s" },
+      opts(),
+      {} as never,
+      {} as never,
+    ).catch((e: unknown) => ({ kind: "threw", e }));
+    expect(out.kind).not.toBe("threw");
+    expect(out.kind).not.toBe("handshake");
+  });
+});
+
 describe("resumeAuthorizeFromRequest", () => {
   it("returns the handshake before looking at the state when there is no session", async () => {
     const out = await resumeAuthorizeFromRequest(

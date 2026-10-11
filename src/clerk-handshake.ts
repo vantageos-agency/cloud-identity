@@ -56,13 +56,29 @@ export async function resolveClerkSessionFromRequest(
     secretKey: options.secretKey,
     publishableKey: options.publishableKey,
   });
-  const state = await client.authenticateRequest(request, {
-    publishableKey: options.publishableKey,
-    secretKey: options.secretKey,
-    ...(options.authorizedParties ? { authorizedParties: [...options.authorizedParties] } : {}),
-    ...(options.jwtKey ? { jwtKey: options.jwtKey } : {}),
-    acceptsToken: "session_token",
+  // A `__clerk_handshake` that does not verify (not a JWT, signed by another key) is no session.
+  // The SDK throws on some of these forms and answers signed-out on others; both become one
+  // outcome, and no header of the SDK's is kept: the cookies would come from an untrusted payload.
+  const carriesHandshake = new URL(request.url).searchParams.has("__clerk_handshake");
+  const invalidHandshake = (): ClerkSessionFromRequest => ({
+    kind: "signed-out",
+    reason: "handshake-invalid",
+    headers: new Headers(),
   });
+  let state: Awaited<ReturnType<typeof client.authenticateRequest>>;
+  try {
+    state = await client.authenticateRequest(request, {
+      publishableKey: options.publishableKey,
+      secretKey: options.secretKey,
+      ...(options.authorizedParties ? { authorizedParties: [...options.authorizedParties] } : {}),
+      ...(options.jwtKey ? { jwtKey: options.jwtKey } : {}),
+      acceptsToken: "session_token",
+    });
+  } catch (error) {
+    if (carriesHandshake) return invalidHandshake();
+    throw error;
+  }
+  if (carriesHandshake && state.status === "signed-out") return invalidHandshake();
   if (state.status === "handshake") {
     return { kind: "handshake", status: 307, headers: state.headers };
   }
