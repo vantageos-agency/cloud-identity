@@ -3,6 +3,20 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0]
+
+### Added
+
+- `./scope-standing`: `scopeStanding(scope)` reads a RESOLVED org scope (the shape
+  an org-scope resolver such as VantagePeers `withOrgScope` returns) as
+  `"fleet" | "operator-admin" | "member" | "refused"`; `requireStanding(scope, door, allowed)`
+  and `requireFleetStanding(scope, door)` throw `RBAC_DENIED` naming the door
+  (`scope-not-resolved` / `standing-not-allowed`); `hasFleetRead(scope)` is the
+  reading meaning of `isMaster`. Fail closed: `isMaster`, `fleetWide` and a known
+  `masterSource` must agree, otherwise `"refused"`. Types `ScopeStanding`,
+  `StandingScope`. New `IdentityRefusalReason` members `scope-not-resolved`,
+  `standing-not-allowed`.
+
 ## [0.19.1]
 
 ### Fixed

@@ -957,6 +957,39 @@ if (!t.ok) return respond(t.status, "headers" in t ? t.headers : {}); // 401, 40
   `resolveTenantFromAccessToken`) and never the token.
 - Types: `ResolveTenantFromAccessTokenResult`, `TokenPrincipal`.
 
+### The standing of a resolved org scope (`/scope-standing`, 0.20.0)
+
+An org-scope resolver hands every door a scope object, and doors used to branch
+on its `isMaster` boolean. That boolean mixes "may read the whole fleet" with
+"is the fleet itself". `scopeStanding(scope)` is the one reading:
+
+| standing | the scope |
+|---|---|
+| `"fleet"` | master, `masterSource` `"service-account"` or `"internal"` |
+| `"operator-admin"` | master, `masterSource` `"operator-admin"`: reads the fleet, is not the fleet |
+| `"member"` | not master, bound to one organisation (`orgClerkId`, or `orgSlug` while ids are filled) |
+| `"refused"` | anything else |
+
+```ts
+import { requireStanding, requireFleetStanding, hasFleetRead } from "@vantageos/cloud-identity/scope-standing";
+
+requireFleetStanding(scope, "secrets.read");                     // the fleet's own service only
+requireStanding(scope, "tasks.list", ["fleet", "operator-admin", "member"]);
+if (hasFleetRead(scope)) { /* unfiltered read: fleet or operator-admin */ }
+```
+
+- Fail closed. A scope is `"fleet"` or `"operator-admin"` only when `isMaster`,
+  `fleetWide` and a known `masterSource` agree; an absent or malformed scope, the
+  `refused` flag, no organisation, or any disagreement is `"refused"` — never the
+  more powerful reading.
+- `requireStanding` / `requireFleetStanding` throw `IdentityRefusalError`
+  `RBAC_DENIED` naming the door: reason `scope-not-resolved` for a `"refused"`
+  scope, `standing-not-allowed` otherwise. An empty `allowed` list is a
+  `TypeError`, never a pass.
+- `hasFleetRead(scope)` is true for `"fleet"` and `"operator-admin"`: the reading
+  meaning of `isMaster`.
+- Types: `ScopeStanding`, `StandingScope`.
+
 ## An organisation is its permanent ID (0.16.0)
 
 A label (the slug an org can be renamed to) is display text. These functions

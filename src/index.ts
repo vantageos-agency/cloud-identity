@@ -119,6 +119,15 @@ export type {
   ClerkSessionFromRequestOptions,
   ResumeFromRequestOutcome,
 } from "./clerk-handshake.js";
+
+// 0.20.0 — the standing of a resolved org scope: one reading of "isMaster".
+export {
+  scopeStanding,
+  hasFleetRead,
+  requireStanding,
+  requireFleetStanding,
+} from "./scope-standing.js";
+export type { ScopeStanding, StandingScope } from "./scope-standing.js";
 export { exchangeAuthorizationCode } from "./token-exchange.js";
 export type {
   AuthorizedTokenClaims,
