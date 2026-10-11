@@ -7,10 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
-- `resolveClerkSessionFromRequest`: a `__clerk_handshake` that does not verify (not a JWT, signed
-  by another key, expired) resolves to `signed-out` with reason `handshake-invalid` and no
-  headers. The SDK threw on some of these forms, so a consumer callback answered 500. Any other
-  SDK error still propagates.
+- `resolveClerkSessionFromRequest`: a `__clerk_handshake` that does not verify (not a JWT, or
+  signed by another key) resolves to `signed-out` with reason `handshake-invalid` and no headers.
+  The SDK threw on these forms, so a consumer callback answered 500. Any other SDK error still
+  propagates. Measured: a Clerk-signed handshake past its own `exp` is still answered by the SDK
+  (its cookies are Clerk-signed; the `__session` among them is verified on its own).
 
 ## [0.19.0]
 

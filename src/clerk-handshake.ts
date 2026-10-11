@@ -56,7 +56,7 @@ export async function resolveClerkSessionFromRequest(
     secretKey: options.secretKey,
     publishableKey: options.publishableKey,
   });
-  // A `__clerk_handshake` that does not verify (not a JWT, another key, expired) is no session.
+  // A `__clerk_handshake` that does not verify (not a JWT, signed by another key) is no session.
   // The SDK throws on some of these forms and answers signed-out on others; both become one
   // outcome, and no header of the SDK's is kept: the cookies would come from an untrusted payload.
   const carriesHandshake = new URL(request.url).searchParams.has("__clerk_handshake");

@@ -144,7 +144,7 @@ describe("resolveClerkSessionFromRequest", () => {
 });
 
 describe("an invalid __clerk_handshake is signed-out, never a throw", () => {
-  // The forms an untrusted `__clerk_handshake` takes: not a JWT, signed by another key, expired.
+  // The forms of a `__clerk_handshake` that does not verify: not a JWT, signed by another key.
   const iat = () => Math.floor(Date.now() / 1000);
   const hsHeader = () => b64u(JSON.stringify({ alg: "RS256", kid: "ins_test", typ: "JWT" }));
   const signed = (payload: Record<string, unknown>, pemKey: string) => {
@@ -166,13 +166,6 @@ describe("an invalid __clerk_handshake is signed-out, never a throw", () => {
         );
       },
     ],
-    [
-      "expired",
-      () => {
-        const t = iat() - 3600;
-        return signed({ iss: `https://${FAPI}`, iat: t, nbf: t, exp: t + 60, handshake: cookies() }, privatePem);
-      },
-    ],
   ];
 
   for (const [name, make] of forms) {
@@ -187,6 +180,20 @@ describe("an invalid __clerk_handshake is signed-out, never a throw", () => {
       expect(r.headers.getSetCookie().some((c) => c.startsWith("__session="))).toBe(false);
     });
   }
+
+  // Measured, not assumed: the SDK does not refuse a handshake token past its own `exp` when the
+  // signature is Clerk's. It answers the handshake and applies the cookies the token carries. Those
+  // cookies are Clerk-signed, and the `__session` among them is verified on its own at the next
+  // request. Declared divergence from "expired -> signed-out": the property held is "never a throw".
+  it("an expired but Clerk-signed handshake is answered by the SDK, never a throw", async () => {
+    const t = iat() - 3600;
+    const hs = signed({ iss: `https://${FAPI}`, iat: t, nbf: t, exp: t + 60, handshake: cookies() }, privatePem);
+    const r = await resolveClerkSessionFromRequest(
+      new Request(`${HOST}/authorize/callback?authorize_state=s&__clerk_handshake=${hs}`, { headers: doc }),
+      opts(),
+    );
+    expect(r.kind).toBe("handshake");
+  });
 
   it("resumeAuthorizeFromRequest continues signed out on a forged handshake instead of throwing", async () => {
     const out = await resumeAuthorizeFromRequest(
