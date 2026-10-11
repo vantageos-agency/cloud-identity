@@ -341,7 +341,13 @@ const res = await exchangeAuthorizationCode(
   is appended by the consumer (the authorization server that owns the issuer)
   to every `redirect-to-client` outcome, success and denial alike. A tampered or expired state, an unknown client or a failed
   session is a refusal, never a redirect; `denied` with `approved: true` is
-  refused as `invalid-request`.
+  refused as `invalid-request`. With consent on (the default), a denial must
+  also post the picker's `consentToken`, verified by the same function as an
+  approval (0.18.0): a missing, empty, forged or foreign token is refused as
+  `consent-required`, the same outcome the approve path returns, and a valid
+  one still redirects with `access_denied`. A denial is a claim in a POST body
+  like an approval; without the token it could be posted for a victim's
+  session. With `requireConsent: false` no token exists and none is required.
   A posted `orgId` is honoured only if the verified user's own membership list
   contains it.
   Consent is ON by default (`requireConsent` defaults to true). What it
@@ -905,6 +911,38 @@ if (!r.ok) return respond(r.status, "headers" in r ? r.headers : {});
 - Limits, stated: the token needs a `sub` and a `kid` (the Clerk session shape);
   the consumer fetches and caches the key set; no scope check is made on the
   token (read `r.session.claims`).
+
+### From a token to `{ principal, orgId }` (`/tenant-from-token`, 0.18.0)
+
+A downstream server never reads a raw claim off a token. It hands the
+`Authorization` header and the same config it gives `verifyMcpAccessToken`
+to one function and gets the person and the organisation, or a typed refusal.
+
+```ts
+import { resolveTenantFromAccessToken } from "@vantageos/cloud-identity/tenant-from-token";
+
+const t = await resolveTenantFromAccessToken(req.headers.authorization, resourceServerConfig);
+if (!t.ok) return respond(t.status, "headers" in t ? t.headers : {}); // 401, 403 or 503
+// t.orgId                      the organisation ID: scope every row with it
+// t.principal.subject          the verified `sub`
+// t.principal.actorName        "user:<sub>"
+// t.principal.role             the verified `org_role`, or null
+```
+
+- It is built on `verifyMcpAccessToken` and verifies nothing itself. A forged,
+  expired, wrong-audience or wrong-issuer token, a missing or malformed header,
+  and an unreachable key set are that function's answers, passed through
+  unchanged (`401` with the RFC 6750 challenge, or `503`). No organisation and
+  no principal is returned for a token that did not verify.
+- The organisation is the verified token's `org_id` claim (also read under its
+  other spellings `organizationId` and `orgId`), and it must be shaped like an
+  organisation ID (`org_...`). A slug (`org_slug`) is a label: never read, and
+  it never rescues a missing ID.
+- A verified token with no usable organisation ID is refused, never resolved
+  to an unscoped view: `RBAC_DENIED`, reason `no-verified-organisation`,
+  `status: 403`. The refusal carries `door` (from the config, default
+  `resolveTenantFromAccessToken`) and never the token.
+- Types: `ResolveTenantFromAccessTokenResult`, `TokenPrincipal`.
 
 ## An organisation is its permanent ID (0.16.0)
 

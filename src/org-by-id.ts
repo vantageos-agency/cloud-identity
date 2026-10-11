@@ -172,8 +172,11 @@ export type ResolveOrgFromClaimResult =
 const CLERK_ORG_ID_SHAPE = /^org_[A-Za-z0-9]+$/;
 const ID_CLAIMS = ["org_id", "organizationId", "orgId"] as const;
 
-/** The first claim that is shaped like a Clerk org ID and resolves as a tenant. */
-function claimedOrgId(claims: Record<string, unknown>): string | undefined {
+/**
+ * The first claim that is shaped like a Clerk org ID and resolves as a tenant.
+ * @internal Not exported from the package; shared with `resolveTenantFromAccessToken`.
+ */
+export function claimedOrgId(claims: Record<string, unknown>): string | undefined {
   for (const name of ID_CLAIMS) {
     const value = claims[name];
     if (typeof value !== "string" || !CLERK_ORG_ID_SHAPE.test(value)) continue;
