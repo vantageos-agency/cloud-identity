@@ -126,8 +126,17 @@ export {
   hasFleetRead,
   requireStanding,
   requireFleetStanding,
+  // 0.20.1 — the service account apart from the internal opt-in; a verified bearer context.
+  isServiceAccountScope,
+  requireServiceAccountStanding,
+  bearerStanding,
 } from "./scope-standing.js";
-export type { ScopeStanding, StandingScope } from "./scope-standing.js";
+export type {
+  ScopeStanding,
+  StandingScope,
+  BearerStanding,
+  StandingBearer,
+} from "./scope-standing.js";
 
 // 0.20.0 — one entry from verified claims to org + person + role + admin.
 export {

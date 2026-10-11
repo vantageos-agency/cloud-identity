@@ -3,6 +3,17 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.1]
+
+### Added
+- `isServiceAccountScope(scope)` and `requireServiceAccountStanding(scope, door)` (`./scope-standing`): the fleet service account apart from the internal opt-in, which `"fleet"` also covers. The require form throws `RBAC_DENIED` `scope-not-resolved` or `standing-not-allowed`.
+- `bearerStanding(context)` (`./scope-standing`): `"service-bearer"`, `"local-trust"`, `"caller"` or `"refused"` for a verified bearer context (`isMaster`, `viaMasterBearer`). Fails closed. Types `BearerStanding`, `StandingBearer`.
+- The `@standingGate` JSDoc tag on every standing gate, kept in `dist/*.d.ts`, so an analyser derives the gates from the package.
+- `resolveCallerFromClaims` refusals carry `subject` when the claims had a verified one.
+
+### Changed
+- README: `requireFleetStanding`'s example no longer says "the fleet's own service only"; it admits the internal opt-in too.
+
 ## [0.20.0]
 
 ### Added
