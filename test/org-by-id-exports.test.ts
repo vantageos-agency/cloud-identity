@@ -3,15 +3,17 @@ import * as root from "../src/index.js";
 import * as orgById from "../src/org-by-id.js";
 
 /**
- * Pins the exported function list of `./org-by-id`. The label-to-ID derivation
- * is exported ONLY under a name that says it belongs to the one-off backfill:
- * a request path must never resolve an organisation from a human label.
+ * Pins the exported function list of `./org-by-id`. A label-to-ID derivation is
+ * exported ONLY under a name that says which boundary it belongs to: the one-off
+ * backfill, or the provisioning input (0.20.0, Pi ruling (3)). A request path
+ * must never resolve an organisation from a human label.
  */
 const EXPECTED_FUNCTIONS = [
   "findOperatorOrg",
   "isFleetStamp",
   "resolveOrgFromClaim",
   "resolveOrgIdForLabelBackfillOnly",
+  "resolveProvisioningLabel",
   "sameOrg",
   "sameTenantStamp",
 ];
@@ -32,11 +34,13 @@ describe("org-by-id export pin", () => {
     for (const fn of EXPECTED_FUNCTIONS) expect(rootFns).toContain(fn);
   });
 
-  it("no label-resolving export exists under a name that does not say backfill-only", () => {
+  it("no label-resolving export exists under a name that does not say its boundary", () => {
     for (const mod of [root, orgById] as Array<Record<string, unknown>>) {
       expect(mod).not.toHaveProperty("resolveOrgIdForLabel");
-      const labelResolvers = Object.keys(mod).filter((k) => /ForLabel/.test(k));
-      expect(labelResolvers).toEqual(["resolveOrgIdForLabelBackfillOnly"]);
+      const labelResolvers = Object.keys(mod)
+        .filter((k) => typeof mod[k] === "function" && /Label/.test(k))
+        .sort();
+      expect(labelResolvers).toEqual(["resolveOrgIdForLabelBackfillOnly", "resolveProvisioningLabel"]);
     }
   });
 });
