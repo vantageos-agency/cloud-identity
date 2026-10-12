@@ -973,7 +973,7 @@ on its `isMaster` boolean. That boolean mixes "may read the whole fleet" with
 ```ts
 import { requireStanding, requireFleetStanding, hasFleetRead } from "@vantageos/cloud-identity/scope-standing";
 
-requireFleetStanding(scope, "secrets.read");                     // the fleet's own service only
+requireFleetStanding(scope, "fleet.stats");                      // the fleet: service account or internal opt-in
 requireStanding(scope, "tasks.list", ["fleet", "operator-admin", "member"]);
 if (hasFleetRead(scope)) { /* unfiltered read: fleet or operator-admin */ }
 ```
@@ -989,6 +989,42 @@ if (hasFleetRead(scope)) { /* unfiltered read: fleet or operator-admin */ }
 - `hasFleetRead(scope)` is true for `"fleet"` and `"operator-admin"`: the reading
   meaning of `isMaster`.
 - Types: `ScopeStanding`, `StandingScope`.
+
+**The service account apart from the internal opt-in (0.20.1).** `"fleet"`
+covers two grants: the fleet's service account and an internal opt-in that
+carries no credential. A door that must be the service account itself (a
+verified actor, an agent credential) uses:
+
+```ts
+import { isServiceAccountScope, requireServiceAccountStanding } from "@vantageos/cloud-identity/scope-standing";
+
+requireServiceAccountStanding(scope, "secrets.read");  // the service account only; the internal opt-in is refused
+if (isServiceAccountScope(scope)) { /* ... */ }
+```
+
+`requireServiceAccountStanding` throws `RBAC_DENIED` with `scope-not-resolved`
+for a `"refused"` scope and `standing-not-allowed` for any other standing, the
+internal opt-in included.
+
+**A verified bearer context (0.20.1).** An MCP transport attaches a context to
+each request after verifying its bearer: `isMaster` for the master population,
+`viaMasterBearer` only when that master presented the network master bearer.
+`bearerStanding(context)` reads it:
+
+| standing | the context |
+|---|---|
+| `"service-bearer"` | master, through the network master bearer |
+| `"local-trust"` | master with no network bearer (a process-local server) |
+| `"caller"` | a non-master token |
+| `"refused"` | absent, malformed, or `viaMasterBearer` on a non-master context |
+
+Types: `BearerStanding`, `StandingBearer`.
+
+**`@standingGate` (0.20.1).** `scopeStanding`, `hasFleetRead`, `requireStanding`,
+`requireFleetStanding`, `isServiceAccountScope`, `requireServiceAccountStanding`
+and `bearerStanding` carry the JSDoc tag `@standingGate` in the published
+declarations, so an analyser credits a call to any of them as a delegated gate
+instead of keeping its own list.
 
 ### From verified claims to the caller (`/caller-from-claims`, 0.20.0)
 
@@ -1006,6 +1042,7 @@ const c = await resolveCallerFromClaims(identity, { orgLookups, principalLookups
 if (!c.ok) {
   // c.refusal: typed RBAC_DENIED (no-verified-organisation, org-mapping-not-found, other-organisation, credential-invalid, ...)
   // c.claimsOrg: the claims NAME an organisation they could not prove (refuse loudly), vs none at all
+  // c.subject (0.20.1): the verified subject when the claims had one, e.g. to decide a service account by subject
 } else {
   // c.subject, c.actorName ("user:<sub>"), c.org { id, label, orgKind, ... }, c.principal, c.role, c.isOrgAdmin
 }

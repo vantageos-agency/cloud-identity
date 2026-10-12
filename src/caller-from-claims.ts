@@ -66,6 +66,13 @@ export type CallerFromClaimsResult =
        * never an organisation itself.
        */
       claimsOrg: boolean;
+      /**
+       * The verified subject, when the claims carried one (0.20.1). A consumer
+       * that decides some callers by subject before any organisation (a fleet
+       * service account) reads it here, never from the credential. Absent when
+       * the refusal is the missing subject itself.
+       */
+      subject?: string;
     };
 
 const ROLE_KEYS = ["orgRole", "org_role", "organizationRole"] as const;
@@ -119,7 +126,7 @@ export async function resolveCallerFromClaims(
   }
 
   const resolved = await resolveOrgFromClaim(record, deps?.orgLookups, { door });
-  if (!resolved.ok) return { ok: false, claimsOrg, refusal: resolved.refusal };
+  if (!resolved.ok) return { ok: false, claimsOrg, subject, refusal: resolved.refusal };
   const org = resolved.org;
 
   const role = readOrgRoleClaim(record);
@@ -133,7 +140,7 @@ export async function resolveCallerFromClaims(
     deps?.principalLookups,
     door,
   );
-  if (!person.ok) return { ok: false, claimsOrg, refusal: person.refusal };
+  if (!person.ok) return { ok: false, claimsOrg, subject, refusal: person.refusal };
 
   const isOrgAdmin = assertOrgAdmin(person.principal, org.id, { adminRoles, door }).ok;
   return {
