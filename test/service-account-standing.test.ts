@@ -30,8 +30,8 @@ describe("isServiceAccountScope", () => {
 });
 
 describe("requireServiceAccountStanding", () => {
-  it("returns for the service account", () => {
-    expect(() => requireServiceAccountStanding(service, "door")).not.toThrow();
+  it("returns the literal \"fleet\" for the service account, like requireFleetStanding", () => {
+    expect(requireServiceAccountStanding(service, "door")).toBe("fleet");
   });
 
   it("refuses the internal opt-in with standing-not-allowed, naming the door", () => {
