@@ -3,6 +3,11 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.2]
+
+### Changed
+- `requireServiceAccountStanding(scope, door)` returns the literal `"fleet"` instead of `void`, like `requireFleetStanding`. An analyser that classifies a standing gate by its return can now credit a door that calls it. Callers that ignore the return are unaffected.
+
 ## [0.20.1]
 
 ### Added

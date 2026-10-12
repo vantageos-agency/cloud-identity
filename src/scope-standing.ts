@@ -134,14 +134,14 @@ export function isServiceAccountScope(scope: unknown): boolean {
 }
 
 /**
- * Returns when the scope is the service account (`isServiceAccountScope`);
- * otherwise throws `IdentityRefusalError` RBAC_DENIED naming `door`:
+ * Returns `"fleet"` when the scope is the service account (`isServiceAccountScope`),
+ * the same literal as `requireFleetStanding`; otherwise throws `IdentityRefusalError` RBAC_DENIED naming `door`:
  *   - "scope-not-resolved"   the scope is "refused";
  *   - "standing-not-allowed" any other standing, the internal opt-in included.
  *
  * @standingGate — judges a resolved scope or a verified bearer context; consumers may credit a call to it as a delegated gate.
  */
-export function requireServiceAccountStanding(scope: unknown, door: string): void {
+export function requireServiceAccountStanding(scope: unknown, door: string): "fleet" {
   const standing = scopeStanding(scope);
   if (standing === "refused") {
     throw new IdentityRefusalError(
@@ -158,6 +158,7 @@ export function requireServiceAccountStanding(scope: unknown, door: string): voi
       ),
     );
   }
+  return "fleet";
 }
 
 /**
