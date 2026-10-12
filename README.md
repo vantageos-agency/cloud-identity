@@ -1002,7 +1002,7 @@ requireServiceAccountStanding(scope, "secrets.read");  // the service account on
 if (isServiceAccountScope(scope)) { /* ... */ }
 ```
 
-`requireServiceAccountStanding` throws `RBAC_DENIED` with `scope-not-resolved`
+`requireServiceAccountStanding` returns `"fleet"` (0.20.2) or throws `RBAC_DENIED` with `scope-not-resolved`
 for a `"refused"` scope and `standing-not-allowed` for any other standing, the
 internal opt-in included.
 
