@@ -84,6 +84,19 @@ describe("filterTargetsInPersonScope", () => {
     expect(all.rows.map((x) => x.id)).toEqual(["keyed"]);
   });
 
+  it("(c2) zero match: a key set that matches no row yields ok with rows [], never every org row", async () => {
+    const rows: Row[] = [
+      { id: "1", orgId: "org_a", scopeKey: "k_1" },
+      { id: "2", orgId: "org_a", scopeKey: ["k_2", "k_3"] },
+      { id: "3", orgId: "org_a", scopeKey: "k_4" },
+    ];
+    const r = await filterTargetsInPersonScope(PERSON_A, rows, deps(keysOf("k-other")));
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected rows");
+    expect(r.rows).toEqual([]);
+    expect(r.rows.length).toBeLessThan(rows.length);
+  });
+
   it("(d) an absent scope is a typed refusal with a stable code, even for an empty list", async () => {
     for (const scope of [null, undefined]) {
       for (const rows of [[{ id: "1", orgId: "org_a", scopeKey: "k_1" }], []] as Row[][]) {
