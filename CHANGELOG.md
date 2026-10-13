@@ -3,7 +3,7 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.21.0]
 
 ### Added
 - An agent bound by ID to its human owner. `ActingCredential` (`kind: "agent"`) gains an optional `ownerPersonId`, taken from the consumer's verified credential row; `PrincipalRow` and `ActingPrincipal` gain an optional `ownerPersonId`. When the credential presents one, `resolveActingPrincipal` requires the agent row's stored owner to be byte-equal (`agent-owner-mismatch`) and `personById(owner, orgId)` to return an active row of the same organisation (`agent-owner-not-member`); an owner lookup that throws or is not supplied refuses `principal-lookup-failed`. The principal carries `ownerPersonId` only when proven. Without `ownerPersonId` the result is unchanged.
@@ -681,7 +681,7 @@ the Hephaistos human-path onboarding, both stalled on this surface.
   `decodeUnverifiedBearer`, `requireTenantId`'s `session`/`bearer` branches, …)
   is behaviorally unchanged. Full suite 87/87, `tsc --noEmit` 0.
 
-## [Unreleased] - 0.3.0
+## [0.3.0] - 2026-07-23
 
 **BREAKING.** Closes two measured 0.2.0 defects — a right must never be
 granted by absence.
