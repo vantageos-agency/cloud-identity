@@ -1055,6 +1055,43 @@ if (!c.ok) {
 - An empty `adminRoles` is a `TypeError`, never a silent non-admin.
 - Types: `CallerFromClaimsDeps`, `CallerFromClaimsOptions`, `CallerFromClaimsResult`.
 
+### Rows in a person's scope, inside the organisation (`/person-scope`)
+
+Organisation isolation answers "which organisation's rows". Inside one
+organisation, a person may be allowed only part of the rows, for example the
+records of the portfolios they manage. `filterTargetsInPersonScope` applies
+that narrowing. Who sees which keys is your data; the package only applies it.
+
+```ts
+import { filterTargetsInPersonScope } from "@vantageos/cloud-identity/person-scope";
+
+const out = await filterTargetsInPersonScope(who.principal, rows, {
+  orgKindOf,
+  scopeOf: async (p) => myScopeStore.scopeFor(p.principalId), // { kind: "keys", keys: new Set([...]) } | { kind: "all", grantedBy: "role:manager" } | null
+  rowScopeKeys: (row) => row.portfolioId,                     // one key, several keys, or none
+}, { door: "records:list" });
+if (!out.ok) throw toHttpError(out.refusal);
+return out.rows;
+```
+
+- Organisation isolation first: `filterTargetsBelongingTo` runs with the same
+  `opts`, and its refusal is returned unchanged. A row of another organisation
+  is dropped even when its key is in the set.
+- A right is presented, never inferred. `scopeOf` returning `null` /
+  `undefined` is refused `person-scope-absent`; an empty key set is refused
+  `person-scope-empty`; `{ kind: "all" }` needs a non-empty `grantedBy` naming
+  the right, or it is refused `person-scope-grant-unreasoned`; any other form
+  is refused `person-scope-malformed`. A `"fleet"` or `"service"` principal
+  needs a presented scope too: there is no implicit `"all"`.
+- `scopeOf` or `rowScopeKeys` throwing is refused `person-scope-lookup-failed`,
+  naming the error kind, never its message.
+- A row is kept when at least one of its keys is in the set. A row with no key
+  (`undefined`, `null`, `""`, `[]`) is dropped; a key of any other form refuses
+  the call. Keys are IDs, compared as exact strings: no case folding, no
+  trimming.
+- Types: `PersonScope`, `PersonScopeDeps`, `PersonScopeOptions`,
+  `PersonScopeResult`.
+
 ## An organisation is its permanent ID (0.16.0)
 
 A label (the slug an org can be renamed to) is display text. These functions

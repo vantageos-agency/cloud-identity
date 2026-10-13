@@ -105,6 +105,10 @@
     "./caller-from-claims": {
       "types": "./dist/caller-from-claims.d.ts",
       "import": "./dist/caller-from-claims.js"
+    },
+    "./person-scope": {
+      "types": "./dist/person-scope.d.ts",
+      "import": "./dist/person-scope.js"
     }
   },
   "files": [

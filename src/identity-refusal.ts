@@ -63,6 +63,12 @@ export type IdentityRefusalReason =
   // standing of a resolved org scope (0.20.0)
   | "scope-not-resolved"
   | "standing-not-allowed"
+  // person scope inside an organisation
+  | "person-scope-absent"
+  | "person-scope-empty"
+  | "person-scope-grant-unreasoned"
+  | "person-scope-malformed"
+  | "person-scope-lookup-failed"
   // resource server: MCP access token (0.15.0)
   | "bearer-missing"
   | "bearer-malformed"
