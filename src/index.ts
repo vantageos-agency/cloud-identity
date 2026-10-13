@@ -149,6 +149,16 @@ export type {
   CallerFromClaimsOptions,
   CallerFromClaimsResult,
 } from "./caller-from-claims.js";
+// Person scope inside an organisation: after organisation isolation
+// (`filterTargetsBelongingTo`), keep the rows whose scope key is in the scope
+// the person presents. Who sees which keys is the consumer's data.
+export { filterTargetsInPersonScope } from "./person-scope.js";
+export type {
+  PersonScope,
+  PersonScopeDeps,
+  PersonScopeOptions,
+  PersonScopeResult,
+} from "./person-scope.js";
 export { exchangeAuthorizationCode } from "./token-exchange.js";
 export type {
   AuthorizedTokenClaims,

@@ -3,6 +3,11 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `./person-scope`: `filterTargetsInPersonScope(principal, rows, deps, opts)` keeps, within the caller's organisation, the rows whose scope key is in the scope the person presents. Organisation isolation is `filterTargetsBelongingTo`, called first; its refusal is returned unchanged. `deps.scopeOf(principal)` returns `{ kind: "keys", keys }` or `{ kind: "all", grantedBy }`; `deps.rowScopeKeys(row)` returns the row's key(s). Keys are compared as exact strings. A row with no key is dropped. Refusals (`RBAC_DENIED`): `person-scope-absent` (no scope presented), `person-scope-empty` (empty key set), `person-scope-grant-unreasoned` (`"all"` without a reason), `person-scope-malformed` (unknown scope form or unreadable row key), `person-scope-lookup-failed` (`scopeOf` or `rowScopeKeys` threw; the error kind is named, never its message). Types `PersonScope`, `PersonScopeDeps`, `PersonScopeOptions`, `PersonScopeResult`.
+
 ## [0.20.2]
 
 ### Changed
