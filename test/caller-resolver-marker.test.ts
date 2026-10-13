@@ -25,7 +25,12 @@ function taggedFunctions(): string[] {
 describe("@callerResolver marker", () => {
   it("marks exactly the package's caller resolvers", () => {
     expect(taggedFunctions()).toEqual(
-      ["resolveActingPrincipal", "resolveCallerFromClaims", "resolvePersonPrincipal"].sort(),
+      [
+        "resolveActingPrincipal",
+        "resolveCallerFromAgentCredential",
+        "resolveCallerFromClaims",
+        "resolvePersonPrincipal",
+      ].sort(),
     );
   });
 
