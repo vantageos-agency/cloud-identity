@@ -55,7 +55,10 @@ import { type IdentityRefusal, refusal } from "./identity-refusal.js";
  *
  *   - `agent`: an agent's own bearer, verified by the consumer (for example by
  *     `validatePresentedBearer`): the agent ID and the organisation the bearer
- *     row is stamped with.
+ *     row is stamped with. Optionally `ownerPersonId`: the human owner the
+ *     agent is bound to. It comes from the consumer's VERIFIED credential row,
+ *     never from a request argument; `resolveActingPrincipal` proves it against
+ *     the agent's stored owner and the owner's membership before it is carried.
  *   - `person`: a person's token, verified by the consumer: the stored person
  *     ID (the verified subject) and the organisation the token is bound to.
  *     Optionally (0.12.0) the role the SAME token carries in that organisation
@@ -70,6 +73,7 @@ export const actingCredentialSchema = z.discriminatedUnion("kind", [
     kind: z.literal("agent"),
     agentId: z.string().min(1),
     verifiedOrgId: z.string().min(1),
+    ownerPersonId: z.string().min(1).optional(),
   }),
   z.strictObject({
     kind: z.literal("person"),
@@ -100,6 +104,8 @@ export const principalRowSchema = z.object({
   id: z.string().min(1),
   orgId: z.string().min(1).nullish(),
   active: z.boolean(),
+  /** An agent row's stored human owner (a person ID). Read only when an owner is presented. */
+  ownerPersonId: z.string().nullish(),
 });
 export type PrincipalRow = z.input<typeof principalRowSchema>;
 
@@ -159,6 +165,12 @@ export type ActingPrincipal = {
    * `verifiedOrgRole`: the verified role in `orgId`. Read by `assertOrgAdmin`.
    */
   orgRole?: string;
+  /**
+   * `kind: "agent"` only, and only when the credential presented an owner and
+   * `resolveActingPrincipal` proved it: the person ID the agent is bound to.
+   * Absent otherwise; read by `assertAgentOwnedBy`.
+   */
+  ownerPersonId?: string;
 };
 
 export type ResolveActingPrincipalResult =
@@ -287,6 +299,48 @@ async function checkOrganisation(
   return null;
 }
 
+/**
+ * Proves the owner an agent credential presents: the agent row's stored owner
+ * is byte-equal to it, and `personById(owner, orgId)` returns an ACTIVE row of
+ * that same organisation. A lookup that is absent or throws refuses through
+ * `loadPrincipalRow`; a miss, an inactive, a malformed or a foreign row is
+ * `agent-owner-not-member`, each naming its case and never the lookup's text.
+ */
+async function proveAgentOwner(
+  agent: z.output<typeof principalRowSchema>,
+  ownerPersonId: string,
+  orgId: string,
+  lookups: PrincipalLookups,
+  door: string,
+): Promise<Refused | null> {
+  if (agent.ownerPersonId !== ownerPersonId) {
+    return denied("agent-owner-mismatch", door, "The agent is not bound to the owner the credential presents.");
+  }
+  const owner = await loadPrincipalRow(
+    lookups.personById,
+    [ownerPersonId, orgId],
+    ownerPersonId,
+    "owner",
+    door,
+  );
+  if (!owner.ok) {
+    switch (owner.refusal.reason) {
+      case "principal-not-found":
+        return denied("agent-owner-not-member", door, "The owner was not found in the agent's organisation.");
+      case "principal-inactive":
+        return denied("agent-owner-not-member", door, "The owner is not active.");
+      case "principal-record-invalid":
+        return denied("agent-owner-not-member", door, "The owner record is not well formed.");
+      default:
+        return owner;
+    }
+  }
+  if (owner.row.orgId !== orgId) {
+    return denied("agent-owner-not-member", door, "The owner belongs to another organisation than the agent.");
+  }
+  return null;
+}
+
 function served(principal: ActingPrincipal): ResolveActingPrincipalResult {
   return { ok: true, principal };
 }
@@ -302,7 +356,13 @@ function served(principal: ActingPrincipal): ResolveActingPrincipalResult {
  *
  *   - agent: the agent row by `agentId`; its stored org must equal the org
  *     the credential was verified for. An agent of the operator org resolves
- *     as an ordinary `kind: "agent"` of that org (RULING 5).
+ *     as an ordinary `kind: "agent"` of that org (RULING 5). When the
+ *     credential carries `ownerPersonId`, the agent row's stored owner must be
+ *     byte-equal to it (`agent-owner-mismatch`) and `personById` must return an
+ *     active row of the same organisation (`agent-owner-not-member`); an absent
+ *     or throwing `personById` refuses (`principal-lookup-failed`). The
+ *     principal then carries `ownerPersonId`, set only when proven. Without
+ *     `ownerPersonId` nothing about the owner is read and the result is unchanged.
  *   - person: the person row by (`personId`, `verifiedOrgId`); it must be
  *     stamped with that org. A person of the operator org resolves as an
  *     ordinary `kind: "person"` of that org (RULING 5).
@@ -370,6 +430,16 @@ export async function resolveActingPrincipal(
     }
     const orgRefusal = await checkOrganisation(rowOrg, look, door);
     if (orgRefusal !== null) return orgRefusal;
+    if (cred.kind === "agent" && cred.ownerPersonId !== undefined) {
+      const ownerRefusal = await proveAgentOwner(loaded.row, cred.ownerPersonId, rowOrg, look, door);
+      if (ownerRefusal !== null) return ownerRefusal;
+      return served({
+        principalId: loaded.row.id,
+        orgId: rowOrg,
+        kind: "agent",
+        ownerPersonId: cred.ownerPersonId,
+      });
+    }
     if (cred.kind === "person" && cred.verifiedOrgRole !== undefined) {
       return served({
         principalId: loaded.row.id,
@@ -762,6 +832,47 @@ export function assertPrincipalListed(
     return denied("principal-not-listed", door, "The principal's ID is not on the list.");
   }
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// assertAgentOwnedBy
+// ---------------------------------------------------------------------------
+
+export type AssertAgentOwnedByOptions = {
+  /** The consumer's name for the door; carried on every refusal. */
+  door?: string;
+};
+
+export type AssertAgentOwnedByResult = { ok: true } | { ok: false; refusal: IdentityRefusal };
+
+/**
+ * Admits an agent principal only when it is bound to this person: it is
+ * `kind: "agent"` and its `ownerPersonId` (set by `resolveActingPrincipal` only
+ * after proving the owner) is byte-equal to `personId`. Synchronous, no lookup.
+ *
+ * Everything else refuses `agent-not-owned`: an absent principal, a person, a
+ * service account or the fleet principal (whatever they carry), an agent with
+ * no proven owner, an absent or empty `personId`, and another person's ID. An
+ * absent owner never matches an absent `personId`.
+ */
+export function assertAgentOwnedBy(
+  principal: ActingPrincipal | null | undefined,
+  personId: string | null | undefined,
+  opts?: AssertAgentOwnedByOptions,
+): AssertAgentOwnedByResult {
+  const door = opts?.door ?? "assertAgentOwnedBy";
+  if (
+    principal !== null &&
+    principal !== undefined &&
+    typeof principal === "object" &&
+    principal.kind === "agent" &&
+    nonEmpty(principal.ownerPersonId) &&
+    nonEmpty(personId) &&
+    principal.ownerPersonId === personId
+  ) {
+    return { ok: true };
+  }
+  return denied("agent-not-owned", door, "The agent is not bound to this person.");
 }
 
 // ---------------------------------------------------------------------------

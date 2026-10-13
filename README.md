@@ -737,6 +737,41 @@ const listed = assertPrincipalListed(who.principal, { orgId: row.orgId, principa
 if (!listed.ok) throw toHttpError(listed.refusal);
 ```
 
+**An agent bound to its human owner** (`./principal-by-id`)
+
+An agent credential may also carry `ownerPersonId`: the person the agent is
+bound to. It is an ID read from your VERIFIED credential row, never a request
+argument. `resolveActingPrincipal` then proves it, and without it nothing
+about the owner is read and the result is exactly what it was:
+
+- the agent row's stored `ownerPersonId` must be byte-equal to the one
+  presented (`agent-owner-mismatch`; an absent or `null` stored owner never
+  matches);
+- `personById(ownerPersonId, orgId)` must return an ACTIVE row of the same
+  organisation, otherwise `agent-owner-not-member`. The detail names the case
+  (not found, not active, another organisation, malformed record) and never
+  quotes your lookup's own error text;
+- `personById` throwing, or not supplied, is refused `principal-lookup-failed`:
+  the check is never skipped;
+- on success the principal carries `ownerPersonId`, set only when proven.
+
+`PrincipalRow` gains the optional `ownerPersonId` (`string | null`); `ActingPrincipal`
+gains the optional `ownerPersonId`.
+
+**`assertAgentOwnedBy(principal, personId, opts)`** (`./principal-by-id`)
+
+Synchronous. Returns `{ ok: true }` or `{ ok: false, refusal }`; `opts` is
+`{ door? }`. Admits only a `kind: "agent"` principal whose proven
+`ownerPersonId` is byte-equal to `personId`. A person, a service account, the
+fleet principal, an agent with no proven owner, an absent or empty `personId`
+and an absent principal all refuse `agent-not-owned`. Types:
+`AssertAgentOwnedByOptions`, `AssertAgentOwnedByResult`.
+
+```js
+const owned = assertAgentOwnedBy(who.principal, task.requestedByPersonId, { door: "tasks:read" });
+if (!owned.ok) throw toHttpError(owned.refusal);
+```
+
 **`assertRecipientAddressable(sender, recipient, lookups, opts)`** (`./principal-by-id`, 0.14.0)
 
 Async. Returns `{ ok: true }` or `{ ok: false, refusal }`. `recipient` is
@@ -1054,6 +1089,28 @@ if (!c.ok) {
   an organisation.
 - An empty `adminRoles` is a `TypeError`, never a silent non-admin.
 - Types: `CallerFromClaimsDeps`, `CallerFromClaimsOptions`, `CallerFromClaimsResult`.
+
+### From a verified agent credential to the caller and its owner
+
+`resolveCallerFromAgentCredential(credential, { orgLookups, principalLookups }, { door })`
+is the agent twin of `resolveCallerFromClaims`, exported from the package root
+(`AgentCallerCredential`, `AgentCallerDeps`, `AgentCallerOptions`,
+`AgentCallerResult`). The credential is `{ agentId, verifiedOrgId, ownerPersonId? }`;
+a name beside the IDs refuses it `credential-invalid`. It reads the
+organisation by ID (`resolveOrgFromClaim`), then the agent by ID in that
+organisation, then proves the owner, all through `resolveActingPrincipal`.
+
+```ts
+import { resolveCallerFromAgentCredential } from "@vantageos/cloud-identity";
+
+const c = await resolveCallerFromAgentCredential(
+  { agentId: row.id, verifiedOrgId: row.orgId, ownerPersonId: row.ownerPersonId },
+  { orgLookups, principalLookups },
+  { door: "tasks:list" },
+);
+if (!c.ok) throw toHttpError(c.refusal);
+// c.org, c.principal (kind "agent"), c.owner: a person principal of the same org, or null when no owner was presented
+```
 
 ### Rows in a person's scope, inside the organisation (`/person-scope`)
 
