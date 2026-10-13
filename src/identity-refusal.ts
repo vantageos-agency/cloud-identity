@@ -69,6 +69,10 @@ export type IdentityRefusalReason =
   | "person-scope-grant-unreasoned"
   | "person-scope-malformed"
   | "person-scope-lookup-failed"
+  // agent bound to its human owner
+  | "agent-owner-mismatch"
+  | "agent-owner-not-member"
+  | "agent-not-owned"
   // resource server: MCP access token (0.15.0)
   | "bearer-missing"
   | "bearer-malformed"

@@ -149,6 +149,14 @@ export type {
   CallerFromClaimsOptions,
   CallerFromClaimsResult,
 } from "./caller-from-claims.js";
+// An agent bound by ID to its human owner: the agent twin of the entry above.
+export { resolveCallerFromAgentCredential } from "./agent-caller.js";
+export type {
+  AgentCallerCredential,
+  AgentCallerDeps,
+  AgentCallerOptions,
+  AgentCallerResult,
+} from "./agent-caller.js";
 // Person scope inside an organisation: after organisation isolation
 // (`filterTargetsBelongingTo`), keep the rows whose scope key is in the scope
 // the person presents. Who sees which keys is the consumer's data.
@@ -260,6 +268,7 @@ export {
   filterTargetsBelongingTo,
   assertOrgAdmin,
   assertPrincipalListed,
+  assertAgentOwnedBy,
   assertRecipientAddressable,
   resolveCallerStanding,
 } from "./principal-by-id.js";
@@ -282,6 +291,8 @@ export type {
   PrincipalIdList,
   AssertPrincipalListedOptions,
   AssertPrincipalListedResult,
+  AssertAgentOwnedByOptions,
+  AssertAgentOwnedByResult,
   RecipientIds,
   RecipientLookups,
   AssertRecipientAddressableOptions,
