@@ -3,6 +3,11 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.2]
+
+### Added
+- `resolveClerkSessionForFormPost(request, { secretKey, publishableKey, authorizedParties?, jwtKey?, expectedOrigin })` (`./clerk-handshake` and the package root; options type `ClerkSessionForFormPostOptions`): the session of a person posting a same-origin form, for the org picker's Approve / Deny. Refuses a request that is not a POST (`not-a-form-post`) or whose `Origin` is not `expectedOrigin` (`cross-origin-post`), then resolves the session with `authenticateRequest` as the GET that served the form, so a production instance's suffixed cookie (`__session_<suffix>`) is read and an expired session token is refreshed from `__refresh_<suffix>` (the returned `Set-Cookie` headers carry the new token). A post that would need a handshake is `signed-out` (`session-needs-handshake`). Measured on a production instance: the session cookie is never named a bare `__session`, and a session token presented after a 70-second wait is refused `session-invalid`; through this function the same post is signed-in.
+
 ## [0.21.1]
 
 ### Added

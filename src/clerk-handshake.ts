@@ -102,6 +102,52 @@ export async function resolveClerkSessionFromRequest(
   return { kind: "signed-out", reason: String(state.reason ?? "unknown"), headers: state.headers };
 }
 
+export interface ClerkSessionForFormPostOptions extends ClerkSessionFromRequestOptions {
+  /** The origin the form was served from (scheme + host): the only `Origin` accepted. */
+  expectedOrigin: string;
+}
+
+/**
+ * The session of the person posting a same-origin form (the org picker's
+ * Approve / Deny), resolved by the SDK exactly as on the GET that rendered
+ * the form.
+ *
+ * Two facts make reading `__session` by hand wrong here, both measured on a
+ * production instance: the cookie is named `__session_<suffix>` (never bare
+ * `__session`), and the session JWT is short-lived, so it has often expired
+ * by the time the person clicks. `authenticateRequest` reads the suffixed
+ * cookie, and refreshes an expired token from `__refresh_<suffix>` — but only
+ * for a GET. So the post is checked first (method POST, `Origin` equal to
+ * `expectedOrigin`), then the session is resolved from the same URL and
+ * cookies as a GET. A redirect (handshake) cannot answer a form post: it is
+ * reported as signed-out, and the person starts the authorization again.
+ *
+ * The consumer must still verify the form's own anti-forgery proof (the
+ * consent token): the Origin check bounds where the post may come from, it
+ * does not prove what the person saw.
+ */
+export async function resolveClerkSessionForFormPost(
+  request: Request,
+  options: ClerkSessionForFormPostOptions,
+): Promise<ClerkSessionFromRequest> {
+  if (request.method !== "POST") {
+    return { kind: "signed-out", reason: "not-a-form-post", headers: new Headers() };
+  }
+  if (request.headers.get("origin") !== new URL(options.expectedOrigin).origin) {
+    return { kind: "signed-out", reason: "cross-origin-post", headers: new Headers() };
+  }
+  const headers = new Headers(request.headers);
+  headers.delete("content-type");
+  headers.delete("content-length");
+  const asNavigation = new Request(request.url, { method: "GET", headers });
+  const { expectedOrigin: _origin, ...clerk } = options;
+  const session = await resolveClerkSessionFromRequest(asNavigation, clerk);
+  if (session.kind === "handshake") {
+    return { kind: "signed-out", reason: "session-needs-handshake", headers: new Headers() };
+  }
+  return session;
+}
+
 export type ResumeFromRequestOutcome =
   | AuthorizeOutcome
   | { kind: "handshake"; status: number; headers: Headers };
