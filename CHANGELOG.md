@@ -3,6 +3,12 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.5]
+
+### Added
+- Support access: a time-bounded, audited grant instead of membership. `buildSupportGrant({ personId, orgId, reason, grantedBy, now, durationMs }, { maxDurationMs })` validates an activation (reason of at least 10 characters, `0 < durationMs <= maxDurationMs`, non-empty IDs) and returns the row to store, `revokedAt: null`. `resolveSupportAccess(principal, targetOrgId, { lookupSupportGrant, now?, onSupportAccess? }, { door })` (package root, tagged `@callerResolver`) admits only a `person` principal holding a live, exact (person, organisation) grant; denied by default. Every granted access and every refusal is reported to `onSupportAccess`; a throwing sink never changes the outcome. Types `StoredSupportGrant`, `BuildSupportGrantInput`, `BuildSupportGrantPolicy`, `BuildSupportGrantResult`, `SupportAccessEvent`, `SupportAccessDeps`, `SupportAccessOptions`, `SupportAccessResult`.
+- New `IdentityRefusalReason` members `support-grant-absent`, `support-grant-expired`, `support-grant-revoked`, `support-grant-mismatch`, `support-grant-own-organisation`, `support-grant-not-a-person`, `support-grant-invalid`, `support-grant-lookup-failed` (all `RBAC_DENIED`).
+
 ## [0.21.4]
 
 ### Added

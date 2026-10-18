@@ -1303,6 +1303,65 @@ organisation does not exist yet), `{ kind: "mapped-without-id", active }` or
 is never "unmapped", so a failing read cannot authorise a creation. Type:
 `ProvisioningLabelResult`.
 
+## Support access: a time-bounded, audited grant instead of membership
+
+A person principal of the operator organisation does not belong to a client
+organisation, so client data is not visible to him by default. When a client
+asks for help, the operator activates a support grant: who (the person's
+stored ID), which organisation (the client's stored ID), why (a reason), until
+when. Without a live grant the answer is a refusal (`RBAC_DENIED`). The package
+decides; the consumer supplies storage and an audit sink only.
+
+```ts
+import { buildSupportGrant, resolveSupportAccess } from "@vantageos/cloud-identity";
+
+// 1. The operator activates, on the client's request.
+const built = buildSupportGrant(
+  { personId, orgId: clientOrgId, reason: "client asked for help with import", grantedBy: adminId, now: Date.now(), durationMs: 2 * 3600_000 },
+  { maxDurationMs: 8 * 3600_000 }, // the consumer's policy ceiling, required
+);
+if (built.ok) await store.insert(built.grant); // StoredSupportGrant
+
+// 2. Every client-organisation read goes through the resolver.
+const access = await resolveSupportAccess(principal, clientOrgId, {
+  lookupSupportGrant: (personId, orgId) => store.byPersonAndOrg(personId, orgId),
+  onSupportAccess: (event) => audit.write(event), // SupportAccessEvent
+}, { door: "tasks:list" });
+if (!access.ok) throw new IdentityRefusalError(access.refusal);
+```
+
+**`buildSupportGrant(input, { maxDurationMs })`** validates non-empty IDs, a
+reason of at least 10 characters, a non-empty `grantedBy`, and
+`0 < durationMs <= maxDurationMs`, and returns the row to store:
+`{ personId, orgId, reason, grantedBy, grantedAt, expiresAt, revokedAt: null }`.
+Otherwise `{ ok: false, refusal }` with `support-grant-invalid`. Types
+`BuildSupportGrantInput`, `BuildSupportGrantPolicy`, `BuildSupportGrantResult`.
+
+**`resolveSupportAccess(principal, targetOrgId, deps, { door })`** (tagged
+`@callerResolver`) returns `{ ok: true, orgId, grant: { reason, grantedBy, expiresAt } }`
+or `{ ok: false, refusal }`. Only a `person` principal can hold a grant; the
+principal's own organisation is not a support access (use normal membership).
+The stored row must equal the principal ID and the target organisation exactly.
+Types `SupportAccessDeps`, `SupportAccessOptions`, `SupportAccessResult`.
+
+| Refusal reason | Meaning |
+|---|---|
+| `support-grant-absent` | no row: denied by default |
+| `support-grant-expired` | `now >= expiresAt` |
+| `support-grant-revoked` | `revokedAt` is set |
+| `support-grant-mismatch` | the lookup returned a row for another person or organisation |
+| `support-grant-own-organisation` | the target is the principal's own organisation |
+| `support-grant-not-a-person` | an agent, service or fleet principal |
+| `support-grant-invalid` | malformed input or stored row |
+| `support-grant-lookup-failed` | the lookup threw: answer unavailable, never a grant |
+
+`onSupportAccess` receives a `SupportAccessEvent` on every granted access
+(`outcome: "granted"`, with `reason` and `expiresAt`) and on every refusal
+(`outcome: "refused"`, with the reason word), so attempts are audited. A
+throwing sink never changes the outcome. Revoke by setting `revokedAt` on the
+stored row; expiry needs no write. Refusals never echo another row's IDs or
+reason text. `StoredSupportGrant` is the stored row type.
+
 ## What this package does not do
 
 Worth reading before you rely on it.
