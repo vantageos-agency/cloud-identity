@@ -82,7 +82,16 @@ export type IdentityRefusalReason =
   // organisation by ID (0.16.0)
   | "org-mapping-lookup-failed"
   | "org-mapping-not-found"
-  | "org-mapping-record-invalid";
+  | "org-mapping-record-invalid"
+  // support access grant (0.21.5)
+  | "support-grant-absent"
+  | "support-grant-expired"
+  | "support-grant-revoked"
+  | "support-grant-mismatch"
+  | "support-grant-own-organisation"
+  | "support-grant-not-a-person"
+  | "support-grant-invalid"
+  | "support-grant-lookup-failed";
 
 export type IdentityRefusal = {
   code: IdentityRefusalCode;

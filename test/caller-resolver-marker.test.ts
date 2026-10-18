@@ -33,6 +33,7 @@ describe("@callerResolver marker", () => {
         "resolvePersonPrincipal",
         "requireTenantFromIdentity",
         "requireSubjectFromIdentity",
+        "resolveSupportAccess",
       ].sort(),
     );
   });

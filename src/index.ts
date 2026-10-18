@@ -241,6 +241,19 @@ export type {
   PersonAccessResult,
 } from "./person-principal.js";
 
+// 0.21.5 — Support access: a time-bounded, audited grant instead of membership
+export { buildSupportGrant, resolveSupportAccess } from "./support-access.js";
+export type {
+  StoredSupportGrant,
+  BuildSupportGrantInput,
+  BuildSupportGrantPolicy,
+  BuildSupportGrantResult,
+  SupportAccessEvent,
+  SupportAccessDeps,
+  SupportAccessOptions,
+  SupportAccessResult,
+} from "./support-access.js";
+
 // 0.10.0 — Identity gaps closed in the package so consumers adapt, never copy.
 export { IdentityRefusalError } from "./identity-refusal.js";
 export type {
