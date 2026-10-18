@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IdentityRefusalError, requireTenantFromIdentity } from "../src/index.js";
+import { IdentityRefusalError, requireSubjectFromIdentity, requireTenantFromIdentity } from "../src/index.js";
 
 const DOOR = "engine:queue.enqueue";
 
@@ -44,4 +44,33 @@ describe("requireTenantFromIdentity: a verified identity's organisation ID claim
     const refusal = refused({ org_id: "acme-hr-secret-slug" });
     expect(refusal.detail).not.toContain("acme-hr-secret-slug");
   });
+});
+
+describe("requireSubjectFromIdentity: a verified identity's subject", () => {
+  it("returns the subject", () => {
+    expect(requireSubjectFromIdentity({ subject: "user_2abc", org_id: "org_A1" }, { door: DOOR })).toBe("user_2abc");
+  });
+
+  for (const [label, identity] of [
+    ["no identity", null],
+    ["undefined identity", undefined],
+    ["no subject", { org_id: "org_A1" }],
+    ["empty subject", { subject: "" }],
+    ["non-string subject", { subject: 42 }],
+  ] as const) {
+    it(`refuses ${label}`, () => {
+      try {
+        requireSubjectFromIdentity(identity as Record<string, unknown> | null | undefined, { door: DOOR });
+      } catch (error) {
+        expect(error).toBeInstanceOf(IdentityRefusalError);
+        expect((error as IdentityRefusalError).refusal).toMatchObject({
+          code: "RBAC_DENIED",
+          reason: "no-verified-subject",
+          door: DOOR,
+        });
+        return;
+      }
+      throw new Error("expected a refusal");
+    });
+  }
 });
