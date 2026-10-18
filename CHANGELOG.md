@@ -3,6 +3,12 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.3]
+
+### Added
+- `requireSubjectFromIdentity(identity, { door })` (package root, tagged `@callerResolver`): the subject of an identity the host has already verified (for a Convex function, `ctx.auth.getUserIdentity()`), for audit stamps such as `createdBy`, so a consumer no longer reads `identity.subject` itself. No identity, or a subject that is not a non-empty string, throws `IdentityRefusalError` `RBAC_DENIED` / `no-verified-subject`.
+- New `IdentityRefusalReason` member `no-verified-subject`.
+
 ## [0.21.2]
 
 ### Added

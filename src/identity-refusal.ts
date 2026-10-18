@@ -33,6 +33,7 @@ export type IdentityRefusalReason =
   | "other-organisation"
   // org-admin proof
   | "no-verified-organisation"
+  | "no-verified-subject"
   | "role-not-admin"
   // namespace write
   | "namespace-invalid"

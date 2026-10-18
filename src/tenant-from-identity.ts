@@ -36,3 +36,32 @@ export function requireTenantFromIdentity(
   }
   return tenantId;
 }
+
+/**
+ * The subject (the person or service the session belongs to) of an identity
+ * the host has ALREADY verified — for a Convex function, the object
+ * `ctx.auth.getUserIdentity()` returns (or null). Use it for an audit stamp
+ * such as `createdBy`, so a consumer never reads `identity.subject` itself.
+ * No identity, or a subject that is not a non-empty string, refuses with
+ * `RBAC_DENIED` / `no-verified-subject`; there is no fallback to a name or a
+ * default actor. Like `requireTenantFromIdentity`, it verifies nothing itself.
+ *
+ * @callerResolver — resolves a verified caller; consumers may derive their accepted sinks from this tag.
+ */
+export function requireSubjectFromIdentity(
+  identity: Record<string, unknown> | null | undefined,
+  options: { door: string },
+): string {
+  const subject = identity?.subject;
+  if (typeof subject !== "string" || subject === "") {
+    throw new IdentityRefusalError(
+      refusal(
+        "RBAC_DENIED",
+        "no-verified-subject",
+        options.door,
+        identity ? "The verified identity carries no subject." : "No verified identity was presented.",
+      ),
+    );
+  }
+  return subject;
+}

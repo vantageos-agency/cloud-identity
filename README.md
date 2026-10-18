@@ -68,6 +68,11 @@ const tenantId = requireTenantFromIdentity(await ctx.auth.getUserIdentity(), {
 });
 ```
 
+For an audit stamp (`createdBy`), `requireSubjectFromIdentity(identity, { door })`
+(0.21.3) returns the same verified identity's subject, and throws
+`IdentityRefusalError` (`RBAC_DENIED`, `no-verified-subject`) when there is no
+identity or the subject is not a non-empty string.
+
 ## Both caller paths, one contract
 
 A right is never granted by an absent argument. `requireTenantId` refuses by
