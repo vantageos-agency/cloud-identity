@@ -73,4 +73,19 @@ describe("requireSubjectFromIdentity: a verified identity's subject", () => {
       throw new Error("expected a refusal");
     });
   }
+
+  it("refuses an identity carrying an email and a name but no subject: no fallback to either", () => {
+    try {
+      requireSubjectFromIdentity({ email: "a@b.c", name: "A" }, { door: DOOR });
+    } catch (error) {
+      expect(error).toBeInstanceOf(IdentityRefusalError);
+      expect((error as IdentityRefusalError).refusal).toMatchObject({
+        code: "RBAC_DENIED",
+        reason: "no-verified-subject",
+        door: DOOR,
+      });
+      return;
+    }
+    throw new Error("expected a refusal");
+  });
 });
