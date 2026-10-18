@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## [0.21.1]
 
 ### Added
-- `requireTenantFromIdentity(identity, { door })` (package root): the tenant ID of an identity the host has already verified (for a Convex function, the result of `ctx.auth.getUserIdentity()`, or `null`). The organisation ID claim is read by the package's own claim reader (`org_id`, `organizationId`, `orgId`, Clerk `org_` shape), so a consumer no longer reads `org_id` itself. No identity, no claim, or a claim that is not an organisation ID throws `IdentityRefusalError` `RBAC_DENIED` / `no-verified-organisation`; the refusal never echoes the claim value.
+- `requireTenantFromIdentity(identity, { door })` (package root, tagged `@callerResolver`): the tenant ID of an identity the host has already verified (for a Convex function, the result of `ctx.auth.getUserIdentity()`, or `null`). The organisation ID claim is read by the package's own claim reader (`org_id`, `organizationId`, `orgId`, Clerk `org_` shape), so a consumer no longer reads `org_id` itself. No identity, no claim, or a claim that is not an organisation ID throws `IdentityRefusalError` `RBAC_DENIED` / `no-verified-organisation`; the refusal never echoes the claim value.
 
 ## [0.21.0]
 
