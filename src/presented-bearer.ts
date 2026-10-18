@@ -299,6 +299,32 @@ export async function validatePresentedBearer(
     return MALFORMED;
   }
 
+  return resolvePresentedToken(token, deps);
+}
+
+// ---------------------------------------------------------------------------
+// resolvePresentedToken — the post-header core
+// ---------------------------------------------------------------------------
+
+/**
+ * The core of `validatePresentedBearer`, after the header has been parsed:
+ * hash the raw token, look the row up by the digest, re-compare the stored
+ * digest in constant time, then row shape, revocation and expiry. Every
+ * mismatch returns the one collapsed refusal; a throwing lookup returns
+ * `unavailable`.
+ *
+ * Shared by `validatePresentedBearer` (token from an Authorization header) and
+ * `resolveConvexMachineCaller` (token from a Convex function argument), so
+ * both transports reach the same decision through the same code.
+ *
+ * @internal Not exported from the package root. The caller must already have
+ * checked that `token` is a non-empty string and that `deps.lookupBySecretHash`
+ * is a function.
+ */
+export async function resolvePresentedToken(
+  token: string,
+  deps: PresentedBearerDeps,
+): Promise<ValidatePresentedBearerResult> {
   const presentedDigest = await sha256Hex(token);
 
   let row: StoredBearerRow | null | undefined;

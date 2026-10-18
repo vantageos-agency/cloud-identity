@@ -94,6 +94,17 @@ export type {
   PresentedBearerInternalReason,
 } from "./presented-bearer.js";
 
+// 0.21.4 — A service calling Convex: the machine credential travels as a
+// function argument (Convex functions receive no request headers) and is
+// resolved by the same core as `validatePresentedBearer`.
+export { resolveConvexMachineCaller, mintMachineCredential } from "./machine-caller.js";
+export type {
+  ConvexMachineCallerInput,
+  ConvexMachineCallerDeps,
+  ConvexMachineCallerResult,
+  MintedMachineCredential,
+} from "./machine-caller.js";
+
 // 0.8.0 — Authorize a PERSON: Clerk session -> verified organisation -> a code
 // bound to both; the exchange that redeems it; the OIDC documents.
 export {

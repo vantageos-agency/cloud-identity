@@ -3,8 +3,8 @@ import {
   type IdentityRefusal,
   mintMachineCredential,
   resolveConvexMachineCaller,
-  sha256Hex,
   type StoredBearerRow,
+  sha256Hex,
 } from "../src/index.js";
 
 const DOOR = "engine:world.step";

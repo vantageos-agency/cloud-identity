@@ -73,6 +73,59 @@ For an audit stamp (`createdBy`), `requireSubjectFromIdentity(identity, { door }
 `IdentityRefusalError` (`RBAC_DENIED`, `no-verified-subject`) when there is no
 identity or the subject is not a non-empty string.
 
+## A service calling Convex: the machine credential
+
+A service with no human behind it (no Clerk session, so no
+`ctx.auth.getUserIdentity()`) calls public Convex functions with a machine
+credential (0.21.4). The package decides the identity; the consumer supplies
+one indexed read.
+
+**Mint.** `mintMachineCredential()` returns a `MintedMachineCredential`:
+`credential` (`vpmc_` + 32 random bytes, base64url) and `secretHash` (its
+SHA-256 hex digest). Store ONLY `secretHash`, with `tenantId`, optional
+`agentId`, `revoked` and `expiresAt` (the `StoredBearerRow` shape). Hand
+`credential` to the service once.
+
+**Transport.** Convex functions do not receive request headers, so the
+credential travels as a function ARGUMENT (for example `machineCredential`),
+next to the organisation the service claims to act for. Never log it. Rotate by
+minting a new credential and revoking the old row.
+
+**Resolve.** `resolveConvexMachineCaller({ credential, claimedOrgId }, deps)`
+(`ConvexMachineCallerInput`, `ConvexMachineCallerDeps` = `PresentedBearerDeps`
+plus `door`) returns a `ConvexMachineCallerResult`: `{ ok: true, tenantId,
+agent, scopes }` or `{ ok: false, refusal }`. It runs the same core as
+`validatePresentedBearer` (digest lookup, constant-time re-compare, row shape,
+revocation, expiry). Tagged `@callerResolver`.
+
+| Outcome | Refusal |
+|---|---|
+| empty or non-string credential or claimed org (lookup not called) | `CREDENTIAL_REFUSED` `credential-invalid` |
+| unknown, revoked, expired, malformed row, stored-digest mismatch | the same `CREDENTIAL_REFUSED` `credential-invalid` |
+| the lookup threw | `RBAC_DENIED` `principal-lookup-failed` (answer "unavailable") |
+| valid credential, row tenant is not the claimed org | `RBAC_DENIED` `other-organisation` |
+
+```ts
+import { IdentityRefusalError, resolveConvexMachineCaller } from "@vantageos/cloud-identity";
+
+const r = await resolveConvexMachineCaller(
+  { credential: args.machineCredential, claimedOrgId: args.orgId },
+  {
+    door: "engine:world.step",
+    lookupBySecretHash: (d) =>
+      ctx.db
+        .query("machine_credentials")
+        .withIndex("by_secret_hash", (q) => q.eq("secretHash", d))
+        .unique(),
+  },
+);
+if (!r.ok) throw new IdentityRefusalError(r.refusal);
+const tenantId = r.tenantId;
+```
+
+Rejected alternative: a custom JWT provider on Convex auth, because it needs
+the consumer to run a token issuer.
+
 ## Both caller paths, one contract
 
 A right is never granted by an absent argument. `requireTenantId` refuses by
