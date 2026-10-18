@@ -51,6 +51,23 @@ Every symbol is available from the package root. Subpath imports
 (`@vantageos/cloud-identity/scope-filter` and friends) also work if you prefer
 to be explicit about where something comes from.
 
+## A host-verified identity to its tenant
+
+When the host has already verified the caller (a Convex function holds
+`await ctx.auth.getUserIdentity()`), `requireTenantFromIdentity` returns the
+tenant ID from the identity's organisation ID claim, read by the package's own
+claim reader. It throws `IdentityRefusalError` (`RBAC_DENIED`,
+`no-verified-organisation`) when there is no identity or no organisation ID;
+there is no fallback to a slug or a default.
+
+```ts
+import { requireTenantFromIdentity } from "@vantageos/cloud-identity";
+
+const tenantId = requireTenantFromIdentity(await ctx.auth.getUserIdentity(), {
+  door: "engine:queue.enqueue",
+});
+```
+
 ## Both caller paths, one contract
 
 A right is never granted by an absent argument. `requireTenantId` refuses by
