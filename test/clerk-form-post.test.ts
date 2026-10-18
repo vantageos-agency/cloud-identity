@@ -89,6 +89,17 @@ describe("resolveClerkSessionForFormPost: the picker's same-origin form post", (
     expect(r).toMatchObject({ kind: "signed-out", reason: "cross-origin-post" });
   });
 
+  it("refuses a lookalike Origin that only starts with the expected one", async () => {
+    const sfx = await cookieSuffix();
+    for (const origin of [`${HOST}.evil.example`, `${HOST}:8443`, "http://mcp.example.test"]) {
+      const r = await resolveClerkSessionForFormPost(
+        post(`__session_${sfx}=${mint()}; __client_uat_${sfx}=1`, { origin }),
+        opts(),
+      );
+      expect(r).toMatchObject({ kind: "signed-out", reason: "cross-origin-post" });
+    }
+  });
+
   it("refuses a post with no Origin header", async () => {
     const sfx = await cookieSuffix();
     const r = await resolveClerkSessionForFormPost(post(`__session_${sfx}=${mint()}; __client_uat_${sfx}=1`, {}), opts());
