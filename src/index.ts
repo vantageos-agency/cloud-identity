@@ -113,10 +113,12 @@ export type {
   ResumeInput,
 } from "./authorize-flow.js";
 export {
+  resolveClerkSessionForFormPost,
   resolveClerkSessionFromRequest,
   resumeAuthorizeFromRequest,
 } from "./clerk-handshake.js";
 export type {
+  ClerkSessionForFormPostOptions,
   ClerkSessionFromRequest,
   ClerkSessionFromRequestOptions,
   ResumeFromRequestOutcome,

@@ -977,6 +977,18 @@ feeds the resume path from the request and returns a `ResumeFromRequestOutcome`
 `ClerkSessionFromRequestOptions`. Behind a proxy, forward `x-forwarded-host`
 and `x-forwarded-proto`.
 
+A form posted back to your host (the org picker's Approve / Deny) is read with
+`resolveClerkSessionForFormPost(request, { ...ClerkSessionFromRequestOptions, expectedOrigin })`
+(0.21.2, options type `ClerkSessionForFormPostOptions`), never by reading a
+cookie yourself: a production instance names its cookie `__session_<suffix>`,
+and the session token is often expired by the time the person clicks. It
+refuses anything but a POST whose `Origin` is `expectedOrigin`
+(`not-a-form-post`, `cross-origin-post`), then resolves the session as the GET
+that served the form did, refreshing an expired token; append the returned
+`Set-Cookie` headers to your response. A post that would need a handshake is
+`signed-out` (`session-needs-handshake`). Keep verifying your form's own
+anti-forgery token.
+
 ### From a token to `{ principal, orgId }` (`/tenant-from-token`, 0.18.0)
 
 A downstream server never reads a raw claim off a token. It hands the
