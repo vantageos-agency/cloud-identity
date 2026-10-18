@@ -29,6 +29,7 @@ describe("@callerResolver marker", () => {
         "resolveActingPrincipal",
         "resolveCallerFromAgentCredential",
         "resolveCallerFromClaims",
+        "resolveConvexMachineCaller",
         "resolvePersonPrincipal",
         "requireTenantFromIdentity",
         "requireSubjectFromIdentity",
