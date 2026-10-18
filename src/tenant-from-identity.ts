@@ -14,6 +14,8 @@ import { IdentityRefusalError, refusal } from "./identity-refusal.js";
  *
  * This function does not verify anything: it trusts the host to have checked
  * the token's signature and issuer before handing the identity over.
+ *
+ * @callerResolver — resolves a verified caller; consumers may derive their accepted sinks from this tag.
  */
 export function requireTenantFromIdentity(
   identity: Record<string, unknown> | null | undefined,
