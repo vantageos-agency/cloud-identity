@@ -3,6 +3,15 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.4]
+
+### Added
+- `resolveConvexMachineCaller({ credential, claimedOrgId }, { door, lookupBySecretHash, now?, onRefusal? })` (package root, tagged `@callerResolver`): resolves a machine credential that a service with no human behind it passes to a Convex function as an ARGUMENT (Convex functions receive no request headers). Returns `{ ok: true, tenantId, agent, scopes }` or `{ ok: false, refusal }`. Empty or non-string credential or claimed organisation refuses `CREDENTIAL_REFUSED` / `credential-invalid` without calling the lookup; unknown, revoked, expired, malformed row and stored-digest mismatch all refuse with the same `CREDENTIAL_REFUSED` / `credential-invalid`; a throwing lookup refuses `RBAC_DENIED` / `principal-lookup-failed`; a valid credential whose row tenant is not the claimed organisation refuses `RBAC_DENIED` / `other-organisation`. No refusal echoes the credential, its digest or the claimed organisation. Types `ConvexMachineCallerInput`, `ConvexMachineCallerDeps`, `ConvexMachineCallerResult`.
+- `mintMachineCredential()` (package root): `{ credential, secretHash }`, the credential being `vpmc_` + 32 bytes of `crypto.getRandomValues`, base64url, and `secretHash` its `sha256Hex`. The consumer stores only `secretHash`. Type `MintedMachineCredential`.
+
+### Changed
+- `validatePresentedBearer` now delegates everything after the header parse to an internal `resolvePresentedToken(token, deps)` shared with `resolveConvexMachineCaller`. Behaviour unchanged.
+
 ## [0.21.3]
 
 ### Added
