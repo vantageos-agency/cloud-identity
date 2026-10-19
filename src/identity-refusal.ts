@@ -91,7 +91,13 @@ export type IdentityRefusalReason =
   | "support-grant-own-organisation"
   | "support-grant-not-a-person"
   | "support-grant-invalid"
-  | "support-grant-lookup-failed";
+  | "support-grant-lookup-failed"
+  // Clerk membership webhook (0.21.6)
+  | "webhook-secret-invalid"
+  | "webhook-headers-missing"
+  | "webhook-timestamp-out-of-window"
+  | "webhook-signature-mismatch"
+  | "membership-event-invalid";
 
 export type IdentityRefusal = {
   code: IdentityRefusalCode;

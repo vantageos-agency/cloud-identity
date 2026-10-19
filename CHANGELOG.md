@@ -3,6 +3,18 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.6]
+
+Publish order: 0.21.4, then the open PR #45 (0.21.5), then this one.
+
+### Added
+- `verifySvixWebhook({ id, timestamp, signature, rawBody }, { secret, now?, toleranceSeconds? })` (package root): Svix signature verification for Clerk webhooks, Web Crypto HMAC-SHA256 over `${id}.${timestamp}.${rawBody}`, every `v1,<base64>` candidate compared in constant time with no early exit. Returns `{ ok: true }` or `{ ok: false, refusal }`. Types `SvixDelivery`, `VerifySvixWebhookOptions`, `VerifySvixWebhookResult`.
+- `clerkMembershipEvent(payload, { svixTimestampSeconds })` (package root): parses an `organizationMembership.created|updated|deleted` payload into `{ ok: true, kind: "upsert" | "delete", orgId, personId, orgSlug?, role, eventAt }`, `{ ok: true, kind: "ignore" }` for any other type, or a typed refusal. A delete is timed `max(data.updated_at, delivery time)`. Types `MembershipEvent`, `ClerkMembershipEventResult`.
+- `decideMembershipEvent(existing, event)` (package root): `{ apply, revive }`. A delete is stale only when strictly older (removal wins a tie); an upsert is stale at or before `lastEventAt`; an upsert newer than a tombstone revives. Types `StoredMembershipState`, `DecideMembershipEventResult`.
+- `membershipPersonLookups(readMembership)` (package root): the `personById` lookup for `resolveActingPrincipal`, answering `{ id, orgId, active: true }` for a live row and `null` for an absent or tombstoned one.
+- `planMembershipReconcile(stored, fromClerk, { at, fullyReadOrgIds })` (package root): `{ upserts, tombstones }`, tombstoning only inside fully read organisations and never touching a row stamped after `at`. Types `MembershipRow`, `ClerkMembershipRow`, `PlanMembershipReconcileOptions`, `MembershipUpsert`, `MembershipTombstone`, `MembershipReconcilePlan`.
+- New `IdentityRefusalReason` members `webhook-secret-invalid`, `webhook-headers-missing`, `webhook-timestamp-out-of-window`, `webhook-signature-mismatch`, `membership-event-invalid`.
+
 ## [0.21.5]
 
 ### Added

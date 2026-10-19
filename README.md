@@ -1362,6 +1362,84 @@ throwing sink never changes the outcome. Revoke by setting `revokedAt` on the
 stored row; expiry needs no write. Refusals never echo another row's IDs or
 reason text. `StoredSupportGrant` is the stored row type.
 
+## Clerk membership sync (0.21.6)
+
+Who belongs to which organisation, kept live from Clerk's
+`organizationMembership.*` webhooks. The package holds the verification, the
+parsing and the ordering; the consumer keeps its HTTP route and its own table.
+Nothing here reads or writes a store.
+
+**`verifySvixWebhook({ id, timestamp, signature, rawBody }, { secret, now?, toleranceSeconds? })`**
+checks a delivery with Web Crypto: HMAC-SHA256 over `${id}.${timestamp}.${rawBody}`,
+keyed by the base64 part of `whsec_<base64>`. `id`, `timestamp` and `signature`
+are the `svix-id`, `svix-timestamp` and `svix-signature` headers; `rawBody` is the
+body text before any JSON parse; `now` is milliseconds. Every `v1,<base64>`
+candidate is compared in constant time with no early exit. Returns `{ ok: true }`
+or `{ ok: false, refusal }` (`CREDENTIAL_REFUSED`) with one of
+`webhook-secret-invalid` (absent or not `whsec_<base64>`, a server
+misconfiguration, so answer 500), `webhook-headers-missing`,
+`webhook-timestamp-out-of-window` (both directions, default 300 seconds, a
+non-numeric timestamp included) or `webhook-signature-mismatch`. No refusal
+carries the secret, the signature or the body. Types `SvixDelivery`,
+`VerifySvixWebhookOptions`, `VerifySvixWebhookResult`.
+
+**`clerkMembershipEvent(payload, { svixTimestampSeconds })`** takes the parsed,
+already verified JSON. `created` and `updated` give `kind: "upsert"`, `deleted`
+gives `kind: "delete"`, with `orgId` (`data.organization.id`), `personId`
+(`data.public_user_data.user_id`), `orgSlug` when present, `role` (`org:admin`
+is `admin`, anything else `member`) and `eventAt` in milliseconds. An upsert is
+timed `data.updated_at`, else the delivery time. A delete is timed
+`max(data.updated_at, delivery time)`: Clerk leaves `updated_at` equal to
+`created_at` on a removal, so a removal is never dated before the moment Clerk
+sent it. Any other event type is `{ ok: true, kind: "ignore" }`; a missing
+organisation or user ID refuses `RBAC_DENIED` / `membership-event-invalid`.
+Types `MembershipEvent`, `ClerkMembershipEventResult`.
+
+**`decideMembershipEvent(existing, event)`** answers `{ apply, revive }` from the
+stored row's `lastEventAt` and `deletedAt` (or `null`). An upsert at or before
+`lastEventAt` is stale; a delete is stale only when strictly older, so the
+removal wins a tie; an upsert newer than a tombstone revives. A tombstone with
+no `lastEventAt` is ordered by its `deletedAt`. Types `StoredMembershipState`,
+`DecideMembershipEventResult`.
+
+**`membershipPersonLookups(readMembership)`** returns the `personById` lookup for
+`resolveActingPrincipal`. `readMembership(orgId, personId)` returns the stored
+row or `null`; a live row answers `{ id, orgId, active: true }`, an absent or
+tombstoned (`deletedAt` set) one answers `null`. A throwing read propagates, so
+the resolver refuses `principal-lookup-failed` and a failure is never taken for
+an absence.
+
+**`planMembershipReconcile(stored, fromClerk, { at, fullyReadOrgIds })`** plans a
+backfill as data: `{ upserts, tombstones }`. Every member Clerk reports is
+upserted (a tombstoned one is revived, `revive: true`); a stored member Clerk
+does not report is tombstoned only in an organisation listed in
+`fullyReadOrgIds`, so a partial read removes nobody. A row stamped after `at`
+is never touched. Types `MembershipRow`, `ClerkMembershipRow`,
+`PlanMembershipReconcileOptions`, `MembershipUpsert`, `MembershipTombstone`,
+`MembershipReconcilePlan`.
+
+```ts
+const verdict = await verifySvixWebhook(
+  {
+    id: req.headers.get("svix-id"),
+    timestamp: req.headers.get("svix-timestamp"),
+    signature: req.headers.get("svix-signature"),
+    rawBody,
+  },
+  { secret: process.env.CLERK_WEBHOOK_SECRET },
+);
+if (!verdict.ok) return respondRefused(verdict.refusal);
+
+const parsed = clerkMembershipEvent(JSON.parse(rawBody), {
+  svixTimestampSeconds: Number(req.headers.get("svix-timestamp")),
+});
+if (!parsed.ok || parsed.kind === "ignore") return respondOk();
+
+const row = await readRow(parsed.orgId, parsed.personId);
+const { apply, revive } = decideMembershipEvent(row, parsed);
+if (apply) await writeRow(parsed, { revive });
+```
+
 ## What this package does not do
 
 Worth reading before you rely on it.
