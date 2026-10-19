@@ -353,19 +353,20 @@ describe("membershipPersonLookups", () => {
 
   it("plugs into resolveActingPrincipal: live resolves, tombstone refuses", async () => {
     const org = { id: "org_A", active: true };
-    const base = { organisationById: async () => org, orgKindOf: async () => "tenant" as never };
+    const base = { organisationById: async () => org, orgKindOf: async () => "client" as const };
     const live = await resolveActingPrincipal(
-      { personId: "user_1", verifiedOrgId: "org_A" },
+      { kind: "person" as const, personId: "user_1", verifiedOrgId: "org_A" },
       { ...base, ...membershipPersonLookups(() => ({})) },
       "test:door",
     );
     expect(live.ok).toBe(true);
     const gone = await resolveActingPrincipal(
-      { personId: "user_1", verifiedOrgId: "org_A" },
+      { kind: "person" as const, personId: "user_1", verifiedOrgId: "org_A" },
       { ...base, ...membershipPersonLookups(() => ({ deletedAt: 1 })) },
       "test:door",
     );
     expect(gone.ok).toBe(false);
+    if (!gone.ok) expect(gone.refusal.reason).toBe("principal-not-found");
   });
 });
 

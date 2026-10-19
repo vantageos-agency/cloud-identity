@@ -391,3 +391,30 @@ export type {
   TokenPrincipal,
   ResolveTenantFromAccessTokenResult,
 } from "./tenant-from-token.js";
+
+// 0.21.6 — Clerk membership sync, store-agnostic: Svix webhook verification, the
+// membership event parsed to ids and an event time, the ordering decision, the
+// owner-membership lookup, and the backfill plan. The consumer keeps only its
+// HTTP route and its own table reads and writes.
+export {
+  verifySvixWebhook,
+  clerkMembershipEvent,
+  decideMembershipEvent,
+  membershipPersonLookups,
+  planMembershipReconcile,
+} from "./membership-sync.js";
+export type {
+  SvixDelivery,
+  VerifySvixWebhookOptions,
+  VerifySvixWebhookResult,
+  MembershipEvent,
+  ClerkMembershipEventResult,
+  StoredMembershipState,
+  DecideMembershipEventResult,
+  MembershipRow,
+  ClerkMembershipRow,
+  PlanMembershipReconcileOptions,
+  MembershipUpsert,
+  MembershipTombstone,
+  MembershipReconcilePlan,
+} from "./membership-sync.js";
