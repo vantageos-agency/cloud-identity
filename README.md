@@ -560,6 +560,89 @@ const mayWrite = resolveWriterRole({
 The module verifies no credential. The token record must come from your own
 lookup of the bearer the person presented, never from a request body.
 
+## Wiring the authorize runtime (`/authorize-runtime`, 0.21.7)
+
+The decisions (`startAuthorize`, `resumeAuthorize`, `exchangeAuthorizationCode`,
+`buildDiscoveryDocument`) take their collaborators as parameters.
+`@vantageos/cloud-identity/authorize-runtime` is the glue that builds them, so an
+MCP server does not copy it. It is store-agnostic and framework-agnostic: you
+inject the client registry, the code storage and the membership lister; it reads
+no `process.env`, opens no connection and logs no value.
+
+```ts
+import {
+  buildAuthorizeRuntime,
+  codeStoreFrom,
+  createClerkDirectory,
+  pickerContentSecurityPolicy,
+  readAuthorizeSettings,
+  renderOrgPicker,
+} from "@vantageos/cloud-identity/authorize-runtime";
+import { createClerkClient } from "@clerk/backend";
+
+const read = readAuthorizeSettings(process.env);
+if (!read.ok) return respond503(read.missing); // names only, never values
+
+const clerk = createClerkDirectory(createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY }));
+const { cfg, deps } = buildAuthorizeRuntime({
+  settings: read.settings,
+  lookupClient: (clientId) => myRegistry.find(clientId),
+  listMemberships: clerk.listMemberships, // filter it here to the orgs your server can serve
+  codeStore: codeStoreFrom({ insert: db.putCode, takeOnce: db.consumeCode }),
+});
+
+// GET /authorize           -> startAuthorize(query, sessionToken, cfg, deps)
+// GET /authorize/callback  -> resumeAuthorize({ state, sessionToken }, cfg, deps)
+// POST /authorize/org      -> resumeAuthorize({ state, sessionToken, orgId, approved, consentToken }, cfg, deps)
+// On kind "org-picker":
+//   body    = renderOrgPicker(outcome.model, { productName: "My Server" })
+//   header  = { "Content-Security-Policy": await pickerContentSecurityPolicy() }
+// POST /token (authorization_code) -> exchangeAuthorizationCode(input, { codeStore: deps.codeStore })
+```
+
+**`readAuthorizeSettings(env, { requireClerkSecretKey? })`** reads
+`AUTHORIZE_STATE_SECRET` (at least 32 characters), `CLERK_DOMAIN`,
+`AUTHORIZE_SIGN_IN_URL`, `AUTHORIZE_CALLBACK_URL`, `PUBLIC_BASE_URL`,
+`CLERK_SECRET_KEY` and the optional comma list `AUTHORIZE_AUTHORIZED_PARTIES`
+from the object you pass. It returns `{ ok: true, settings }` or
+`{ ok: false, missing, refusal }`, where `missing` holds the NAMES of every
+absent or unusable variable and `refusal` is `server-misconfigured`. Pass
+`requireClerkSecretKey: false` when you inject your own membership lister.
+`AUTHORIZE_ENV` lists the names; `DEFAULT_AUTHORIZE_SCOPE` is `mcp:full openid`.
+Types `AuthorizeEnv`, `AuthorizeSettings`, `AuthorizeSettingsResult`,
+`ReadAuthorizeSettingsOptions`.
+
+**`createClerkJwksSource({ issuer, fetch?, now?, ttlMs? })`** is the
+`session.jwks` function: it serves the key set from its own cache for `ttlMs`
+(default ten minutes) and refetches after. A failed or malformed answer throws
+and is not cached; the flow then refuses `jwks-unavailable`. `buildAuthorizeRuntime`
+creates one unless you pass `jwks`. Types `JwksFetch`, `ClerkJwksSourceOptions`.
+
+**`codeStoreFrom({ insert, takeOnce })`** adapts your storage to
+`AuthorizationCodeStore`. `takeOnce(codeHash)` must be atomic. Its answer is
+checked: `ok` with a complete record, `unknown` and `already-used` pass; anything
+else throws, and the exchange answers `code-store-unavailable`.
+`createInMemoryCodeStore()` is a single-use store for tests and a one-instance
+development server. Type `CodeStoreBackend`.
+
+**`createClerkDirectory(clerk, { pageSize?, maxPages? })`** returns
+`listMemberships` and `getUser` over a Clerk Backend client you created. The list
+is read in full; a Clerk failure or a list that does not end within `maxPages`
+throws, so a partial list is never offered. Types `ClerkUsersApi`,
+`ClerkDirectoryOptions`, `ClerkDirectory`.
+
+**`renderOrgPicker(model, { productName, formAction? })`** returns the consent
+page (default action `/authorize/org`); every interpolated value is escaped and
+the hidden `consentToken` is the CSRF protection of the post. Send
+`await pickerContentSecurityPolicy()` as its `Content-Security-Policy`: no
+scripts, no external assets, no framing, one inline style admitted by hash. Type
+`OrgPickerOptions`.
+
+**`buildAuthorizeRuntime({ settings, lookupClient, listMemberships, codeStore, jwks?, now?, generateCode?, resourcePath?, defaultScope?, supportedScopes? })`**
+returns `{ cfg, deps }`. The only resource codes are issued for is
+`<baseUrl><resourcePath>` (default `/mcp`). Consent stays on. Types
+`AuthorizeRuntimeOptions`, `AuthorizeRuntime`.
+
 ## Role policy, membership, namespace writes and secrets (0.10.0)
 
 Seven primitives that consumers used to copy. Each is pure, takes its policy as

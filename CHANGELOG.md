@@ -3,6 +3,19 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.7]
+
+Additive: one new subpath, no change to any existing export.
+
+### Added
+- `@vantageos/cloud-identity/authorize-runtime` (subpath only, not re-exported from the root: `renderOrgPicker` takes display labels, which the root's no-name-input surface guard would otherwise count as identity inputs): the runtime glue around `startAuthorize`, `resumeAuthorize` and `exchangeAuthorizationCode`, so a server wiring person sign-in imports it instead of copying it. Every collaborator is injected; nothing reads `process.env`, opens a connection or logs a value.
+- `readAuthorizeSettings(env, { requireClerkSecretKey? })`: typed settings from an env object, or `{ ok: false, missing, refusal }` with the NAMES of the absent or unusable variables (a state secret under 32 characters, a URL that does not parse) and a `server-misconfigured` refusal. `AUTHORIZE_ENV`, `DEFAULT_AUTHORIZE_SCOPE`. Types `AuthorizeEnv`, `AuthorizeSettings`, `AuthorizeSettingsResult`, `ReadAuthorizeSettingsOptions`.
+- `createClerkJwksSource({ issuer, fetch?, now?, ttlMs? })`: the `session.jwks` function with a per-source cache (default 10 minutes), one shared in-flight fetch, and nothing cached on a failed or malformed answer. Types `JwksFetch`, `ClerkJwksSourceOptions`.
+- `codeStoreFrom({ insert, takeOnce })`: adapts the host's storage to `AuthorizationCodeStore`; a consume answer that is not `ok` with a complete record, `unknown` or `already-used` throws (the exchange answers `code-store-unavailable`). `createInMemoryCodeStore()` for tests and a single-instance development server. Type `CodeStoreBackend`.
+- `createClerkDirectory(clerk, { pageSize?, maxPages? })`: `listMemberships` (read in full, paged; a Clerk failure or a list that does not end within `maxPages` throws) and `getUser` over a Clerk Backend client the host created. Types `ClerkUsersApi`, `ClerkDirectoryOptions`, `ClerkDirectory`.
+- `renderOrgPicker(model, { productName, formAction? })` and `pickerContentSecurityPolicy()`: the escaped, script-free organisation picker and consent page, and the CSP that admits only its one inline style by hash. Type `OrgPickerOptions`.
+- `buildAuthorizeRuntime({ settings, lookupClient, listMemberships, codeStore, jwks?, now?, generateCode?, resourcePath?, defaultScope?, supportedScopes? })`: the `{ cfg, deps }` the flow functions take, consent left on. Types `AuthorizeRuntimeOptions`, `AuthorizeRuntime`.
+
 ## [0.21.6]
 
 Publish order: 0.21.4, then the open PR #45 (0.21.5), then this one.
