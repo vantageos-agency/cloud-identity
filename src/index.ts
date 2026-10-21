@@ -254,6 +254,20 @@ export type {
   SupportAccessResult,
 } from "./support-access.js";
 
+// 0.22.0 — May a typed name be treated as the acting agent? One pure decision on
+// the caller already resolved by ID; a typed name never overrides it.
+export { decideActingClaim } from "./acting-claim.js";
+export type {
+  ActingCaller,
+  ActingClaimMode,
+  ActingClaimInput,
+  ActingClaimRefusal,
+  ActingClaimRefusalCode,
+  ActingClaimRefusalReason,
+  ActingClaimResult,
+  ActingClaimVia,
+} from "./acting-claim.js";
+
 // 0.10.0 — Identity gaps closed in the package so consumers adapt, never copy.
 export { IdentityRefusalError } from "./identity-refusal.js";
 export type {
