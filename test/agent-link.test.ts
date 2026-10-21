@@ -441,3 +441,32 @@ describe("agent link: resolveAgentLink", () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe("agent link: the admin role is matched EXACTLY", () => {
+  it.each(["admin-lite", "org:adminx", "org:admin ", "ORG:ADMIN", "org:admin:lite", "org:"])(
+    "a stored role %j that is not an admin role is refused at build and voids the link",
+    async (storedRole) => {
+      const dir = directory();
+      dir.members.set(`${MARIE}|${IRIS}`, { active: true, role: storedRole, orgId: IRIS });
+      expect(await buildWith(dir)).toMatchObject({
+        ok: false,
+        refusal: { reason: "agent-link-grantor-not-admin" },
+      });
+      expect(await resolveWith(dir, [linkRow()], PI_CALLER, VICTOR)).toMatchObject({
+        ok: false,
+        refusal: { reason: "agent-link-grantor-void" },
+      });
+    },
+  );
+
+  it("a role that merely starts with a configured admin role string does not pass", async () => {
+    const dir = directory();
+    dir.members.set(`${MARIE}|${IRIS}`, { active: true, role: "admin-lite", orgId: IRIS });
+    const r = await buildAgentLink(buildInput, {
+      lookupAgent: dir.lookupAgent,
+      lookupMembership: dir.lookupMembership,
+      adminRoles: ["admin"],
+    });
+    expect(r).toMatchObject({ ok: false, refusal: { reason: "agent-link-grantor-not-admin" } });
+  });
+});
