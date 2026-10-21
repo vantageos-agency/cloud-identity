@@ -66,7 +66,11 @@ type Lookup<A extends unknown[], R> = (
 export type AgentLinkLookups = {
   /** An agent's stored row by its ID: `{ id, orgId, active }`. */
   lookupAgent: Lookup<[agentId: string], PrincipalRow>;
-  /** A person's membership of ONE organisation: `{ active, role, orgId? }`. */
+  /**
+   * A person's membership of ONE organisation: `{ active, role, orgId? }`.
+   * `membershipPersonLookups(read).lookupMembership` answers exactly this, so the
+   * consumer's deps are `{ lookupAgent, ...membershipPersonLookups(read), adminRoles }`.
+   */
   lookupMembership: Lookup<[personId: string, orgId: string], MembershipRecord>;
   /**
    * The role values that count as organisation admin, exactly as the stored
