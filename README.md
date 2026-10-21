@@ -1445,6 +1445,90 @@ throwing sink never changes the outcome. Revoke by setting `revokedAt` on the
 stored row; expiry needs no write. Refusals never echo another row's IDs or
 reason text. `StoredSupportGrant` is the stored row type.
 
+## Agent link: one agent of an organisation reaches one agent of another (0.23.0)
+
+Organisations are isolated: an agent cannot message, or assign a task to, an
+agent of another organisation, and a NAME never crosses an organisation. An
+agent link is the one deliberate exception, and it is as narrow as it can be
+written. It is what lets an agent of a consulting organisation and an agent of
+a client organisation reach each other, and it is the path for a client
+organisation linking agents of another organisation (a reseller).
+
+- **Directional.** A row says `fromAgentId` may reach `toAgentId`; it says
+  nothing about the reverse. "Both ways" is two rows.
+- **Granted by the target side.** The row is activated by an ADMIN member of the
+  TARGET agent's organisation (`toOrgId`). An admin of the source organisation,
+  or a plain member of the target organisation, cannot create it.
+- **Exact pair.** A third agent of the same two organisations is not covered.
+- **Standing.** No expiry, unlike a support grant. Revocation (`revokedAt`) is
+  the off switch.
+- **Voided when the grantor leaves.** At every request the grantor must still be
+  an active admin member of `toOrgId`. A grantor who was removed, lost the admin
+  role, or whose membership went inactive voids the link with no write to the
+  row; a current admin of `toOrgId` can grant it again.
+- **By ID only.** Agents, persons and organisations are stored IDs. Nothing reads
+  a name.
+
+```ts
+import { buildAgentLink, resolveAgentLink } from "@vantageos/cloud-identity";
+
+// 1. The TARGET side's admin grants. One call, one direction.
+const built = await buildAgentLink(
+  { fromAgentId, fromOrgId, toAgentId, toOrgId, grantedBy: targetOrgAdminPersonId, reason: "HR onboarding coordination", now: Date.now() },
+  {
+    lookupAgent: (agentId) => agents.byId(agentId),                       // { id, orgId, active }
+    lookupMembership: (personId, orgId) => members.byPersonAndOrg(personId, orgId), // { active, role, orgId? }
+    adminRoles: ["org:admin"],
+  },
+);
+if (built.ok) await store.insert(built.link); // StoredAgentLink
+
+// 2. Every cross-organisation message or task assignment goes through the resolver.
+const reach = await resolveAgentLink(
+  { fromAgent: { agentId, orgId }, toAgentId, door: "tasks:create" },
+  {
+    lookupAgentLink: (fromAgentId, toAgentId) => store.byPair(fromAgentId, toAgentId),
+    lookupAgent, lookupMembership, adminRoles: ["org:admin"],
+    onAgentLink: (event) => audit.write(event), // AgentLinkEvent
+  },
+);
+if (!reach.ok) throw new IdentityRefusalError(reach.refusal);
+```
+
+**`buildAgentLink(input, { lookupAgent, lookupMembership, adminRoles })`**
+validates non-empty IDs, a reason of at least 10 characters, a finite `now`,
+different organisations, that `grantedBy` is an active member of `toOrgId` whose
+stored role is in `adminRoles`, and that both agents exist, are active and
+belong to the organisations stated. It returns `{ ok: true, link }` with the row
+to store, `{ fromAgentId, fromOrgId, toAgentId, toOrgId, grantedBy, grantedAt, revokedAt: null, reason }`,
+or `{ ok: false, refusal }`. Types `BuildAgentLinkInput`, `BuildAgentLinkDeps`,
+`BuildAgentLinkResult`, `AgentLinkLookups`.
+
+**`resolveAgentLink({ fromAgent, toAgentId, door }, deps)`** (tagged
+`@callerResolver`) returns `{ ok: true, toAgentId, toOrgId, link: { reason, grantedBy, grantedAt } }`
+or `{ ok: false, refusal }`. It admits only a stored, non-revoked row for exactly
+the (`fromAgent.agentId`, `toAgentId`) pair and the caller's organisation, while
+the target agent is still active in `toOrgId` and the grantor is still an active
+admin of `toOrgId`. Types `ResolveAgentLinkInput`, `ResolveAgentLinkDeps`,
+`ResolveAgentLinkResult`, `StoredAgentLink`.
+
+| Refusal reason | Meaning |
+|---|---|
+| `agent-link-absent` | no row for this pair (the reverse pair and a third agent land here) |
+| `agent-link-revoked` | `revokedAt` is set |
+| `agent-link-mismatch` | the lookup returned a row for another pair or another source organisation |
+| `agent-link-invalid` | malformed input, deps or stored row |
+| `agent-link-same-organisation` | build only: both agents are in one organisation |
+| `agent-link-grantor-not-admin` | build only: the grantor is not an active admin of `toOrgId` |
+| `agent-link-grantor-void` | resolve only: the grantor is no longer an active admin of `toOrgId` |
+| `agent-link-agent-unavailable` | an agent is missing, inactive, or not in the organisation stated |
+| `agent-link-lookup-failed` | a lookup threw: reported by error kind only, never a grant |
+
+`onAgentLink` receives an `AgentLinkEvent` on every attempt (`outcome: "granted"`
+with `reason` and `grantedBy`, or `outcome: "refused"` with the reason word). A
+throwing sink never changes the outcome. Refusals never echo another row's IDs or
+reason text.
+
 ## Clerk membership sync (0.21.6)
 
 Who belongs to which organisation, kept live from Clerk's

@@ -74,6 +74,10 @@
       "types": "./dist/tenant-membership.d.ts",
       "import": "./dist/tenant-membership.js"
     },
+    "./agent-link": {
+      "types": "./dist/agent-link.d.ts",
+      "import": "./dist/agent-link.js"
+    },
     "./namespace-write": {
       "types": "./dist/namespace-write.d.ts",
       "import": "./dist/namespace-write.js"
