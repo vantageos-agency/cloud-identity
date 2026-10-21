@@ -254,6 +254,21 @@ export type {
   SupportAccessResult,
 } from "./support-access.js";
 
+// 0.23.0 — Agent link: an explicit, revocable, directional channel between one agent
+// of an organisation and one agent of another, granted by an admin of the TARGET side
+export { buildAgentLink, resolveAgentLink } from "./agent-link.js";
+export type {
+  StoredAgentLink,
+  AgentLinkLookups,
+  BuildAgentLinkInput,
+  BuildAgentLinkDeps,
+  BuildAgentLinkResult,
+  AgentLinkEvent,
+  ResolveAgentLinkInput,
+  ResolveAgentLinkDeps,
+  ResolveAgentLinkResult,
+} from "./agent-link.js";
+
 // 0.22.0 — May a typed name be treated as the acting agent? One pure decision on
 // the caller already resolved by ID; a typed name never overrides it.
 export { decideActingClaim } from "./acting-claim.js";
