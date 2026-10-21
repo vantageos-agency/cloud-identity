@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { buildAgentLink, resolveAgentLink, type StoredAgentLink } from "../src/agent-link.js";
 import {
   clerkMembershipEvent,
   decideMembershipEvent,
@@ -367,6 +368,140 @@ describe("membershipPersonLookups", () => {
     );
     expect(gone.ok).toBe(false);
     if (!gone.ok) expect(gone.refusal.reason).toBe("principal-not-found");
+  });
+});
+
+describe("membershipPersonLookups: lookupMembership (the stored role)", () => {
+  it("a live admin row answers { active: true, role }", async () => {
+    const read = vi.fn(() => ({ role: "org:admin" }));
+    const { lookupMembership } = membershipPersonLookups(read);
+    expect(await lookupMembership("user_1", "org_A")).toEqual({ active: true, role: "org:admin" });
+    // the one positional closure is read as (orgId, personId), same as personById
+    expect(read).toHaveBeenCalledWith("org_A", "user_1");
+  });
+
+  it("a live member row answers its own role, not an admin one", async () => {
+    const { lookupMembership } = membershipPersonLookups(() => ({ role: "org:member" }));
+    expect(await lookupMembership("user_1", "org_A")).toEqual({ active: true, role: "org:member" });
+  });
+
+  it("a live row with no stored role answers role null", async () => {
+    const { lookupMembership } = membershipPersonLookups(() => ({}));
+    expect(await lookupMembership("user_1", "org_A")).toEqual({ active: true, role: null });
+  });
+
+  it("a tombstoned row is inactive and does not leak its stale role", async () => {
+    const { lookupMembership } = membershipPersonLookups(() => ({ role: "org:admin", deletedAt: 5 }));
+    expect(await lookupMembership("user_1", "org_A")).toEqual({ active: false, role: null });
+  });
+
+  it("an absent row is null", async () => {
+    const { lookupMembership } = membershipPersonLookups(async () => null);
+    expect(await lookupMembership("user_1", "org_A")).toBeNull();
+  });
+
+  it("a row naming its organisation carries it, so a loose read cannot become another org's membership", async () => {
+    const { lookupMembership } = membershipPersonLookups(() => ({ role: "org:admin", orgId: "org_B" }));
+    expect(await lookupMembership("user_1", "org_A")).toEqual({ active: true, role: "org:admin", orgId: "org_B" });
+  });
+
+  it("a throwing read propagates", async () => {
+    const { lookupMembership } = membershipPersonLookups(() => {
+      throw new Error("db down");
+    });
+    await expect(lookupMembership("user_1", "org_A")).rejects.toThrow("db down");
+  });
+
+  it("personById is unchanged by the role being present", async () => {
+    const { personById } = membershipPersonLookups(() => ({ role: "org:admin" }));
+    expect(await personById("user_1", "org_A")).toEqual({ id: "user_1", orgId: "org_A", active: true });
+  });
+});
+
+describe("agent link built from membershipPersonLookups alone (scoped identities)", () => {
+  const PERELLO = "org_perello";
+  const IRIS = "org_iris";
+  const NOW = 9_000_000;
+  const ROLES = ["org:admin"] as const;
+  type Row = { role: string; deletedAt?: number };
+
+  function world(rows: Record<string, Row>) {
+    const reads: Array<[string, string]> = [];
+    // storage only, one scoped read keyed by (orgId, personId); no fleet-wide reader
+    const read = (orgId: string, personId: string) => {
+      reads.push([orgId, personId]);
+      return rows[`${orgId}|${personId}`] ?? null;
+    };
+    const agents = new Map([
+      ["agent_pi", { id: "agent_pi", orgId: PERELLO, active: true }],
+      ["agent_victor", { id: "agent_victor", orgId: IRIS, active: true }],
+    ]);
+    const deps = {
+      lookupAgent: async (id: string) => agents.get(id) ?? null,
+      ...membershipPersonLookups(read),
+      adminRoles: ROLES,
+    };
+    return { reads, deps };
+  }
+
+  const input = (grantedBy: string) => ({
+    fromAgentId: "agent_pi",
+    fromOrgId: PERELLO,
+    toAgentId: "agent_victor",
+    toOrgId: IRIS,
+    grantedBy,
+    reason: "pi and victor coordinate the onboarding",
+    now: NOW,
+  });
+  const stored = (grantedBy: string): StoredAgentLink => ({
+    ...input(grantedBy),
+    grantedAt: NOW - 1,
+    revokedAt: null,
+  });
+  const resolve = (deps: ReturnType<typeof world>["deps"], grantedBy: string) =>
+    resolveAgentLink(
+      { fromAgent: { agentId: "agent_pi", orgId: PERELLO }, toAgentId: "agent_victor", door: "tasks:create" },
+      { ...deps, lookupAgentLink: async () => stored(grantedBy), now: () => NOW },
+    );
+
+  it("an admin grants and the link stands", async () => {
+    const w = world({ [`${IRIS}|marie`]: { role: "org:admin" } });
+    expect((await buildAgentLink(input("marie"), w.deps)).ok).toBe(true);
+    expect((await resolve(w.deps, "marie")).ok).toBe(true);
+    // only the target organisation is ever read
+    expect(w.reads.every(([org]) => org === IRIS)).toBe(true);
+  });
+
+  it("a plain member is refused at build and at resolve", async () => {
+    const w = world({ [`${IRIS}|bob`]: { role: "org:member" } });
+    expect(await buildAgentLink(input("bob"), w.deps)).toMatchObject({
+      ok: false,
+      refusal: { reason: "agent-link-grantor-not-admin" },
+    });
+    expect(await resolve(w.deps, "bob")).toMatchObject({ ok: false, refusal: { reason: "agent-link-grantor-void" } });
+  });
+
+  it("a tombstoned admin is refused at build and voids the link at resolve", async () => {
+    const w = world({ [`${IRIS}|marie`]: { role: "org:admin", deletedAt: 3 } });
+    expect(await buildAgentLink(input("marie"), w.deps)).toMatchObject({
+      ok: false,
+      refusal: { reason: "agent-link-grantor-not-admin" },
+    });
+    expect(await resolve(w.deps, "marie")).toMatchObject({ ok: false, refusal: { reason: "agent-link-grantor-void" } });
+  });
+
+  it("an admin of the SOURCE organisation only is refused", async () => {
+    const w = world({ [`${PERELLO}|operator`]: { role: "org:admin" } });
+    expect(await buildAgentLink(input("operator"), w.deps)).toMatchObject({
+      ok: false,
+      refusal: { reason: "agent-link-grantor-not-admin" },
+    });
+  });
+
+  it("an absent grantor is refused", async () => {
+    const w = world({});
+    expect(await buildAgentLink(input("ghost"), w.deps)).toMatchObject({ ok: false });
+    expect(await resolve(w.deps, "ghost")).toMatchObject({ ok: false, refusal: { reason: "agent-link-grantor-void" } });
   });
 });
 
