@@ -32,6 +32,7 @@
  */
 
 import { z } from "zod";
+import { normalizeLabel } from "./label-normal.js";
 
 // ---------------------------------------------------------------------------
 // Refusal vocabulary
@@ -100,10 +101,7 @@ function refuse(
 /** How a person is recorded as "who did it": "user:<verified subject>". */
 export const PERSON_ACTOR_PREFIX = "user:";
 
-/** NFC, lowercase, trim: the comparison form of an acting name. */
-function normalizeName(name: string): string {
-  return name.normalize("NFC").toLowerCase().trim();
-}
+const normalizeName = normalizeLabel;
 
 /** The actor name of a verified subject. */
 export function personActorName(subject: string): string {
