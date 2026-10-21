@@ -102,16 +102,6 @@ export type IdentityRefusalReason =
   | "agent-link-grantor-void"
   | "agent-link-agent-unavailable"
   | "agent-link-lookup-failed"
-  // agent link across organisations (0.23.0)
-  | "agent-link-absent"
-  | "agent-link-revoked"
-  | "agent-link-mismatch"
-  | "agent-link-invalid"
-  | "agent-link-same-organisation"
-  | "agent-link-grantor-not-admin"
-  | "agent-link-grantor-void"
-  | "agent-link-agent-unavailable"
-  | "agent-link-lookup-failed"
   // Clerk membership webhook (0.21.6)
   | "webhook-secret-invalid"
   | "webhook-headers-missing"

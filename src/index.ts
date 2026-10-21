@@ -439,6 +439,8 @@ export type {
   MembershipEvent,
   ClerkMembershipEventResult,
   StoredMembershipState,
+  StoredMembershipRead,
+  MembershipLookupResult,
   DecideMembershipEventResult,
   MembershipRow,
   ClerkMembershipRow,

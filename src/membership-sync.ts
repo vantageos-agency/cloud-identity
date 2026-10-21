@@ -228,25 +228,56 @@ export function decideMembershipEvent(
 // The owner-membership lookup
 // ---------------------------------------------------------------------------
 
+/** What `membershipPersonLookups` reads from a stored membership row. */
+export type StoredMembershipRead = {
+  deletedAt?: number;
+  /** The role as the consumer stored it (for Clerk: `"org:admin"`). Never interpreted here. */
+  role?: string | null;
+  /** The organisation the row names, when it carries one; re-checked by the membership resolver. */
+  orgId?: string | null;
+};
+
+/** The membership of ONE person in ONE organisation, in the shape `buildAgentLink` and `resolveMembership` read. */
+export type MembershipLookupResult = { active: boolean; role: string | null; orgId?: string };
+
 /**
- * `personById` for `resolveActingPrincipal`, answered from the consumer's own
- * membership row. `readMembership` returns the row for (org ID, person ID) or
- * null; a row with `deletedAt` set is a removed member and answers null, as does
- * an absent one. A throwing read propagates, so the resolver refuses
- * `principal-lookup-failed` rather than treating a failure as an absence.
+ * The lookups answered from the consumer's own membership row, from ONE closure.
+ * `readMembership` returns the row for (org ID, person ID) or null; an absent row
+ * and a tombstoned one (`deletedAt` set) are both a removed member.
+ *
+ * - `personById` is for `resolveActingPrincipal`: `{ id, orgId, active: true }`
+ *   for a live row, `null` otherwise.
+ * - `lookupMembership(personId, orgId)` is for `buildAgentLink`, `resolveAgentLink`
+ *   and `resolveMembership`: `{ active, role, orgId? }` with the STORED role for a
+ *   live row, `{ active: false, role: null }` for a tombstone (a removed member's
+ *   stale role is never surfaced), `null` for an absent row. The role is returned
+ *   as stored and decided elsewhere (`adminRoles`, matched exactly).
+ *
+ * A throwing read propagates from both, so a failure is never taken for an
+ * absence: the resolver refuses `principal-lookup-failed`, the membership
+ * resolver `membership-lookup-failed`.
  */
 export function membershipPersonLookups(
   readMembership: (
     orgId: string,
     personId: string,
-  ) => { deletedAt?: number } | null | undefined | Promise<{ deletedAt?: number } | null | undefined>,
-): Pick<PrincipalLookups, "personById"> {
+  ) => StoredMembershipRead | null | undefined | Promise<StoredMembershipRead | null | undefined>,
+): Pick<PrincipalLookups, "personById"> & {
+  lookupMembership: (personId: string, orgId: string) => Promise<MembershipLookupResult | null>;
+} {
   return {
     personById: async (personId, orgId) => {
       const row = await readMembership(orgId, personId);
       return row === null || row === undefined || row.deletedAt !== undefined
         ? null
         : { id: personId, orgId, active: true };
+    },
+    lookupMembership: async (personId, orgId) => {
+      const row = await readMembership(orgId, personId);
+      if (row === null || row === undefined) return null;
+      if (row.deletedAt !== undefined) return { active: false, role: null };
+      const named = typeof row.orgId === "string" && row.orgId.length > 0 ? { orgId: row.orgId } : {};
+      return { active: true, role: row.role ?? null, ...named };
     },
   };
 }

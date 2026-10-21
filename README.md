@@ -1569,12 +1569,29 @@ removal wins a tie; an upsert newer than a tombstone revives. A tombstone with
 no `lastEventAt` is ordered by its `deletedAt`. Types `StoredMembershipState`,
 `DecideMembershipEventResult`.
 
-**`membershipPersonLookups(readMembership)`** returns the `personById` lookup for
-`resolveActingPrincipal`. `readMembership(orgId, personId)` returns the stored
-row or `null`; a live row answers `{ id, orgId, active: true }`, an absent or
-tombstoned (`deletedAt` set) one answers `null`. A throwing read propagates, so
-the resolver refuses `principal-lookup-failed` and a failure is never taken for
-an absence.
+**`membershipPersonLookups(readMembership)`** returns, from ONE closure, the
+lookups that read the consumer's stored membership: `{ personById, lookupMembership }`.
+`readMembership(orgId, personId)` returns the stored row (`{ role?, deletedAt?, orgId? }`)
+or `null`. `personById` is for `resolveActingPrincipal`: a live row answers
+`{ id, orgId, active: true }`, an absent or tombstoned (`deletedAt` set) one
+answers `null`. `lookupMembership(personId, orgId)` is for `buildAgentLink`,
+`resolveAgentLink` and `resolveMembership`: a live row answers
+`{ active: true, role, orgId? }` with the role exactly as stored (`null` when the row
+has none), a tombstoned row `{ active: false, role: null }` (a removed member's
+stale role is not surfaced), an absent one `null`. A throwing read propagates
+from both, so a failure is never taken for an absence. Types
+`StoredMembershipRead` (the row read) and `MembershipLookupResult` (what
+`lookupMembership` answers).
+
+```ts
+// agent-link deps from the one package call: no membership read of your own
+const deps = {
+  lookupAgent: (agentId) => readAgent(agentId),
+  ...membershipPersonLookups((orgId, personId) => readOrgMembershipRow(orgId, personId)),
+  adminRoles: ["org:admin"], // matched EXACTLY against the stored role
+};
+await buildAgentLink(input, deps);
+```
 
 **`planMembershipReconcile(stored, fromClerk, { at, fullyReadOrgIds })`** plans a
 backfill as data: `{ upserts, tombstones }`. Every member Clerk reports is
