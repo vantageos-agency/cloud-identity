@@ -3,6 +3,23 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0]
+
+Additive: two new functions, one new subpath, nine new refusal reasons. No existing export changes behaviour.
+
+### Added
+- Agent link: an explicit, revocable channel that lets ONE agent of an organisation message, or assign a task to, ONE agent of ANOTHER organisation, by ID only. A name stays refused across organisations: no path here accepts one.
+  - `buildAgentLink({ fromAgentId, fromOrgId, toAgentId, toOrgId, grantedBy, reason, now }, { lookupAgent, lookupMembership, adminRoles })` (package root and `@vantageos/cloud-identity/agent-link`) validates an activation and returns the row to store, `{ ok: true, link }`, `revokedAt: null`, no expiry. It proves that `grantedBy` is an active member of `toOrgId` whose stored role is in `adminRoles`, that both agents exist, are active and belong to the organisations stated, that the two organisations differ, and that the reason has at least 10 characters.
+  - `resolveAgentLink({ fromAgent: { agentId, orgId }, toAgentId, door }, { lookupAgentLink, lookupAgent, lookupMembership, adminRoles, now?, onAgentLink? })` (package root, tagged `@callerResolver`) decides per request. It admits only a stored, non-revoked row for exactly the (`fromAgentId`, `toAgentId`) pair and the caller's organisation, while the target agent is still active in `toOrgId` AND the grantor is still an active admin of `toOrgId`. A grantor who was removed, lost the admin role or whose membership went inactive voids the link, with no write to the row. Every attempt is reported to `onAgentLink`; a throwing sink never changes the outcome. Types `StoredAgentLink`, `AgentLinkLookups`, `BuildAgentLinkInput`, `BuildAgentLinkDeps`, `BuildAgentLinkResult`, `AgentLinkEvent`, `ResolveAgentLinkInput`, `ResolveAgentLinkDeps`, `ResolveAgentLinkResult`.
+  - A link is DIRECTIONAL: pi -> victor says nothing about victor -> pi, and does not cover a third agent of the same two organisations.
+- New `IdentityRefusalReason` members `agent-link-absent`, `agent-link-revoked`, `agent-link-mismatch`, `agent-link-invalid`, `agent-link-same-organisation`, `agent-link-grantor-not-admin`, `agent-link-grantor-void`, `agent-link-agent-unavailable`, `agent-link-lookup-failed` (all `RBAC_DENIED`).
+
+### How a grant is made
+- The grant is made by the TARGET side. The consumer calls `buildAgentLink` with `grantedBy` set to the stored person ID of an admin of the target agent's organisation (`toOrgId`), then stores `built.link`. An admin of the source organisation cannot grant it, and neither can a plain member of the target organisation.
+- It takes ONE ROW PER DIRECTION. For two agents to reach each other, `buildAgentLink` is called twice: A -> B granted by an admin of B's organisation, and B -> A granted by an admin of A's organisation.
+- Revoke by setting `revokedAt` on the stored row. Re-granting after the grantor left is a new `buildAgentLink` call by a current admin of `toOrgId`.
+- Consumers that list resolvers from the `@callerResolver` tag now see `resolveAgentLink` as well.
+
 ## [0.22.0]
 
 Additive: one new function and one new subpath. No existing export changes behaviour.
