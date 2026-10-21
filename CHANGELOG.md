@@ -3,6 +3,22 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.1]
+
+Additive patch: `membershipPersonLookups` also returns the stored membership role. Existing callers are unaffected: `personById` answers exactly what it did, and the new `lookupMembership` key is extra on the returned object.
+
+### Added
+- `membershipPersonLookups(readMembership)` now returns `{ personById, lookupMembership }`. `lookupMembership(personId, orgId)` answers `{ active: true, role, orgId? }` for a live row (the role exactly as stored, `null` when absent from the row), `{ active: false, role: null }` for a tombstoned row, and `null` for an absent one; a throwing read propagates. It has the shape of `AgentLinkLookups["lookupMembership"]`, so a consumer builds the agent link deps from ONE package call, with no membership read of its own: `{ lookupAgent, ...membershipPersonLookups(read), adminRoles }`. Types `StoredMembershipRead`, `MembershipLookupResult`.
+  - Why this and not a new function: the consumer already feeds `membershipPersonLookups` one positional closure; a sibling would make it wire the same read twice. The row type gains optional `role` and `orgId` (both optional, so every existing closure still type-checks).
+  - A tombstoned row does not surface its stale role: a removed admin carries no role into the decision, and `resolveMembership` refuses an inactive record in any case.
+  - `buildAgentLink` and `resolveAgentLink` are unchanged: they already take `lookupMembership`, so the deps this call produces are accepted as they are (spreading the extra `personById` is harmless).
+
+### Fixed
+- `IdentityRefusalReason` listed the nine agent-link reasons twice. A duplicate union member is harmless to the compiler; the repeated block is removed, the type is unchanged.
+
+### Verified, no change needed
+- The admin role is matched EXACTLY (`adminRoles.includes(role)`): a stored role that merely starts with an admin role string (`"admin-lite"` against `["admin"]`, `"org:adminx"`, `"org:admin "`, `"ORG:ADMIN"`) is refused at build and voids the link at resolve. Pinned by tests that passed on first run, so they guard the behaviour rather than fix it.
+
 ## [0.23.0]
 
 Additive: two new functions, one new subpath, nine new refusal reasons. No existing export changes behaviour.
