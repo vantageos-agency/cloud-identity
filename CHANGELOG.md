@@ -3,6 +3,18 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0]
+
+Additive: one new function and one new subpath. No existing export changes behaviour.
+
+### Added
+- `decideActingClaim({ claimed, caller, mode?, door? })` (package root and `@vantageos/cloud-identity/acting-claim`): whether a name a caller typed into a call may be treated as the acting agent, decided on the caller the consumer already resolved BY ID. Returns `{ ok: true, via }` or `{ ok: false, refusal }`. `caller` is one of `agent-credential` (`agentId`, `agentLabel`, `orgSlug`), `seat` (`agentId`, `agentLabel`, `orgId`), `seat-unresolved` (`allowlist`), `master-bearer`, `master-scope`, `org-member`, or `null`.
+  - The claim must equal the resolved agent's label for `agent-credential` and `seat`, else `AGENT_IDENTITY_MISMATCH`, in every mode: a typed name never overrides a resolved identity. `master-bearer` is `AGENT_CREDENTIAL_REQUIRED` in every mode. `master-scope` passes. `org-member` and `seat-unresolved` pass only in explicit `"permissive"` mode (`via: "permissive-unattributed"`) or, for `seat-unresolved`, when the allowlist is exactly one real label (not `"*"`, not empty) and the claim equals it (`via: "seat-own-label"`); otherwise `AGENT_CREDENTIAL_REQUIRED`.
+  - `mode` is an input. Absent, or any value other than the exact string `"permissive"`, is strict.
+  - Refusal codes are the ones the consumer's local check already used: `AGENT_IDENTITY_MISMATCH`, `AGENT_CREDENTIAL_REQUIRED`. The local no-context refusal carried no code, only the text `Forbidden: no authorization context ...`; it is now `RBAC_DENIED` with reason `no-context`. Two further `RBAC_DENIED` refusals are new: `caller-invalid` (an unknown kind, or a resolved agent with an empty ID or label, which would otherwise let an empty claim equal an empty label) and `claim-invalid` (a claim that is not a string). The refusal is the package's `{ code, reason, door, detail }` shape plus `claimed` and `resolved`; the wording of `detail` differs from the consumer's old message strings.
+  - The comparison is the package's own (NFC, lowercase, trim; accents are not folded). It was a private helper of the person-principal module and is now one internal module used by both; `resolvePersonActingName` behaves as before.
+  - Types `ActingCaller`, `ActingClaimMode`, `ActingClaimInput`, `ActingClaimRefusal`, `ActingClaimRefusalCode`, `ActingClaimRefusalReason`, `ActingClaimResult`, `ActingClaimVia`.
+
 ## [0.21.7]
 
 Additive: one new subpath, no change to any existing export.
