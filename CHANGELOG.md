@@ -3,7 +3,9 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.23.2] - 2026-10-24
+
+Security patch. One runtime change: the `zod` floor. Nothing else in the published surface changes.
 
 ### Security
 - Runtime: `zod` floor raised `^4.4.3` → `^4.6.7` (GHSA-mrhx-c7xc-m3w5, memory exhaustion while validating oversized constrained collections; fixed in 4.6.6). A consumer installing the next release can no longer resolve a vulnerable zod through this package.
