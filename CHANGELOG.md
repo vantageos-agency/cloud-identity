@@ -3,6 +3,12 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- Runtime: `zod` floor raised `^4.4.3` → `^4.6.7` (GHSA-mrhx-c7xc-m3w5, memory exhaustion while validating oversized constrained collections; fixed in 4.6.6). A consumer installing the next release can no longer resolve a vulnerable zod through this package.
+- Dev toolchain only, nothing published changes: `vitest` `^1.6.0` → `^5.0.5`, `vite` `^8.3.5` added (vitest 5's peer), `@types/node` `^20.11.0` → `^24.19.2` (vitest 5's peer range). This clears tinypool (GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr, CRITICAL), vite (GHSA-587h-7wmj-h5pm and 7 others), esbuild, postcss, nanoid and source-map-js from the lockfile.
+
 ## [0.23.1]
 
 Additive patch: `membershipPersonLookups` also returns the stored membership role. Existing callers are unaffected: `personById` answers exactly what it did, and the new `lookupMembership` key is extra on the returned object.
