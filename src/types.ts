@@ -23,13 +23,16 @@ export type FromAllowListEntry = string;
 /**
  * Minimal OAuth context attached to an inbound MCP request.
  *
- * - `fromAllowList`: row.createdBy must be in this list for non-master callers
- *   to see a row. `["*"]` is the master wildcard convention.
+ * - `fromAllowList` (optional since 0.24.0): row.createdBy must be in this
+ *   list for non-master callers to see a row. An absent list names nobody.
+ *   A `"*"` entry still makes the caller master (deprecated, see
+ *   `isMasterScope`); declare `scope: "master"` instead.
  * - `namespaceReadPrefixes`: row.namespace must equal one of these OR start
  *   with prefix + '/' for the row to be readable by non-master callers.
  * - `namespaceWritePrefixes`: same semantics for write paths (enforced by the
  *   caller, this brick only exposes the field on the type).
- * - `scope`: optional scope profile name. `"master"` triggers wildcard pass.
+ * - `scope`: optional scope profile name. `"master"` triggers wildcard pass,
+ *   and is the signal master is decided on.
  */
 export type OAuthCtx = {
   /**
@@ -38,8 +41,12 @@ export type OAuthCtx = {
    * @deprecated Since 0.14.0. A list of NAMES selects rows, and a name must
    * never select or authorise one. Use `filterTargetsBelongingTo`, which
    * compares stored IDs. Behaviour unchanged; removed when consumers migrate.
+   *
+   * Optional since 0.24.0, so a consumer can stop sending it. Absent (or not
+   * an array) means no name: no row is selected by `createdBy` or by a
+   * declared grant field, and the caller is not made master by it.
    */
-  fromAllowList: FromAllowListEntry[];
+  fromAllowList?: FromAllowListEntry[];
   namespaceReadPrefixes: NamespacePrefix[];
   namespaceWritePrefixes: NamespacePrefix[];
   scope?: ScopeProfile;

@@ -101,12 +101,17 @@ export function sameTenantStamp(
  * The consumer's organisation mapping row, as an adapter returns it. `id` is
  * the permanent org ID and may be absent while the store is being filled;
  * `label` is the slug. Extra fields are allowed and ignored.
+ *
+ * Both rosters are optional (since 0.24.0): `allowedOrchestrators` is the
+ * legacy NAME roster, `allowedAgentIds` the roster by agent ID. A roster that
+ * is present must be well formed, or the row is refused.
  */
 export const orgMappingRowSchema = z.object({
   id: z.string().min(1).nullish(),
   label: z.string().min(1),
   active: z.boolean(),
-  allowedOrchestrators: z.array(z.string()),
+  allowedOrchestrators: z.array(z.string()).optional(),
+  allowedAgentIds: z.array(z.string().min(1)).optional(),
   scopes: z.array(z.string()),
   orgKind: z.string().nullish(),
 });
@@ -155,7 +160,20 @@ export type ResolvedOrg = {
   id: string;
   /** The org's CURRENT label. Display text. */
   label: string;
-  allowedOrchestrators: string[];
+  /**
+   * The mapping row's NAME roster, present when the row has one.
+   *
+   * @deprecated Since 0.24.0. Names are labels, not identity. Read
+   * `allowedAgentIds`. Optional so a consumer can remove the field from its
+   * rows; absent means the row stores no name roster.
+   */
+  allowedOrchestrators?: string[];
+  /**
+   * The mapping row's roster by agent ID, present when the row has one
+   * (an empty list is returned as empty). Absent means the row stores no ID
+   * roster: nothing is admitted by it.
+   */
+  allowedAgentIds?: string[];
   scopes: string[];
   orgKind: OrgKind | null;
 };
@@ -210,7 +228,10 @@ export async function resolveOrgFromClaim(
       org: {
         id,
         label: row.label,
-        allowedOrchestrators: row.allowedOrchestrators,
+        ...(row.allowedOrchestrators !== undefined
+          ? { allowedOrchestrators: row.allowedOrchestrators }
+          : {}),
+        ...(row.allowedAgentIds !== undefined ? { allowedAgentIds: row.allowedAgentIds } : {}),
         scopes: row.scopes,
         orgKind: kindOf(row.orgKind),
       },
