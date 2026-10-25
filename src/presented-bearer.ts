@@ -29,6 +29,12 @@
  * presented token, never the token. A consumer's datastore query, query log
  * and slow-query log therefore never see a usable secret. The raw token does
  * not appear in any returned value, any refusal, or any logging callback.
+ *
+ * @security Never carry a RAW token in a Convex function argument. Measured:
+ * when any argument fails Convex's validator, Convex echoes the whole argument
+ * object, valid fields included, into the caller's error, and the error is
+ * persisted in the deployment log. Hash at the HTTP boundary with `sha256Hex`
+ * and pass only the digest to `resolvePresentedDigest`.
  */
 
 import { z } from "zod";
@@ -121,7 +127,7 @@ export type AgentScopedIdentity = {
  *   - `error: "malformed"` → header present but not parseable as
  *     `Bearer <non-empty-token>`.
  *   - `error: "mismatch"` → the single, COLLAPSED refusal. An unknown digest,
- *     a revoked row, an expired row, a row of invalid shape and a row whose
+ *     a malformed digest (`resolvePresentedDigest`), a revoked row, an expired row, a row of invalid shape and a row whose
  *     stored digest does not match all produce this value and nothing else, so
  *     a prober cannot learn from the response whether a token was ever real.
  *   - `error: "unavailable"` → the lookup callback itself threw or rejected.
@@ -168,7 +174,9 @@ export type PresentedBearerInternalReason =
   | "expired-token"
   | "row-shape-invalid"
   | "stored-digest-mismatch"
-  | "lookup-failed";
+  | "lookup-failed"
+  /** A digest presented to `resolvePresentedDigest` that is not 64 lowercase hex characters. */
+  | "malformed-digest";
 
 export type PresentedBearerDeps = {
   /**
@@ -308,14 +316,21 @@ export async function validatePresentedBearer(
 
 /**
  * The core of `validatePresentedBearer`, after the header has been parsed:
- * hash the raw token, look the row up by the digest, re-compare the stored
- * digest in constant time, then row shape, revocation and expiry. Every
- * mismatch returns the one collapsed refusal; a throwing lookup returns
- * `unavailable`.
+ * hash the raw token, then hand the digest to the same decision as
+ * `resolvePresentedDigest` (lookup by digest, constant-time re-compare, row
+ * shape, revocation, expiry). Every mismatch returns the one collapsed
+ * refusal; a throwing lookup returns `unavailable`.
  *
  * Shared by `validatePresentedBearer` (token from an Authorization header) and
- * `resolveConvexMachineCaller` (token from a Convex function argument), so
- * both transports reach the same decision through the same code.
+ * `resolveConvexMachineCaller`.
+ *
+ * @security Do not use this with a token carried in a Convex function
+ * ARGUMENT. On any argument-validation failure Convex echoes the whole
+ * argument object, valid fields included, into the caller's error, and that
+ * error is persisted in the deployment log. A raw token in an argument is
+ * therefore one malformed call away from being written to a log. Hash at the
+ * HTTP boundary with `sha256Hex` and pass the digest to
+ * `resolvePresentedDigest` instead.
  *
  * @internal Not exported from the package root. The caller must already have
  * checked that `token` is a non-empty string and that `deps.lookupBySecretHash`
@@ -325,7 +340,74 @@ export async function resolvePresentedToken(
   token: string,
   deps: PresentedBearerDeps,
 ): Promise<ValidatePresentedBearerResult> {
-  const presentedDigest = await sha256Hex(token);
+  return decideOnDigest(await sha256Hex(token), deps);
+}
+
+// ---------------------------------------------------------------------------
+// resolvePresentedDigest — the digest entry point
+// ---------------------------------------------------------------------------
+
+/** A SHA-256 hex digest exactly as `sha256Hex` produces it: 64 lowercase hex characters. */
+const DIGEST_SHAPE = /^[0-9a-f]{64}$/;
+
+/**
+ * Resolve the SHA-256 HEX DIGEST of a presented token into a verified
+ * identity, or into a typed refusal. The transport for a caller that must not
+ * carry the raw token, above all a Convex function: hash at the HTTP boundary
+ * with `sha256Hex` (the same function that produces the stored `secretHash`),
+ * pass only the digest, resolve it here.
+ *
+ * Decides exactly as `resolvePresentedToken` does after hashing, through the
+ * same code: lookup by digest, constant-time re-compare of the stored digest,
+ * row shape, revocation, expiry, and the same results.
+ *
+ * Only a 64-character lowercase hex string is accepted. Anything else (wrong
+ * length, uppercase, whitespace, a non-string) returns the SAME collapsed
+ * refusal as a well-formed digest that matches no row, without calling the
+ * lookup. A distinct "bad digest" result would tell a prober which half of
+ * its input was wrong; the internal reason `malformed-digest` still reaches
+ * `deps.onRefusal` for the consumer's own logs.
+ *
+ * @security A digest is not a secret-free value: it is the lookup key of a
+ * live credential, so whoever holds it can present it here. What it does not
+ * do is reveal the token, so a log that captures it does not hand out a
+ * credential usable at any raw-token door. Do not log it on purpose.
+ *
+ * @example
+ * ```ts
+ * // HTTP boundary: hash once, forward only the digest.
+ * const digest = await sha256Hex(token);
+ * // Convex function: resolve the digest.
+ * const result = await resolvePresentedDigest(args.tokenDigest, {
+ *   lookupBySecretHash: (d) => ctx.db.query("tokens").withIndex("by_secret_hash", (q) => q.eq("secretHash", d)).unique(),
+ * });
+ * ```
+ */
+export async function resolvePresentedDigest(
+  digestHex: string,
+  deps: PresentedBearerDeps,
+): Promise<ValidatePresentedBearerResult> {
+  if (typeof deps?.lookupBySecretHash !== "function") {
+    // A programming error in the consumer, not a claim about any caller.
+    throw new TypeError(
+      "resolvePresentedDigest: deps.lookupBySecretHash must be a function.",
+    );
+  }
+  return decideOnDigest(digestHex, deps);
+}
+
+/**
+ * The ONE decision, shared by the raw-token and the digest entry points. The
+ * raw path reaches it with `sha256Hex` output, which always has the accepted
+ * shape, so the shape check changes nothing for it.
+ */
+async function decideOnDigest(
+  presentedDigest: unknown,
+  deps: PresentedBearerDeps,
+): Promise<ValidatePresentedBearerResult> {
+  if (typeof presentedDigest !== "string" || !DIGEST_SHAPE.test(presentedDigest)) {
+    return collapse(deps, "malformed-digest");
+  }
 
   let row: StoredBearerRow | null | undefined;
   try {
