@@ -268,7 +268,10 @@ await resolveTenant({ session: null }); // throws Error("Unauthenticated: no ses
   **Deprecated since 0.11.0** (see below).
 - `isMasterScope(ctx)` / `isWildcardScope(ctx)` — true when the caller holds
   unrestricted access. Useful for skipping filtering you know is pointless;
-  never as a substitute for it.
+  never as a substitute for it. Decided on `scope === "master"`. A `"*"`
+  entry in `fromAllowList` still counts as master, **deprecated since
+  0.24.0**: declare `scope: "master"` instead. It is removed in a major
+  release.
 
 **Deprecated since 0.11.0 (pointing to `filterTargetsBelongingTo` since 0.14.0): `passesScopeFilter`, `scopeFilterGet` and
 `scopeFilterList`.** All three (the last two through the first) admit a row
@@ -283,6 +286,11 @@ Visibility is granted two ways: the row's `createdBy` appears in the caller's
 `fromAllowList`, or the row's `namespace` sits under one of the caller's
 `namespaceReadPrefixes`. Prefixes match on a path boundary, so a caller allowed
 `team/finance` does not thereby see `team/finance-archive`.
+
+`fromAllowList` is optional since 0.24.0. An absent list, or a value that is
+not an array, names nobody: no row is visible through `createdBy` or a grant
+field, and the caller is not master through it. Namespace prefixes work as
+before.
 
 A third way is opt-in per call. All three functions take an optional last
 argument, `grantFields` (type `GrantFieldDeclaration`, a list of property
@@ -314,7 +322,8 @@ want to catch by type, and `BearerPayload`, the type returned by
 **Supporting types** (no runtime code — import with `import type`)
 
 - `OAuthCtx` — the context object every scope-filter function above requires:
-  `{ fromAllowList, namespaceReadPrefixes, namespaceWritePrefixes, scope? }`.
+  `{ fromAllowList?, namespaceReadPrefixes, namespaceWritePrefixes, scope? }`
+  (`fromAllowList` optional since 0.24.0).
 - `ScopeProfile`, `NamespacePrefix`, `FromAllowListEntry` — the field types
   that make up `OAuthCtx`.
 - `ValidateMasterBearerResult` — the return type of `validateMasterBearer`.
@@ -1339,8 +1348,10 @@ as adapters, and refuse by default. All are in `./org-by-id` and the root.
 
 **`resolveOrgFromClaim(claims, lookups, opts)`** takes the claim record of a
 VERIFIED credential (never a request field) and returns
-`{ ok: true, org: { id, label, allowedOrchestrators, scopes, orgKind } }`
-or a typed `RBAC_DENIED` refusal. The `org_id` claim (also read from
+`{ ok: true, org: { id, label, allowedOrchestrators?, allowedAgentIds?, scopes, orgKind } }`
+or a typed `RBAC_DENIED` refusal. Each roster is on `org` only when the row
+has it (since 0.24.0): `allowedOrchestrators` is the legacy name roster
+(deprecated), `allowedAgentIds` the roster by agent ID. The `org_id` claim (also read from
 `organizationId` and `orgId`, only when shaped like a Clerk org ID) selects the
 mapping row through `lookups.orgById`; a stale label in the token is ignored,
 so a rename never changes who the caller is. Refused: no claim, an ID no
@@ -1376,7 +1387,9 @@ It returns `{ present: true, orgId }` or a typed `ORG_ID_ABSENT` absence
 It never invents an ID.
 
 **`orgMappingRowSchema`** is the Zod shape of a mapping row an adapter returns
-(`id`, `label`, `active`, `allowedOrchestrators`, `scopes`, `orgKind`).
+(`id`, `label`, `active`, `allowedOrchestrators?`, `allowedAgentIds?`,
+`scopes`, `orgKind`). Both rosters are optional since 0.24.0; one that is
+present but malformed refuses the row.
 
 Types: `OrgRef`, `OrgMappingRow`, `OrgMappingLookups`,
 `ResolvedOrg`, `ResolveOrgFromClaimOptions`, `ResolveOrgFromClaimResult`,

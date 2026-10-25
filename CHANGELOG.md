@@ -3,6 +3,22 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0] - 2026-10-25
+
+Additive optionality: neither name list is required any more, so a consumer can remove them and keep only IDs. Every existing test passes unchanged (936/936); 17 new tests pin the new behaviour.
+
+### Changed
+- `OAuthCtx.fromAllowList` is optional. An absent list, `null`, or a value that is not an array names nobody: `passesScopeFilter` / `scopeFilterList` / `scopeFilterGet` select no row by `createdBy` or by a declared grant field, and `isMasterScope` / `isWildcardScope` / `assertNamespaceWrite` do not treat the caller as master through it. Before, an absent list threw a `TypeError` inside `isMasterScope`. Namespace read and write prefixes decide exactly as before.
+- Master is decided on the declared `scope === "master"`. The `"*"` entry in `fromAllowList` still makes a caller master, now **deprecated**: a consumer can attach a context whose `scope` is a non-master profile and whose list is a stored org roster that holds `"*"`, and dropping the signal would withhold master from it. Declare `scope: "master"` instead; the `"*"` signal is removed in a major release. `isMasterScope({ scope: "tenant", fromAllowList: ["*"] })` stays `true`.
+- `orgMappingRowSchema.allowedOrchestrators` is optional. A mapping row without it resolves through `resolveOrgFromClaim` (and parses in `findOperatorOrg`, `resolveOrgIdForLabelBackfillOnly`, `resolveProvisioningLabel`) instead of being refused as `org-mapping-record-invalid`. A present but malformed list still refuses the row.
+- `ResolvedOrg.allowedOrchestrators` is optional and deprecated: it is on the resolved org when the row has it, with the same value as before, and absent otherwise. Type-level note for readers: a consumer that assigns it to a required `string[]` needs `?? []` when it upgrades. Runtime output for a row that carries the list is unchanged.
+
+### Added
+- `orgMappingRowSchema.allowedAgentIds` (optional, non-empty strings) and `ResolvedOrg.allowedAgentIds`: the mapping row's roster by agent ID, exposed when the row has it (an empty list stays empty). Before, the field was stripped by the schema, so a consumer had to read the row a second time to get it. A present but malformed ID roster refuses the row (`org-mapping-record-invalid`).
+
+### Fixed
+- A `fromAllowList` that is a string instead of an array (an untyped caller) is no longer read as names. Before, `"alice".includes("ali")` selected a row whose `createdBy` was `"ali"`, and `"*"` as a string made the caller master. Typed callers cannot produce this shape.
+
 ## [0.23.3] - 2026-10-25
 
 Packaging fix. No function changes.
