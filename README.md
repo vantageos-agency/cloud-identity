@@ -166,6 +166,15 @@ So hash at the HTTP boundary and send only the SHA-256 hex digest (0.25.0):
      returns the same `ValidatePresentedBearerResult` as
      `validatePresentedBearer`.
 
+**A digest door is reachable only by the service identity.** The stored
+`secretHash` IS the digest, so once a door accepts a digest, a stored digest is
+a presentable credential: read access to the token table becomes equivalent to
+holding every live token. Expose the Convex function that calls
+`resolvePresentedDigest` / `resolveConvexMachineCallerFromDigest` to the
+deployment's service identity only (an internal function, or a door that refuses
+any other caller by name), never to a client, and treat the token table's read
+access as security-critical.
+
 Both run the one decision the raw-token functions run after hashing: lookup by
 digest, constant-time re-compare of the stored digest, row shape, revocation,
 expiry. The raw-token functions (`validatePresentedBearer`,
