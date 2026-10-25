@@ -72,6 +72,14 @@ describe("OAuthCtx without fromAllowList: runtime", () => {
     expect(isWildcardScope(noNames())).toBe(false);
   });
 
+  it("only the scope \"master\" is master: any other declared scope is not (Eta #54 surviving mutant)", () => {
+    for (const scope of ["mcp:full", "tenant", "team-member", "client-generic", "public-readonly", "Master", "master ", ""]) {
+      expect(isMasterScope(noNames({ scope })), JSON.stringify(scope)).toBe(false);
+      expect(isMasterScope(noNames({ scope, fromAllowList: ["alice"] })), JSON.stringify(scope)).toBe(false);
+      expect(passesScopeFilter(noNames({ scope }), { createdBy: "stranger", namespace: "elsewhere" })).toBe(false);
+    }
+  });
+
   it("master is decided by the declared scope, with no list", () => {
     expect(isMasterScope(noNames({ scope: "master" }))).toBe(true);
     expect(passesScopeFilter(noNames({ scope: "master" }), { createdBy: "x", namespace: "y" })).toBe(true);
