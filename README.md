@@ -51,6 +51,18 @@ Every symbol is available from the package root. Subpath imports
 (`@vantageos/cloud-identity/scope-filter` and friends) also work if you prefer
 to be explicit about where something comes from.
 
+**In a bundle (a Convex function, an edge worker), import by subpath.** The
+root re-exports `clerk-handshake`, which pulls `@clerk/backend`: importing even
+`requireTenantId` from the root bundles 33 Clerk modules. The subpath does not:
+
+```js
+import { requireTenantId } from "@vantageos/cloud-identity/org-guard"; // 0 Clerk modules
+```
+
+Measured with esbuild on 0.23.3: the root import of `requireTenantId` is
+599,033 bytes (33 `@clerk` modules), the `./org-guard` import 1,065 bytes
+(none). `test/org-guard-subpath.test.ts` re-measures it on every run.
+
 ## A host-verified identity to its tenant
 
 When the host has already verified the caller (a Convex function holds
