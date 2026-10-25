@@ -3,6 +3,16 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.3] - 2026-10-25
+
+Packaging fix. No function changes.
+
+### Added
+- `./org-guard` subpath export (`requireTenantId`). Before, `requireTenantId` was reachable only through the root index, which re-exports `clerk-handshake` and so pulls `@clerk/backend` into every bundle that imports it. vantageos-crm measured a Convex bundle growing 724,158 -> 813,936 bytes (33 Clerk modules) from that one import after upgrading from 0.7.0, when the root depended on zod alone. Measured here with esbuild: root import 599,033 bytes / 33 `@clerk` modules; `./org-guard` import 1,065 bytes / 0. The root import is unchanged and keeps working; both paths hand out the same function (`test/org-guard-subpath.test.ts`).
+
+### Changed
+- Dev toolchain only: `esbuild` `^0.28.0` declared as a devDependency (it was already present through vite 8; the new test imports it directly). OSV: 0 advisories on 0.28.2.
+
 ## [0.23.2] - 2026-10-24
 
 Security patch. One runtime change: the `zod` floor. Nothing else in the published surface changes.
