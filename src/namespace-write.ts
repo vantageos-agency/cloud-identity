@@ -16,7 +16,9 @@ import type { OAuthCtx } from "./types.js";
 
 /**
  * Throws `IdentityRefusalError` unless the caller may write `namespace`.
- * Master scope (`scope === "master"` or `"*"` in `fromAllowList`) passes.
+ * Master scope passes, as decided by `isMasterScope`: `scope === "master"`,
+ * or the deprecated `"*"` entry in `fromAllowList`. An absent
+ * `fromAllowList` is fine: the decision is on the write prefixes.
  *
  * @param door The consumer's own name for the entry point, for the refusal.
  */

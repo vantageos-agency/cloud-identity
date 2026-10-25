@@ -44,6 +44,15 @@
  *     (untyped JS, `as any`), every function also throws at runtime if
  *     `oauthCtx` is nullish, instead of silently granting access.
  *   - Master scope (scope === "master" OR fromAllowList includes "*") = wildcard pass.
+ *
+ * Contract (0.24.0 — additive):
+ *   - `oauthCtx.fromAllowList` is optional. An absent list, or a value that
+ *     is not an array, names nobody: no row passes by `createdBy` or by a
+ *     declared grant field, and the caller is not master by it. Namespace
+ *     read prefixes still serve rows exactly as before.
+ *   - Master is decided on the declared `scope === "master"`. The `"*"`
+ *     entry in `fromAllowList` is kept as a DEPRECATED second signal, so a
+ *     caller that is master only through a stored `"*"` keeps it.
  *   - Non-master scope = row passes iff:
  *       row.createdBy ∈ oauthCtx.fromAllowList
  *       OR
@@ -98,14 +107,26 @@ export type ScopeFilterable = {
 };
 
 /**
+ * The caller's name list, or `[]` when it is absent or not an array. A
+ * string is not a list: `"alice".includes("ali")` must never select a row.
+ */
+function namesOf(ctx: OAuthCtx): readonly string[] {
+  return Array.isArray(ctx.fromAllowList) ? ctx.fromAllowList : [];
+}
+
+/**
  * Returns true when the scope profile grants full, wildcard access.
- * Mirrors `isMasterScope` from the source module: `scope === "master"` OR
- * `fromAllowList` contains the `"*"` sentinel.
+ *
+ * Decided on the declared `scope === "master"`. A `"*"` entry in
+ * `fromAllowList` is a DEPRECATED second signal (since 0.24.0): it still
+ * returns true, so a context that is master only through a stored `"*"`
+ * keeps master, and it is removed in a major release once consumers declare
+ * `scope: "master"` instead. An absent list is never master.
  */
 export function isMasterScope(ctx: OAuthCtx): boolean {
   assertOauthCtx(ctx);
   if (ctx.scope === "master") return true;
-  return ctx.fromAllowList.includes("*");
+  return namesOf(ctx).includes("*");
 }
 
 /**
@@ -123,7 +144,7 @@ export type GrantFieldDeclaration = readonly string[];
 
 const NO_GRANT_FIELDS: GrantFieldDeclaration = [];
 
-function grantFieldMatches(value: unknown, fromAllowList: string[]): boolean {
+function grantFieldMatches(value: unknown, fromAllowList: readonly string[]): boolean {
   if (typeof value === "string") return fromAllowList.includes(value);
   if (Array.isArray(value)) {
     return value.some(
@@ -174,8 +195,9 @@ export function passesScopeFilter<T extends ScopeFilterable>(
 ): boolean {
   assertOauthCtx(oauthCtx);
   if (isMasterScope(oauthCtx)) return true;
+  const names = namesOf(oauthCtx);
   const { createdBy, namespace } = row;
-  if (createdBy && oauthCtx.fromAllowList.includes(createdBy)) return true;
+  if (createdBy && names.includes(createdBy)) return true;
   if (namespace) {
     for (const p of oauthCtx.namespaceReadPrefixes) {
       if (namespaceMatchesPrefix(namespace, p)) return true;
@@ -183,7 +205,7 @@ export function passesScopeFilter<T extends ScopeFilterable>(
   }
   for (const field of grantFields) {
     const value = (row as unknown as Record<string, unknown>)[field];
-    if (grantFieldMatches(value, oauthCtx.fromAllowList)) return true;
+    if (grantFieldMatches(value, names)) return true;
   }
   return false;
 }
