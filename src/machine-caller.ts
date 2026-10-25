@@ -3,11 +3,24 @@
  *
  * A Convex query or mutation never sees a request header, so a service with
  * no human behind it (no Clerk session, no `ctx.auth` identity) cannot present
- * an `Authorization: Bearer` header to it. The credential therefore travels as
- * a function ARGUMENT, and this module resolves it by the same core as
+ * an `Authorization: Bearer` header to it. The credential therefore reaches
+ * the function as an ARGUMENT, and this module resolves it by the same core as
  * `validatePresentedBearer`: digest, indexed lookup, constant-time re-compare,
  * row shape, revocation, expiry. The consumer supplies the lookup and nothing
  * else; the decision is made here.
+ *
+ * @security Pass the DIGEST, never the raw credential. Measured: when any
+ * argument of a Convex call fails its validator, Convex echoes the whole
+ * argument object, valid fields included, into the caller's error, and that
+ * error is persisted in the deployment log. A raw credential in an argument is
+ * one malformed call away from a log. Hash at the HTTP boundary with
+ * `sha256Hex` and call `resolveConvexMachineCallerFromDigest` in the Convex
+ * function. `resolveConvexMachineCaller` (raw credential) stays for callers
+ * that already hold the credential in-process; it hashes and runs the same
+ * decision.
+ *
+ * Import from `@vantageos/cloud-identity/machine-caller` in a Convex bundle:
+ * the root index re-exports the Clerk handshake and pulls `@clerk/backend` in.
  *
  * @security The credential, its digest and the claimed organisation never
  * appear in a returned refusal. The consumer stores only the digest.
@@ -15,15 +28,29 @@
 
 import { sha256Hex } from "./crypto.js";
 import { type IdentityRefusal, refusal } from "./identity-refusal.js";
-import { type AgentPresence, type PresentedBearerDeps, resolvePresentedToken } from "./presented-bearer.js";
+import { type AgentPresence, type PresentedBearerDeps, resolvePresentedDigest } from "./presented-bearer.js";
 
 const MACHINE_CREDENTIAL_PREFIX = "vpmc_";
 const MACHINE_CREDENTIAL_BYTES = 32;
 
-/** What a Convex function receives from the calling service. */
+/**
+ * A raw machine credential and the claimed organisation.
+ *
+ * @security Not for a Convex function argument: a validation failure on any
+ * argument echoes the whole object, credential included, into the error and
+ * the deployment log. Use `ConvexMachineCallerDigestInput` there.
+ */
 export type ConvexMachineCallerInput = {
   /** The machine credential, as minted by `mintMachineCredential`. Never logged. */
   credential: string;
+  /** The organisation the caller claims to act for; must equal the stored row's tenant. */
+  claimedOrgId: string;
+};
+
+/** What a Convex function receives from the calling service: the digest, never the credential. */
+export type ConvexMachineCallerDigestInput = {
+  /** `sha256Hex(credential)`, computed at the HTTP boundary: 64 lowercase hex characters. */
+  credentialDigest: string;
   /** The organisation the caller claims to act for; must equal the stored row's tenant. */
   claimedOrgId: string;
 };
@@ -47,8 +74,12 @@ export type MintedMachineCredential = {
 const INVALID_DETAIL = "The machine credential is not valid.";
 
 /**
- * Resolves a machine credential presented as a Convex function argument into
- * its tenant, agent and scopes, or a typed refusal.
+ * Resolves a RAW machine credential into its tenant, agent and scopes, or a
+ * typed refusal. Hashes the credential with `sha256Hex` and runs exactly the
+ * decision of `resolveConvexMachineCallerFromDigest`.
+ *
+ * @security Do not receive the raw credential as a Convex function argument
+ * (see the module note): use `resolveConvexMachineCallerFromDigest`.
  *
  *   - empty or non-string `credential` / `claimedOrgId`: `CREDENTIAL_REFUSED`
  *     `credential-invalid`, without calling the lookup.
@@ -71,18 +102,71 @@ export async function resolveConvexMachineCaller(
     // A programming error in the consumer, not a claim about any caller.
     throw new TypeError("resolveConvexMachineCaller: deps.lookupBySecretHash must be a function.");
   }
-  const door = typeof deps.door === "string" && deps.door !== "" ? deps.door : "resolveConvexMachineCaller";
-  const invalid: ConvexMachineCallerResult = {
-    ok: false,
-    refusal: refusal("CREDENTIAL_REFUSED", "credential-invalid", door, INVALID_DETAIL),
-  };
+  const door = doorOf(deps, "resolveConvexMachineCaller");
 
   const credential: unknown = input?.credential;
   const claimedOrgId: unknown = input?.claimedOrgId;
-  if (typeof credential !== "string" || credential === "") return invalid;
-  if (typeof claimedOrgId !== "string" || claimedOrgId === "") return invalid;
+  if (typeof credential !== "string" || credential === "") return invalidFor(door);
+  if (typeof claimedOrgId !== "string" || claimedOrgId === "") return invalidFor(door);
 
-  const result = await resolvePresentedToken(credential, deps);
+  return decideForOrg(await sha256Hex(credential), claimedOrgId, door, deps);
+}
+
+/**
+ * Resolves the SHA-256 hex DIGEST of a machine credential, received as a
+ * Convex function argument, into its tenant, agent and scopes, or a typed
+ * refusal. The entry point a Convex function uses: the calling service hashes
+ * the credential with `sha256Hex` at its HTTP boundary and sends only the
+ * digest, so a Convex argument-validation error can never echo a usable
+ * credential into an error or a log.
+ *
+ * Same outcomes as `resolveConvexMachineCaller`, through the same code. A
+ * `credentialDigest` that is not 64 lowercase hex characters is refused with
+ * the SAME `CREDENTIAL_REFUSED` `credential-invalid` as a digest that matches
+ * no row, without calling the lookup, so its shape tells a prober nothing.
+ *
+ * @callerResolver — resolves a verified caller; consumers may derive their accepted sinks from this tag.
+ */
+export async function resolveConvexMachineCallerFromDigest(
+  input: ConvexMachineCallerDigestInput,
+  deps: ConvexMachineCallerDeps,
+): Promise<ConvexMachineCallerResult> {
+  if (typeof deps?.lookupBySecretHash !== "function") {
+    // A programming error in the consumer, not a claim about any caller.
+    throw new TypeError("resolveConvexMachineCallerFromDigest: deps.lookupBySecretHash must be a function.");
+  }
+  const door = doorOf(deps, "resolveConvexMachineCallerFromDigest");
+
+  const credentialDigest: unknown = input?.credentialDigest;
+  const claimedOrgId: unknown = input?.claimedOrgId;
+  // A non-string digest is refused here; a string of the wrong shape is
+  // refused inside the shared decision. Both are the same `credential-invalid`
+  // a wrong digest gets, so the digest's shape tells a prober nothing.
+  if (typeof credentialDigest !== "string") return invalidFor(door);
+  if (typeof claimedOrgId !== "string" || claimedOrgId === "") return invalidFor(door);
+
+  return decideForOrg(credentialDigest, claimedOrgId, door, deps);
+}
+
+function doorOf(deps: ConvexMachineCallerDeps, fallback: string): string {
+  return typeof deps.door === "string" && deps.door !== "" ? deps.door : fallback;
+}
+
+function invalidFor(door: string): ConvexMachineCallerResult {
+  return {
+    ok: false,
+    refusal: refusal("CREDENTIAL_REFUSED", "credential-invalid", door, INVALID_DETAIL),
+  };
+}
+
+/** The ONE machine-caller decision, shared by the raw and the digest entry points. */
+async function decideForOrg(
+  credentialDigest: string,
+  claimedOrgId: string,
+  door: string,
+  deps: ConvexMachineCallerDeps,
+): Promise<ConvexMachineCallerResult> {
+  const result = await resolvePresentedDigest(credentialDigest, deps);
   if (!result.ok) {
     if (result.error === "unavailable") {
       return {
@@ -95,7 +179,7 @@ export async function resolveConvexMachineCaller(
         ),
       };
     }
-    return invalid;
+    return invalidFor(door);
   }
 
   const { identity } = result;

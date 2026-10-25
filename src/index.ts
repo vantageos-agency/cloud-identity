@@ -80,6 +80,7 @@ export type {
 // for a presented bearer; consumers must not keep a local variant.
 export {
   validatePresentedBearer,
+  resolvePresentedDigest,
   requireAgentScopedIdentity,
   storedBearerRowSchema,
 } from "./presented-bearer.js";
@@ -97,9 +98,16 @@ export type {
 // 0.21.4 — A service calling Convex: the machine credential travels as a
 // function argument (Convex functions receive no request headers) and is
 // resolved by the same core as `validatePresentedBearer`.
-export { resolveConvexMachineCaller, mintMachineCredential } from "./machine-caller.js";
+// 0.25.0 — the digest entry point: a Convex function receives sha256Hex(credential),
+// never the credential (an argument-validation error echoes every argument).
+export {
+  resolveConvexMachineCaller,
+  resolveConvexMachineCallerFromDigest,
+  mintMachineCredential,
+} from "./machine-caller.js";
 export type {
   ConvexMachineCallerInput,
+  ConvexMachineCallerDigestInput,
   ConvexMachineCallerDeps,
   ConvexMachineCallerResult,
   MintedMachineCredential,

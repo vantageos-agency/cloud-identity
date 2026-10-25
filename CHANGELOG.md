@@ -3,6 +3,20 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.0] - 2026-10-25
+
+Additive: digest entry points for Convex consumers, and the `./machine-caller` subpath. The raw-token functions are unchanged and keep passing their tests.
+
+### Security
+- A raw bearer passed as a Convex function argument leaks: on any argument-validation failure Convex echoes the whole argument object, valid fields included, into the caller's error, and the error is persisted in the deployment log. The docstrings of `resolvePresentedToken`, `resolveConvexMachineCaller` and `ConvexMachineCallerInput` now document the raw-token argument transport as unsafe. Hash at the HTTP boundary with `sha256Hex` and pass the digest.
+
+### Added
+- `resolvePresentedDigest(digestHex, deps)`: resolves the SHA-256 hex digest of a presented token. Same result type as `validatePresentedBearer`.
+- `resolveConvexMachineCallerFromDigest({ credentialDigest, claimedOrgId }, deps)` and `ConvexMachineCallerDigestInput`. Tagged `@callerResolver`.
+- One decision path: the raw-token functions hash and call the same digest decision (lookup, constant-time re-compare, row shape, revocation, expiry). `test/presented-digest.test.ts` pins identical results, refusal reasons and lookup arguments for both paths across nine outcomes.
+- Only a 64-character lowercase hex digest is accepted. Anything else returns the same collapsed refusal as a digest matching no row (`mismatch` / `CREDENTIAL_REFUSED` `credential-invalid`), without a lookup. New internal reason `malformed-digest` for `onRefusal` (type-level note: an exhaustive `switch` over `PresentedBearerInternalReason` gains one case).
+- `./machine-caller` subpath export. Measured with esbuild, importing `resolveConvexMachineCallerFromDigest`: root 816,088 bytes / 33 `@clerk` modules; `./machine-caller` 760,183 bytes / 0 (`test/machine-caller-subpath.test.ts`). Most of the remaining weight is `zod`, which `storedBearerRowSchema` needs.
+
 ## [0.24.0] - 2026-10-25
 
 Additive optionality: neither name list is required any more, so a consumer can remove them and keep only IDs. Every existing test passes unchanged (936/936); 17 new tests pin the new behaviour.

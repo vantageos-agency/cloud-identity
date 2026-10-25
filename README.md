@@ -99,11 +99,15 @@ SHA-256 hex digest). Store ONLY `secretHash`, with `tenantId`, optional
 `credential` to the service once.
 
 **Transport.** Convex functions do not receive request headers, so the
-credential travels as a function ARGUMENT (for example `machineCredential`),
-next to the organisation the service claims to act for. Never log it. Rotate by
-minting a new credential and revoking the old row.
+credential reaches the function as an ARGUMENT, next to the organisation the
+service claims to act for. Since 0.25.0 that argument is the credential's
+DIGEST, never the credential: see "Convex consumers: pass the digest, never
+the token" below. Rotate by minting a new credential and revoking the old row.
 
-**Resolve.** `resolveConvexMachineCaller({ credential, claimedOrgId }, deps)`
+**Resolve.** In a Convex function, `resolveConvexMachineCallerFromDigest({
+credentialDigest, claimedOrgId }, deps)` (`ConvexMachineCallerDigestInput`).
+For a caller that holds the raw credential in-process, outside any Convex
+argument, `resolveConvexMachineCaller({ credential, claimedOrgId }, deps)`
 (`ConvexMachineCallerInput`, `ConvexMachineCallerDeps` = `PresentedBearerDeps`
 plus `door`) returns a `ConvexMachineCallerResult`: `{ ok: true, tenantId,
 agent, scopes }` or `{ ok: false, refusal }`. It runs the same core as
@@ -113,15 +117,17 @@ revocation, expiry). Tagged `@callerResolver`.
 | Outcome | Refusal |
 |---|---|
 | empty or non-string credential or claimed org (lookup not called) | `CREDENTIAL_REFUSED` `credential-invalid` |
+| digest that is not 64 lowercase hex characters (lookup not called) | the same `CREDENTIAL_REFUSED` `credential-invalid` |
 | unknown, revoked, expired, malformed row, stored-digest mismatch | the same `CREDENTIAL_REFUSED` `credential-invalid` |
 | the lookup threw | `RBAC_DENIED` `principal-lookup-failed` (answer "unavailable") |
 | valid credential, row tenant is not the claimed org | `RBAC_DENIED` `other-organisation` |
 
 ```ts
-import { IdentityRefusalError, resolveConvexMachineCaller } from "@vantageos/cloud-identity";
+import { IdentityRefusalError } from "@vantageos/cloud-identity/identity-refusal";
+import { resolveConvexMachineCallerFromDigest } from "@vantageos/cloud-identity/machine-caller";
 
-const r = await resolveConvexMachineCaller(
-  { credential: args.machineCredential, claimedOrgId: args.orgId },
+const r = await resolveConvexMachineCallerFromDigest(
+  { credentialDigest: args.credentialDigest, claimedOrgId: args.orgId },
   {
     door: "engine:world.step",
     lookupBySecretHash: (d) =>
@@ -137,6 +143,65 @@ const tenantId = r.tenantId;
 
 Rejected alternative: a custom JWT provider on Convex auth, because it needs
 the consumer to run a token issuer.
+
+## Convex consumers: pass the digest, never the token
+
+A raw bearer passed as a Convex function argument leaks. Measured: when any
+argument of a Convex call fails its validator, Convex echoes the WHOLE
+argument object, valid fields included, into the caller's error, and that
+error is persisted in the deployment log. One malformed call writes the token
+to a log.
+
+So hash at the HTTP boundary and send only the SHA-256 hex digest (0.25.0):
+
+1. **HTTP boundary** (MCP server, route handler): `sha256Hex(token)` from
+   `@vantageos/cloud-identity/crypto`. It is the same function that produces
+   the stored `secretHash` (and `mintMachineCredential`'s), so the digests
+   agree by construction. Forward the digest; drop the token.
+2. **Convex function**: resolve the digest.
+   - `resolveConvexMachineCallerFromDigest({ credentialDigest, claimedOrgId }, deps)`
+     from `@vantageos/cloud-identity/machine-caller` for a machine caller.
+   - `resolvePresentedDigest(digestHex, deps)` from
+     `@vantageos/cloud-identity/presented-bearer` for a presented bearer; it
+     returns the same `ValidatePresentedBearerResult` as
+     `validatePresentedBearer`.
+
+Both run the one decision the raw-token functions run after hashing: lookup by
+digest, constant-time re-compare of the stored digest, row shape, revocation,
+expiry. The raw-token functions (`validatePresentedBearer`,
+`resolveConvexMachineCaller`) are unchanged; they hash and call the same code,
+and `test/presented-digest.test.ts` pins identical results for every outcome.
+
+Only a 64-character lowercase hex digest is accepted. Anything else is refused
+with the SAME refusal as a well-formed digest that matches no row (`mismatch`,
+or `CREDENTIAL_REFUSED` `credential-invalid`), without a lookup, so the shape
+of the input tells a prober nothing. The consumer's `onRefusal` sink still
+receives the internal reason `malformed-digest`.
+
+A digest is still the key of a live credential: whoever holds it can present
+it to a digest door. Do not log it on purpose. What it does not do is reveal
+the token.
+
+Import from the narrow subpaths in a Convex bundle. The root index re-exports
+the Clerk handshake: measured with esbuild, importing
+`resolveConvexMachineCallerFromDigest` from the root bundles 33 `@clerk`
+modules, from `./machine-caller` none (`test/machine-caller-subpath.test.ts`).
+
+```ts
+// HTTP boundary
+import { sha256Hex } from "@vantageos/cloud-identity/crypto";
+await convex.mutation(api.engine.step, {
+  orgId,
+  credentialDigest: await sha256Hex(credential),
+});
+
+// Convex function: args = { orgId: v.string(), credentialDigest: v.string() }
+import { resolveConvexMachineCallerFromDigest } from "@vantageos/cloud-identity/machine-caller";
+const r = await resolveConvexMachineCallerFromDigest(
+  { credentialDigest: args.credentialDigest, claimedOrgId: args.orgId },
+  { door: "engine:step", lookupBySecretHash: (d) => lookupRow(ctx, d) },
+);
+```
 
 ## Both caller paths, one contract
 
