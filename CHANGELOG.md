@@ -3,6 +3,13 @@
 All notable changes to `@vantageos/cloud-identity` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Additive: one resolver for an agent write made by the fleet service account.
+
+### Added
+- `resolveAgentWriter({ scope, verifiedActor, targetOrgId? }, { principalLookups }, { door? })`, tagged `@callerResolver`, and the `./agent-writer` subpath. It requires the service-account standing (`requireServiceAccountStanding`), a `verifiedActor` of exactly `{ agentId, orgId }`, a claim for the call's target organisation when one is named, and then resolves the agent by ID through `resolveActingPrincipal`. It returns `{ principalId, orgId, kind: "agent" }` or throws `IdentityRefusalError`. It only resolves; the door still writes and compares stored IDs with the resolved IDs. No name takes part, and no new refusal reason is added. `test/agentWrite.test.ts` pins 20 outcomes, including each refusal without a lookup where none is needed.
+
 ## [0.25.0] - 2026-10-25
 
 Additive: digest entry points for Convex consumers, and the `./machine-caller` subpath. The raw-token functions are unchanged and keep passing their tests.

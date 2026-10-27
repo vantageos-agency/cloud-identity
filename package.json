@@ -46,6 +46,10 @@
       "types": "./dist/machine-caller.d.ts",
       "import": "./dist/machine-caller.js"
     },
+    "./agent-writer": {
+      "types": "./dist/agent-writer.d.ts",
+      "import": "./dist/agent-writer.js"
+    },
     "./authorize": {
       "types": "./dist/authorize-flow.d.ts",
       "import": "./dist/authorize-flow.js"

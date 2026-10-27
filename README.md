@@ -1377,6 +1377,46 @@ if (!c.ok) throw toHttpError(c.refusal);
 // c.org, c.principal (kind "agent"), c.owner: a person principal of the same org, or null when no owner was presented
 ```
 
+### The agent behind a service-account write (`/agent-writer`)
+
+The fleet service account calls a Convex mutation on behalf of an agent and
+carries the claim the transport verified: the agent's stored ID and the
+organisation ID it was verified in. `resolveAgentWriter` is the one decision on
+that claim, so a door does not keep a local variant. It resolves the claim to
+the stored agent principal, or throws `IdentityRefusalError`.
+
+```ts
+import { resolveAgentWriter } from "@vantageos/cloud-identity/agent-writer";
+
+const writer = await resolveAgentWriter(
+  { scope, verifiedActor: args.verifiedActor, targetOrgId: scope.orgId },
+  { principalLookups }, // agentById, organisationById, orgKindOf: reads BY ID
+  { door: "debate:postTurn" },
+);
+// writer = { principalId, orgId, kind: "agent" }, read from stored rows.
+// The door still writes, and admits by comparing the stored IDs of the rows
+// it touches with writer.principalId / writer.orgId.
+```
+
+It refuses (`RBAC_DENIED`, naming the door) when:
+
+- the caller is not the fleet service account: a member, the internal opt-in
+  and an operator admin are all refused (`standing-not-allowed`), an unresolved
+  scope is `scope-not-resolved`;
+- `verifiedActor` is absent, or is anything other than exactly `{ agentId, orgId }`:
+  a name beside the IDs refuses it whole (`credential-invalid`);
+- the claim is for another organisation than `targetOrgId`, or the stored agent
+  sits in another organisation than the claim (`other-organisation`);
+- the agent lookup misses, is not supplied, throws, or returns a deactivated or
+  malformed row; or the organisation is not active.
+
+It only resolves: it writes nothing and grants no write. It proves the caller is
+the service account and that the IDs name one live agent of that organisation;
+it cannot prove the transport verified the right agent, so `verifiedActor` must
+be the transport's own result, never a value the end client chose. Tagged
+`@callerResolver`. Types: `AgentWriterClaim`, `AgentWriterInput`,
+`AgentWriterDeps`, `AgentWriterOptions`.
+
 ### Rows in a person's scope, inside the organisation (`/person-scope`)
 
 Organisation isolation answers "which organisation's rows". Inside one
