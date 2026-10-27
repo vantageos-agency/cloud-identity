@@ -180,6 +180,14 @@ export type {
   AgentCallerOptions,
   AgentCallerResult,
 } from "./agent-caller.js";
+// The agent behind a write the fleet service account makes on its behalf.
+export { resolveAgentWriter } from "./agent-writer.js";
+export type {
+  AgentWriterClaim,
+  AgentWriterInput,
+  AgentWriterDeps,
+  AgentWriterOptions,
+} from "./agent-writer.js";
 // Person scope inside an organisation: after organisation isolation
 // (`filterTargetsBelongingTo`), keep the rows whose scope key is in the scope
 // the person presents. Who sees which keys is the consumer's data.
