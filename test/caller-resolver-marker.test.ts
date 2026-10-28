@@ -38,6 +38,7 @@ describe("@callerResolver marker", () => {
         "resolveAgentLink",
         "resolveAgentWriter",
         "resolvePersonalAgent",
+        "resolveAgentWriterFromIdentity",
       ].sort(),
     );
   });
