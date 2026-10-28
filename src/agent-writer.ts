@@ -30,7 +30,8 @@
  */
 
 import { z } from "zod";
-import { IdentityRefusalError, refusal } from "./identity-refusal.js";
+import { IdentityRefusalError, type IdentityRefusalReason, refusal } from "./identity-refusal.js";
+import { type OrgMappingLookups, orgMappingRowSchema } from "./org-by-id.js";
 import {
   type ActingPrincipal,
   type PrincipalLookups,
@@ -135,7 +136,7 @@ async function resolveClaim(
 }
 
 // ---------------------------------------------------------------------------
-// From the transport identity (0.27.0)
+// From the transport (0.27.0)
 // ---------------------------------------------------------------------------
 
 /**
@@ -151,26 +152,22 @@ type Lookup<A extends unknown[], R> = (
   ...args: A
 ) => Promise<R | null | undefined> | R | null | undefined;
 
-/** The two indexed reads the package needs to decide that a verified subject IS the fleet service account. */
+/** The one service-account read: the stored rows carrying a verified subject. */
 export type ServiceAccountIdentityLookups = {
   /** The stored service-account rows carrying `subject` as their auth subject (an indexed read, bounded). */
   serviceAccountsBySubject?: Lookup<[subject: string], readonly ServiceAccountRow[]>;
-  /**
-   * The ID of the service account an organisation's own record names (for
-   * example a column on its mapping row), or null. Read BY organisation ID.
-   * A row its organisation does not name back is not that organisation's
-   * service account, whatever subject it carries.
-   */
-  serviceAccountIdOfOrg?: Lookup<[orgId: string], string>;
+};
+
+/**
+ * The host transport's auth object, as Convex hands it to a function
+ * (`ctx.auth`). The package calls `getUserIdentity()` itself; the host has
+ * verified the token (signature, issuer) before it answers.
+ */
+export type TransportAuth = {
+  getUserIdentity(): Promise<unknown> | unknown;
 };
 
 export type AgentWriterFromIdentityInput = {
-  /**
-   * The identity the host transport verified, exactly as it hands it over: for
-   * a Convex function, the value of `ctx.auth.getUserIdentity()` (or null).
-   * Absent or malformed is refused.
-   */
-  identity: unknown;
   /** The `verifiedActor` claim the transport carried; absent or malformed is refused. */
   verifiedActor: AgentWriterClaim | null | undefined;
   /** The organisation ID the call acts in, when the call names one; the claim must be for it. */
@@ -183,51 +180,93 @@ export type AgentWriterFromIdentityDeps = {
    * account's organisation, which must be the operator's) and `agentById`.
    */
   principalLookups: PrincipalLookups;
-  /** The service-account reads, by verified subject and by organisation ID. */
+  /**
+   * The mapping store, read BY organisation ID (`orgById`, the same adapter
+   * `resolveCallerFromClaims` reads). The row's `serviceAccountId` must name
+   * the service-account row back.
+   */
+  orgLookups: Pick<OrgMappingLookups, "orgById">;
+  /** The service-account read by verified subject. */
   serviceAccountLookups: ServiceAccountIdentityLookups;
 };
 
-function lookupFailed(door: string): IdentityRefusalError {
-  return new IdentityRefusalError(
-    refusal("RBAC_DENIED", "principal-lookup-failed", door, "The service-account lookup was not supplied or failed."),
-  );
+function deny(reason: IdentityRefusalReason, door: string, detail: string): IdentityRefusalError {
+  return new IdentityRefusalError(refusal("RBAC_DENIED", reason, door, detail));
 }
 
 function notTheServiceAccount(door: string): IdentityRefusalError {
-  return new IdentityRefusalError(
-    refusal(
-      "RBAC_DENIED",
-      "standing-not-allowed",
-      door,
-      "Only the fleet service account is allowed here; the verified identity is not it.",
-    ),
+  return deny(
+    "standing-not-allowed",
+    door,
+    "Only the fleet service account is allowed here; the verified identity is not it.",
   );
+}
+
+/** The verified subject, read by the package from the transport. Throws on absence, malformation or failure. */
+async function subjectFromTransport(auth: TransportAuth | null | undefined, door: string): Promise<string> {
+  if (auth === null || typeof auth !== "object" || typeof auth.getUserIdentity !== "function") {
+    throw deny("no-verified-subject", door, "No verified identity was presented.");
+  }
+  let raw: unknown;
+  try {
+    raw = await auth.getUserIdentity();
+  } catch {
+    throw deny("credential-invalid", door, "The transport could not produce a verified identity.");
+  }
+  const identity =
+    raw !== null && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+  return requireSubjectFromIdentity(identity, { door });
+}
+
+/** Whether the organisation's own mapping row (read by its ID) names `serviceAccountId` as its service account. */
+async function orgNamesServiceAccount(
+  orgId: string,
+  serviceAccountId: string,
+  orgLookups: Pick<OrgMappingLookups, "orgById"> | undefined,
+  door: string,
+): Promise<boolean> {
+  const orgById = orgLookups?.orgById;
+  if (typeof orgById !== "function") {
+    throw deny("org-mapping-lookup-failed", door, "The organisation lookup was not supplied or failed.");
+  }
+  let raw: unknown;
+  try {
+    raw = await orgById(orgId);
+  } catch {
+    throw deny("org-mapping-lookup-failed", door, "The organisation lookup was not supplied or failed.");
+  }
+  if (raw === null || raw === undefined) return false;
+  const row = orgMappingRowSchema.safeParse(raw);
+  if (!row.success || row.data.id !== orgId) {
+    throw deny("org-mapping-record-invalid", door, "The organisation record is not a valid record of that organisation.");
+  }
+  return row.data.serviceAccountId === serviceAccountId;
 }
 
 /**
  * Whether the verified subject is the fleet service account, decided from
  * stored rows only: a row carrying the subject, named back by its own
- * organisation, that resolves (`resolveActingPrincipal`) to the `fleet`
- * principal. Throws `IdentityRefusalError` RBAC_DENIED naming the door.
+ * organisation's mapping row, that resolves (`resolveActingPrincipal`) to the
+ * `fleet` principal. Throws `IdentityRefusalError` RBAC_DENIED naming the door.
  */
 async function requireServiceAccountSubject(
   subject: string,
   deps: AgentWriterFromIdentityDeps,
   door: string,
 ): Promise<void> {
-  const look = deps?.serviceAccountLookups;
-  const bySubject = look?.serviceAccountsBySubject;
-  const idOfOrg = look?.serviceAccountIdOfOrg;
-  if (typeof bySubject !== "function" || typeof idOfOrg !== "function") throw lookupFailed(door);
+  const bySubject = deps?.serviceAccountLookups?.serviceAccountsBySubject;
+  const lookupFailed = () =>
+    deny("principal-lookup-failed", door, "The service-account lookup was not supplied or failed.");
+  if (typeof bySubject !== "function") throw lookupFailed();
 
   let rows: unknown;
   try {
     rows = await bySubject(subject);
   } catch {
-    throw lookupFailed(door);
+    throw lookupFailed();
   }
   if (rows === null || rows === undefined) rows = [];
-  if (!Array.isArray(rows)) throw lookupFailed(door);
+  if (!Array.isArray(rows)) throw lookupFailed();
 
   const own = rows.filter(
     (r): r is ServiceAccountRow =>
@@ -239,18 +278,10 @@ async function requireServiceAccountSubject(
   for (const row of own) {
     const orgId = row.orgId;
     if (typeof orgId !== "string" || orgId.length === 0) {
-      last = new IdentityRefusalError(
-        refusal("RBAC_DENIED", "no-verified-organisation", door, "The service account is stamped with no organisation."),
-      );
+      last = deny("no-verified-organisation", door, "The service account is stamped with no organisation.");
       continue;
     }
-    let named: unknown;
-    try {
-      named = await idOfOrg(orgId);
-    } catch {
-      throw lookupFailed(door);
-    }
-    if (named !== row.id) {
+    if (!(await orgNamesServiceAccount(orgId, row.id, deps.orgLookups, door))) {
       last = notTheServiceAccount(door);
       continue;
     }
@@ -274,47 +305,45 @@ async function requireServiceAccountSubject(
 
 /**
  * `resolveAgentWriter`, with the caller's standing decided by the package from
- * the TRANSPORT identity rather than from a scope the consumer resolved. The
- * consumer passes what its host verified (for Convex, `ctx.auth.getUserIdentity()`)
- * and two indexed reads; it resolves no scope of its own for this door.
+ * the TRANSPORT rather than from a scope the consumer resolved. The consumer
+ * passes its host's auth object (for Convex, `ctx.auth`) and never reads the
+ * identity itself; the package calls `getUserIdentity()`.
  *
- *   1. the identity carries a verified subject (`requireSubjectFromIdentity`);
+ *   1. the transport yields a verified subject (`requireSubjectFromIdentity`);
  *   2. that subject is the fleet service account: a stored service-account row
- *      carries it, the row's organisation names that row as its own, and the
- *      row resolves through `resolveActingPrincipal` to the `fleet` principal
- *      (the organisation is the operator's, active, the row active). An org
- *      claim on the identity plays no part: neither upgrade nor downgrade;
+ *      carries it, the row's organisation names that row as its own
+ *      (`orgById(row.orgId).serviceAccountId`), and the row resolves through
+ *      `resolveActingPrincipal` to the `fleet` principal (the operator
+ *      organisation, active, the row active). An org claim on the identity
+ *      plays no part: neither upgrade nor downgrade;
  *   3. then exactly `resolveAgentWriter`'s steps 2 to 4 on the claim.
  *
  * Returns `{ principalId, orgId, kind: "agent" }`, or throws `IdentityRefusalError`
  * RBAC_DENIED naming the door:
  *
- *   - "no-verified-subject"      the identity is absent, not an object, or carries no subject;
+ *   - "no-verified-subject"      no auth object, no identity, or an identity with no subject;
+ *   - "credential-invalid"       `getUserIdentity()` threw (its text is never surfaced);
  *   - "standing-not-allowed"     no service account carries the subject (a member, a person),
  *     its organisation does not name it, or it is not the operator's (a client service account);
- *   - "principal-lookup-failed"  a service-account lookup was not supplied, threw, or answered
- *     something other than a list (its text is never surfaced);
- *   - "principal-inactive" / "no-verified-organisation" / "organisation-not-active" /
- *     "principal-record-invalid"  the service-account row or its organisation does not hold;
+ *   - "principal-lookup-failed"  the subject lookup was not supplied, threw, or answered a non-list;
+ *   - "org-mapping-lookup-failed" / "org-mapping-record-invalid"  the organisation lookup was not
+ *     supplied, threw, or answered a malformed row or a row of another organisation;
+ *   - "principal-inactive" / "no-verified-organisation" / "organisation-not-active"  the
+ *     service-account row or its organisation does not hold;
  *   - then every refusal of `resolveAgentWriter` for the claim.
- *
- * @security the host must have verified the identity (signature, issuer) before
- * handing it over; this function verifies no token itself.
  *
  * @callerResolver — resolves a verified caller; consumers may derive their accepted sinks from this tag.
  */
 export async function resolveAgentWriterFromIdentity(
+  auth: TransportAuth | null | undefined,
   input: AgentWriterFromIdentityInput,
   deps: AgentWriterFromIdentityDeps,
   options?: AgentWriterOptions,
 ): Promise<ActingPrincipal> {
   const door = options?.door ?? "resolveAgentWriterFromIdentity";
-  const raw = input?.identity;
-  const identity =
-    raw !== null && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
-  const subject = requireSubjectFromIdentity(identity, { door });
+  const subject = await subjectFromTransport(auth, door);
 
   await requireServiceAccountSubject(subject, deps, door);
 
-  return resolveClaim(input.verifiedActor, input.targetOrgId, deps.principalLookups, door);
+  return resolveClaim(input?.verifiedActor, input?.targetOrgId, deps.principalLookups, door);
 }
