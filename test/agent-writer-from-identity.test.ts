@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  type ActingPrincipal,
+  type AgentWriterFromIdentityResult,
+  type IdentityRefusal,
   IdentityRefusalError,
   type PrincipalLookups,
   type PrincipalRow,
+  resolveAgentWriter,
   resolveAgentWriterFromIdentity,
   type OrgMappingRow,
   type ServiceAccountIdentityLookups,
@@ -87,19 +91,29 @@ const SVC_IDENTITY = {
   tokenIdentifier: "x|user_svc",
 };
 
-async function refusalOf(p: Promise<unknown>) {
-  try {
-    await p;
-  } catch (e) {
-    expect(e).toBeInstanceOf(IdentityRefusalError);
-    return (e as IdentityRefusalError).refusal;
-  }
-  throw new Error("expected a refusal, the call resolved");
+/**
+ * The resolver RETURNS its refusal (`{ ok: false, refusal }`), like the package's
+ * other `resolve*`; it never throws one. A throw fails the test.
+ */
+async function refusalOf(p: Promise<AgentWriterFromIdentityResult>): Promise<IdentityRefusal> {
+  const r = await p;
+  if (r.ok) throw new Error("expected a refusal, the call resolved");
+  expect(Object.keys(r).sort()).toEqual(["ok", "refusal"]);
+  return r.refusal;
+}
+
+async function principalOf(p: Promise<AgentWriterFromIdentityResult>): Promise<ActingPrincipal> {
+  const r = await p;
+  if (!r.ok) throw new Error(`expected a principal, refused: ${r.refusal.reason}`);
+  expect(Object.keys(r).sort()).toEqual(["ok", "principal"]);
+  return r.principal;
 }
 
 describe("resolveAgentWriterFromIdentity", () => {
   it("GREEN: the service account's transport identity resolves the claim to the stored agent principal", async () => {
-    const principal = await resolveAgentWriterFromIdentity(auth(SVC_IDENTITY), { verifiedActor: CLAIM }, deps());
+    const principal = await principalOf(
+      resolveAgentWriterFromIdentity(auth(SVC_IDENTITY), { verifiedActor: CLAIM }, deps()),
+    );
     expect(principal).toEqual({
       principalId: "agent_a_eta",
       orgId: "org_a",
@@ -108,10 +122,12 @@ describe("resolveAgentWriterFromIdentity", () => {
   });
 
   it("GREEN: the standing is decided by subject; an org claim on the identity neither upgrades nor downgrades it", async () => {
-    const principal = await resolveAgentWriterFromIdentity(
-      auth({ ...SVC_IDENTITY, org_id: "org_a", org_role: "org:member" }),
-      { verifiedActor: CLAIM, targetOrgId: "org_a" },
-      deps(),
+    const principal = await principalOf(
+      resolveAgentWriterFromIdentity(
+        auth({ ...SVC_IDENTITY, org_id: "org_a", org_role: "org:member" }),
+        { verifiedActor: CLAIM, targetOrgId: "org_a" },
+        deps(),
+      ),
     );
     expect(principal.orgId).toBe("org_a");
   });
@@ -120,10 +136,12 @@ describe("resolveAgentWriterFromIdentity", () => {
     const bySubject = vi.fn((subject: string) => SERVICE_ROWS.filter((r) => r.subject === subject));
     const idOfOrg = vi.fn(ORG_BY_ID);
     const agentById = vi.fn((id: string) => AGENTS[id] ?? null);
-    await resolveAgentWriterFromIdentity(
-      auth(SVC_IDENTITY),
-      { verifiedActor: CLAIM },
-      deps({ agentById }, { serviceAccountsBySubject: bySubject }, idOfOrg),
+    await principalOf(
+      resolveAgentWriterFromIdentity(
+        auth(SVC_IDENTITY),
+        { verifiedActor: CLAIM },
+        deps({ agentById }, { serviceAccountsBySubject: bySubject }, idOfOrg),
+      ),
     );
     expect(bySubject).toHaveBeenCalledWith(SVC_SUBJECT);
     expect(idOfOrg).toHaveBeenCalledWith(OP);
@@ -295,7 +313,7 @@ describe("resolveAgentWriterFromIdentity", () => {
         return this.identity;
       },
     };
-    const principal = await resolveAgentWriterFromIdentity(host, { verifiedActor: CLAIM }, deps());
+    const principal = await principalOf(resolveAgentWriterFromIdentity(host, { verifiedActor: CLAIM }, deps()));
     expect(principal.principalId).toBe("agent_a_eta");
   });
 
@@ -403,5 +421,14 @@ describe("resolveAgentWriterFromIdentity", () => {
     expect(r.door).toBe("resolveAgentWriterFromIdentity");
     expect(JSON.stringify(r)).not.toContain("user_alice");
     expect(JSON.stringify(r)).not.toContain("agent_a_eta");
+  });
+
+  it("resolveAgentWriter, beside it, still THROWS its refusal (its 0.26.0 contract is unchanged)", async () => {
+    await expect(
+      resolveAgentWriter(
+        { scope: { isMaster: false, fleetWide: false, orgClerkId: "org_a" }, verifiedActor: CLAIM },
+        { principalLookups: principalLookups() },
+      ),
+    ).rejects.toBeInstanceOf(IdentityRefusalError);
   });
 });
