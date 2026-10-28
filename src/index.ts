@@ -181,12 +181,16 @@ export type {
   AgentCallerResult,
 } from "./agent-caller.js";
 // The agent behind a write the fleet service account makes on its behalf.
-export { resolveAgentWriter } from "./agent-writer.js";
+export { resolveAgentWriter, resolveAgentWriterFromIdentity } from "./agent-writer.js";
 export type {
   AgentWriterClaim,
   AgentWriterInput,
   AgentWriterDeps,
   AgentWriterOptions,
+  AgentWriterFromIdentityInput,
+  AgentWriterFromIdentityDeps,
+  ServiceAccountIdentityLookups,
+  ServiceAccountRow,
 } from "./agent-writer.js";
 // The agent a person acts as: the one active agent that designates them, or the person.
 export { resolvePersonalAgent } from "./personal-agent.js";

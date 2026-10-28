@@ -31,8 +31,14 @@
 
 import { z } from "zod";
 import { IdentityRefusalError, refusal } from "./identity-refusal.js";
-import { type ActingPrincipal, type PrincipalLookups, resolveActingPrincipal } from "./principal-by-id.js";
+import {
+  type ActingPrincipal,
+  type PrincipalLookups,
+  type PrincipalRow,
+  resolveActingPrincipal,
+} from "./principal-by-id.js";
 import { requireServiceAccountStanding } from "./scope-standing.js";
+import { requireSubjectFromIdentity } from "./tenant-from-identity.js";
 
 const verifiedActorSchema = z.strictObject({
   agentId: z.string().min(1),
@@ -90,7 +96,17 @@ export async function resolveAgentWriter(
 
   requireServiceAccountStanding(input?.scope, door);
 
-  const parsed = verifiedActorSchema.safeParse(input?.verifiedActor);
+  return resolveClaim(input?.verifiedActor, input?.targetOrgId, deps?.principalLookups, door);
+}
+
+/** Steps 2 to 4, shared by both entry points once the caller is proven to be the service account. */
+async function resolveClaim(
+  verifiedActor: unknown,
+  target: string | null | undefined,
+  principalLookups: PrincipalLookups,
+  door: string,
+): Promise<ActingPrincipal> {
+  const parsed = verifiedActorSchema.safeParse(verifiedActor);
   if (!parsed.success) {
     throw new IdentityRefusalError(
       refusal("RBAC_DENIED", "credential-invalid", door, "The call carries no verified agent identified by ID."),
@@ -98,7 +114,6 @@ export async function resolveAgentWriter(
   }
   const claim = parsed.data;
 
-  const target = input.targetOrgId;
   if (target !== undefined && target !== null && target !== claim.orgId) {
     throw new IdentityRefusalError(
       refusal(
@@ -112,9 +127,194 @@ export async function resolveAgentWriter(
 
   const resolved = await resolveActingPrincipal(
     { kind: "agent", agentId: claim.agentId, verifiedOrgId: claim.orgId },
-    deps?.principalLookups,
+    principalLookups,
     door,
   );
   if (!resolved.ok) throw new IdentityRefusalError(resolved.refusal);
   return resolved.principal;
+}
+
+// ---------------------------------------------------------------------------
+// From the transport identity (0.27.0)
+// ---------------------------------------------------------------------------
+
+/**
+ * A stored service-account row, as the consumer reads it by the verified
+ * subject: the row's own ID, organisation and active flag (`PrincipalRow`),
+ * and the auth subject the row carries. The package compares `subject`
+ * byte-equal with the verified one, so a row the lookup returns for another
+ * subject is ignored rather than believed.
+ */
+export type ServiceAccountRow = PrincipalRow & { subject: string };
+
+type Lookup<A extends unknown[], R> = (
+  ...args: A
+) => Promise<R | null | undefined> | R | null | undefined;
+
+/** The two indexed reads the package needs to decide that a verified subject IS the fleet service account. */
+export type ServiceAccountIdentityLookups = {
+  /** The stored service-account rows carrying `subject` as their auth subject (an indexed read, bounded). */
+  serviceAccountsBySubject?: Lookup<[subject: string], readonly ServiceAccountRow[]>;
+  /**
+   * The ID of the service account an organisation's own record names (for
+   * example a column on its mapping row), or null. Read BY organisation ID.
+   * A row its organisation does not name back is not that organisation's
+   * service account, whatever subject it carries.
+   */
+  serviceAccountIdOfOrg?: Lookup<[orgId: string], string>;
+};
+
+export type AgentWriterFromIdentityInput = {
+  /**
+   * The identity the host transport verified, exactly as it hands it over: for
+   * a Convex function, the value of `ctx.auth.getUserIdentity()` (or null).
+   * Absent or malformed is refused.
+   */
+  identity: unknown;
+  /** The `verifiedActor` claim the transport carried; absent or malformed is refused. */
+  verifiedActor: AgentWriterClaim | null | undefined;
+  /** The organisation ID the call acts in, when the call names one; the claim must be for it. */
+  targetOrgId?: string | null;
+};
+
+export type AgentWriterFromIdentityDeps = {
+  /**
+   * Indexed reads BY ID. Used: `organisationById`, `orgKindOf` (the service
+   * account's organisation, which must be the operator's) and `agentById`.
+   */
+  principalLookups: PrincipalLookups;
+  /** The service-account reads, by verified subject and by organisation ID. */
+  serviceAccountLookups: ServiceAccountIdentityLookups;
+};
+
+function lookupFailed(door: string): IdentityRefusalError {
+  return new IdentityRefusalError(
+    refusal("RBAC_DENIED", "principal-lookup-failed", door, "The service-account lookup was not supplied or failed."),
+  );
+}
+
+function notTheServiceAccount(door: string): IdentityRefusalError {
+  return new IdentityRefusalError(
+    refusal(
+      "RBAC_DENIED",
+      "standing-not-allowed",
+      door,
+      "Only the fleet service account is allowed here; the verified identity is not it.",
+    ),
+  );
+}
+
+/**
+ * Whether the verified subject is the fleet service account, decided from
+ * stored rows only: a row carrying the subject, named back by its own
+ * organisation, that resolves (`resolveActingPrincipal`) to the `fleet`
+ * principal. Throws `IdentityRefusalError` RBAC_DENIED naming the door.
+ */
+async function requireServiceAccountSubject(
+  subject: string,
+  deps: AgentWriterFromIdentityDeps,
+  door: string,
+): Promise<void> {
+  const look = deps?.serviceAccountLookups;
+  const bySubject = look?.serviceAccountsBySubject;
+  const idOfOrg = look?.serviceAccountIdOfOrg;
+  if (typeof bySubject !== "function" || typeof idOfOrg !== "function") throw lookupFailed(door);
+
+  let rows: unknown;
+  try {
+    rows = await bySubject(subject);
+  } catch {
+    throw lookupFailed(door);
+  }
+  if (rows === null || rows === undefined) rows = [];
+  if (!Array.isArray(rows)) throw lookupFailed(door);
+
+  const own = rows.filter(
+    (r): r is ServiceAccountRow =>
+      r !== null && typeof r === "object" && (r as { subject?: unknown }).subject === subject,
+  );
+  if (own.length === 0) throw notTheServiceAccount(door);
+
+  let last: IdentityRefusalError = notTheServiceAccount(door);
+  for (const row of own) {
+    const orgId = row.orgId;
+    if (typeof orgId !== "string" || orgId.length === 0) {
+      last = new IdentityRefusalError(
+        refusal("RBAC_DENIED", "no-verified-organisation", door, "The service account is stamped with no organisation."),
+      );
+      continue;
+    }
+    let named: unknown;
+    try {
+      named = await idOfOrg(orgId);
+    } catch {
+      throw lookupFailed(door);
+    }
+    if (named !== row.id) {
+      last = notTheServiceAccount(door);
+      continue;
+    }
+    const resolved = await resolveActingPrincipal(
+      { kind: "service", serviceAccountId: row.id },
+      {
+        ...deps.principalLookups,
+        serviceAccountById: (id) => (id === row.id ? row : null),
+      },
+      door,
+    );
+    if (!resolved.ok) {
+      last = new IdentityRefusalError(resolved.refusal);
+      continue;
+    }
+    if (resolved.principal.kind === "fleet" && resolved.principal.principalId === row.id) return;
+    last = notTheServiceAccount(door);
+  }
+  throw last;
+}
+
+/**
+ * `resolveAgentWriter`, with the caller's standing decided by the package from
+ * the TRANSPORT identity rather than from a scope the consumer resolved. The
+ * consumer passes what its host verified (for Convex, `ctx.auth.getUserIdentity()`)
+ * and two indexed reads; it resolves no scope of its own for this door.
+ *
+ *   1. the identity carries a verified subject (`requireSubjectFromIdentity`);
+ *   2. that subject is the fleet service account: a stored service-account row
+ *      carries it, the row's organisation names that row as its own, and the
+ *      row resolves through `resolveActingPrincipal` to the `fleet` principal
+ *      (the organisation is the operator's, active, the row active). An org
+ *      claim on the identity plays no part: neither upgrade nor downgrade;
+ *   3. then exactly `resolveAgentWriter`'s steps 2 to 4 on the claim.
+ *
+ * Returns `{ principalId, orgId, kind: "agent" }`, or throws `IdentityRefusalError`
+ * RBAC_DENIED naming the door:
+ *
+ *   - "no-verified-subject"      the identity is absent, not an object, or carries no subject;
+ *   - "standing-not-allowed"     no service account carries the subject (a member, a person),
+ *     its organisation does not name it, or it is not the operator's (a client service account);
+ *   - "principal-lookup-failed"  a service-account lookup was not supplied, threw, or answered
+ *     something other than a list (its text is never surfaced);
+ *   - "principal-inactive" / "no-verified-organisation" / "organisation-not-active" /
+ *     "principal-record-invalid"  the service-account row or its organisation does not hold;
+ *   - then every refusal of `resolveAgentWriter` for the claim.
+ *
+ * @security the host must have verified the identity (signature, issuer) before
+ * handing it over; this function verifies no token itself.
+ *
+ * @callerResolver — resolves a verified caller; consumers may derive their accepted sinks from this tag.
+ */
+export async function resolveAgentWriterFromIdentity(
+  input: AgentWriterFromIdentityInput,
+  deps: AgentWriterFromIdentityDeps,
+  options?: AgentWriterOptions,
+): Promise<ActingPrincipal> {
+  const door = options?.door ?? "resolveAgentWriterFromIdentity";
+  const raw = input?.identity;
+  const identity =
+    raw !== null && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+  const subject = requireSubjectFromIdentity(identity, { door });
+
+  await requireServiceAccountSubject(subject, deps, door);
+
+  return resolveClaim(input.verifiedActor, input.targetOrgId, deps.principalLookups, door);
 }
