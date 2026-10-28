@@ -1447,25 +1447,26 @@ refusal (`RBAC_DENIED`), and the lookup's text is never surfaced. Tagged
 `PersonalAgentOptions`, `PersonalAgentResult`, `PersonalAgentRow`,
 `PersonalAgentStayReason`.
 #### From the transport identity (`resolveAgentWriterFromIdentity`, 0.27.0)
+#### From the transport (`resolveAgentWriterFromIdentity`, 0.27.0)
 
 `resolveAgentWriter` trusts a `scope` the consumer already resolved. When the
 only way to get that scope is a local resolver, the identity decision is split
-across two layers. `resolveAgentWriterFromIdentity` takes what the host
-transport verified instead (for Convex, `ctx.auth.getUserIdentity()`) and
-decides the service-account standing itself, from two indexed reads:
+across two layers. `resolveAgentWriterFromIdentity` takes the host transport's
+auth object instead (for Convex, `ctx.auth`), calls `getUserIdentity()` itself,
+and decides the service-account standing from stored rows:
 
 ```ts
 import { resolveAgentWriterFromIdentity } from "@vantageos/cloud-identity/agent-writer";
 
 const writer = await resolveAgentWriterFromIdentity(
-  { identity: await ctx.auth.getUserIdentity(), verifiedActor: { agentId, orgId } },
+  ctx.auth, // the consumer never reads the identity itself
+  { verifiedActor: { agentId, orgId } },
   {
     principalLookups, // agentById, organisationById, orgKindOf: reads BY ID
+    orgLookups, // orgById: the mapping row by org ID, carrying `serviceAccountId`
     serviceAccountLookups: {
       // the service-account rows carrying this verified subject: { id, orgId, active, subject }
       serviceAccountsBySubject: (subject) => readServiceRowsBySubject(subject),
-      // the service-account ID the organisation's own record names, or null
-      serviceAccountIdOfOrg: (orgId) => readServiceAccountIdOfOrg(orgId),
     },
   },
   { door: "debate:postTurn" },
@@ -1474,18 +1475,22 @@ const writer = await resolveAgentWriterFromIdentity(
 
 The subject is the fleet service account when a row carries it (compared
 byte-equal; a row for another subject is ignored), the row's organisation names
-that row back, and the row resolves through `resolveActingPrincipal` to the
-`fleet` principal (the operator organisation, active, the row active). An org
-claim on the identity takes no part. Then the claim is resolved exactly as
-`resolveAgentWriter` resolves it.
+that row back (`OrgMappingRow.serviceAccountId`, read through `orgById`), and
+the row resolves through `resolveActingPrincipal` to the `fleet` principal (the
+operator organisation, active, the row active). An org claim on the identity
+takes no part. Then the claim is resolved exactly as `resolveAgentWriter`
+resolves it.
 
-It refuses (`RBAC_DENIED`, naming the door): `no-verified-subject` for an absent
-or malformed identity; `standing-not-allowed` for a member or person, a row its
-organisation does not name, or a client organisation's service account;
-`principal-lookup-failed` when a service-account lookup is missing, throws or
-answers a non-list; the row's own refusals (`principal-inactive`,
-`no-verified-organisation`, `organisation-not-active`); then every
-`resolveAgentWriter` refusal for the claim. Tagged `@callerResolver`. Types:
+It refuses (`RBAC_DENIED`, naming the door): `no-verified-subject` for no auth
+object, no identity or no subject; `credential-invalid` when `getUserIdentity()`
+throws (its text is never surfaced); `standing-not-allowed` for a member or
+person, a row its organisation does not name, or a client organisation's
+service account; `principal-lookup-failed` when the subject lookup is missing,
+throws or answers a non-list; `org-mapping-lookup-failed` /
+`org-mapping-record-invalid` for the organisation lookup; the row's own
+refusals (`principal-inactive`, `no-verified-organisation`,
+`organisation-not-active`); then every `resolveAgentWriter` refusal for the
+claim. Tagged `@callerResolver`. Types: `TransportAuth`,
 `AgentWriterFromIdentityInput`, `AgentWriterFromIdentityDeps`,
 `ServiceAccountIdentityLookups`, `ServiceAccountRow`.
 

@@ -191,6 +191,7 @@ export type {
   AgentWriterFromIdentityDeps,
   ServiceAccountIdentityLookups,
   ServiceAccountRow,
+  TransportAuth,
 } from "./agent-writer.js";
 // The agent a person acts as: the one active agent that designates them, or the person.
 export { resolvePersonalAgent } from "./personal-agent.js";

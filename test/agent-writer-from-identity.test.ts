@@ -307,7 +307,7 @@ describe("resolveAgentWriterFromIdentity", () => {
       },
       "org-mapping-lookup-failed",
     ],
-    ["the organisation lookup is not supplied", undefined, "org-mapping-lookup-failed"],
+    ["the organisation lookup is not supplied", null, "org-mapping-lookup-failed"],
     ["the organisation row is malformed", () => ({ id: OP }), "org-mapping-record-invalid"],
     ["the organisation row is another organisation's", () => orgRow("org_x", "svc_1"), "org-mapping-record-invalid"],
   ])("RED: %s: refused, no lookup text surfaced", async (_n, orgById, reason) => {

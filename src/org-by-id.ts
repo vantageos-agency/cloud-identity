@@ -114,6 +114,13 @@ export const orgMappingRowSchema = z.object({
   allowedAgentIds: z.array(z.string().min(1)).optional(),
   scopes: z.array(z.string()),
   orgKind: z.string().nullish(),
+  /**
+   * The ID of the service account this organisation names as its own (0.27.0),
+   * when the row stores one. Read only by `resolveAgentWriterFromIdentity`: a
+   * service-account row its organisation does not name here is not that
+   * organisation's service account, whatever subject it carries.
+   */
+  serviceAccountId: z.string().min(1).nullish(),
 });
 export type OrgMappingRow = z.input<typeof orgMappingRowSchema>;
 
