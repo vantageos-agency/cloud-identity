@@ -188,6 +188,16 @@ export type {
   AgentWriterDeps,
   AgentWriterOptions,
 } from "./agent-writer.js";
+// The agent a person acts as: the one active agent that designates them, or the person.
+export { resolvePersonalAgent } from "./personal-agent.js";
+export type {
+  PersonalAgentDeps,
+  PersonalAgentInput,
+  PersonalAgentOptions,
+  PersonalAgentResult,
+  PersonalAgentRow,
+  PersonalAgentStayReason,
+} from "./personal-agent.js";
 // Person scope inside an organisation: after organisation isolation
 // (`filterTargetsBelongingTo`), keep the rows whose scope key is in the scope
 // the person presents. Who sees which keys is the consumer's data.

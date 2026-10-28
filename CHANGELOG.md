@@ -5,6 +5,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+Additive: one resolver for the agent a person acts as.
+
+### Added
+- `resolvePersonalAgent({ personId, orgId }, { designatedAgents, principalLookups }, { door? })`, tagged `@callerResolver`, and the `./personal-agent` subpath. A verified person acts as the agent that designates them when EXACTLY ONE active agent of the person's organisation does (the agent row stores the person's ID; the consumer injects the by-ID read of those rows). Zero or only inactive designations (`reason` `none` / `inactive`) and more than one active (`ambiguous`) leave the person as the person: `{ ok: true, actingAs: "person", reason }`. An agent of another organisation, or one designating someone else, is neither selected nor counted. The one selected agent is re-read by ID through `resolveActingPrincipal` and returned as `{ ok: true, actingAs: "agent", principal }`. An absent or throwing lookup, a malformed row or an empty ID is a typed refusal (`{ ok: false, refusal }`, never "the person", its text never surfaced). No new refusal reason. `test/personal-agent.test.ts` pins 18 outcomes.
+
 ## [0.26.0] - 2026-10-27
 
 Additive: one resolver for an agent write made by the fleet service account.

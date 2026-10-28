@@ -70,6 +70,10 @@
       "types": "./dist/oidc.d.ts",
       "import": "./dist/oidc.js"
     },
+    "./personal-agent": {
+      "types": "./dist/personal-agent.d.ts",
+      "import": "./dist/personal-agent.js"
+    },
     "./person-principal": {
       "types": "./dist/person-principal.d.ts",
       "import": "./dist/person-principal.js"
