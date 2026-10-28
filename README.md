@@ -1458,7 +1458,7 @@ and decides the service-account standing from stored rows:
 ```ts
 import { resolveAgentWriterFromIdentity } from "@vantageos/cloud-identity/agent-writer";
 
-const writer = await resolveAgentWriterFromIdentity(
+const w = await resolveAgentWriterFromIdentity(
   ctx.auth, // the consumer never reads the identity itself
   { verifiedActor: { agentId, orgId } },
   {
@@ -1471,7 +1471,13 @@ const writer = await resolveAgentWriterFromIdentity(
   },
   { door: "debate:postTurn" },
 );
+if (!w.ok) throw toHttpError(w.refusal); // the door refuses, the package never throws
+// w.principal = { principalId, orgId, kind: "agent" }
 ```
+
+Unlike `resolveAgentWriter`, which throws, it returns `{ ok: true, principal }`
+or `{ ok: false, refusal }`, like the package's other `resolve*`, so the door
+itself refuses on the absent principal.
 
 The subject is the fleet service account when a row carries it (compared
 byte-equal; a row for another subject is ignored), the row's organisation names
@@ -1481,7 +1487,7 @@ operator organisation, active, the row active). An org claim on the identity
 takes no part. Then the claim is resolved exactly as `resolveAgentWriter`
 resolves it.
 
-It refuses (`RBAC_DENIED`, naming the door): `no-verified-subject` for no auth
+Its refusals (`RBAC_DENIED`, naming the door): `no-verified-subject` for no auth
 object, no identity or no subject; `credential-invalid` when `getUserIdentity()`
 throws (its text is never surfaced); `standing-not-allowed` for a member or
 person, a row its organisation does not name, or a client organisation's
@@ -1491,7 +1497,7 @@ throws or answers a non-list; `org-mapping-lookup-failed` /
 refusals (`principal-inactive`, `no-verified-organisation`,
 `organisation-not-active`); then every `resolveAgentWriter` refusal for the
 claim. Tagged `@callerResolver`. Types: `TransportAuth`,
-`AgentWriterFromIdentityInput`, `AgentWriterFromIdentityDeps`,
+`AgentWriterFromIdentityInput`, `AgentWriterFromIdentityDeps`, `AgentWriterFromIdentityResult`,
 `ServiceAccountIdentityLookups`, `ServiceAccountRow`.
 
 ### Rows in a person's scope, inside the organisation (`/person-scope`)
