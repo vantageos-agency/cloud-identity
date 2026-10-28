@@ -37,6 +37,7 @@ describe("@callerResolver marker", () => {
         "resolveSupportAccess",
         "resolveAgentLink",
         "resolveAgentWriter",
+        "resolvePersonalAgent",
       ].sort(),
     );
   });

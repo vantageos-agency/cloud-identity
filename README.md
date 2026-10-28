@@ -1417,6 +1417,36 @@ be the transport's own result, never a value the end client chose. Tagged
 `@callerResolver`. Types: `AgentWriterClaim`, `AgentWriterInput`,
 `AgentWriterDeps`, `AgentWriterOptions`.
 
+### The agent a person acts as (`/personal-agent`)
+
+An operator may designate one agent of a person's organisation as that person's
+personal agent; the agent row stores the person's ID. `resolvePersonalAgent` is
+the one decision "which principal does this verified person act as". The
+consumer injects the by-ID read of the agents that designate the person.
+
+```ts
+import { resolvePersonalAgent } from "@vantageos/cloud-identity/personal-agent";
+
+const r = await resolvePersonalAgent(
+  { personId: token.userId, orgId: token.orgId }, // the verified token's stored IDs
+  { designatedAgents, principalLookups },         // agent rows by (personId, orgId); agentById, organisationById, orgKindOf
+  { door: "oauth:getAccessTokenByHash" },
+);
+if (!r.ok) throw toHttpError(r.refusal);            // a failed read never becomes "the person"
+// r.actingAs === "agent":  r.principal = { principalId, orgId, kind: "agent" }
+// r.actingAs === "person": r.reason is "none" | "inactive" | "ambiguous"
+```
+
+The person acts as the agent only when EXACTLY ONE active agent of the person's
+organisation designates them. None or only inactive ones, and more than one
+active (ambiguous), leave the person as the person. An agent of another
+organisation, or one that designates someone else, is neither selected nor
+counted. An absent or throwing lookup, a malformed row or an empty ID is a
+refusal (`RBAC_DENIED`), and the lookup's text is never surfaced. Tagged
+`@callerResolver`. Types: `PersonalAgentInput`, `PersonalAgentDeps`,
+`PersonalAgentOptions`, `PersonalAgentResult`, `PersonalAgentRow`,
+`PersonalAgentStayReason`.
+
 ### Rows in a person's scope, inside the organisation (`/person-scope`)
 
 Organisation isolation answers "which organisation's rows". Inside one
