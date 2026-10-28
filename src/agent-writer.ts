@@ -30,7 +30,12 @@
  */
 
 import { z } from "zod";
-import { IdentityRefusalError, type IdentityRefusalReason, refusal } from "./identity-refusal.js";
+import {
+  type IdentityRefusal,
+  IdentityRefusalError,
+  type IdentityRefusalReason,
+  refusal,
+} from "./identity-refusal.js";
 import { type OrgMappingLookups, orgMappingRowSchema } from "./org-by-id.js";
 import {
   type ActingPrincipal,
@@ -303,6 +308,11 @@ async function requireServiceAccountSubject(
   throw last;
 }
 
+/** The result of `resolveAgentWriterFromIdentity`: the stored agent principal, or the refusal. */
+export type AgentWriterFromIdentityResult =
+  | { ok: true; principal: ActingPrincipal }
+  | { ok: false; refusal: IdentityRefusal };
+
 /**
  * `resolveAgentWriter`, with the caller's standing decided by the package from
  * the TRANSPORT rather than from a scope the consumer resolved. The consumer
@@ -318,8 +328,9 @@ async function requireServiceAccountSubject(
  *      plays no part: neither upgrade nor downgrade;
  *   3. then exactly `resolveAgentWriter`'s steps 2 to 4 on the claim.
  *
- * Returns `{ principalId, orgId, kind: "agent" }`, or throws `IdentityRefusalError`
- * RBAC_DENIED naming the door:
+ * Returns `{ ok: true, principal }` with `principal = { principalId, orgId, kind: "agent" }`,
+ * or `{ ok: false, refusal }`, a RBAC_DENIED refusal naming the door; it never throws a
+ * refusal (unlike `resolveAgentWriter`, which keeps its throwing contract). Reasons:
  *
  *   - "no-verified-subject"      no auth object, no identity, or an identity with no subject;
  *   - "credential-invalid"       `getUserIdentity()` threw (its text is never surfaced);
@@ -339,11 +350,17 @@ export async function resolveAgentWriterFromIdentity(
   input: AgentWriterFromIdentityInput,
   deps: AgentWriterFromIdentityDeps,
   options?: AgentWriterOptions,
-): Promise<ActingPrincipal> {
+): Promise<AgentWriterFromIdentityResult> {
   const door = options?.door ?? "resolveAgentWriterFromIdentity";
-  const subject = await subjectFromTransport(auth, door);
-
-  await requireServiceAccountSubject(subject, deps, door);
-
-  return resolveClaim(input?.verifiedActor, input?.targetOrgId, deps.principalLookups, door);
+  try {
+    const subject = await subjectFromTransport(auth, door);
+    await requireServiceAccountSubject(subject, deps, door);
+    const principal = await resolveClaim(input?.verifiedActor, input?.targetOrgId, deps?.principalLookups, door);
+    return { ok: true, principal };
+  } catch (err) {
+    // Every step refuses by an IdentityRefusalError built here; anything else is a
+    // programming error and propagates unchanged.
+    if (err instanceof IdentityRefusalError) return { ok: false, refusal: err.refusal };
+    throw err;
+  }
 }

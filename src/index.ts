@@ -189,6 +189,7 @@ export type {
   AgentWriterOptions,
   AgentWriterFromIdentityInput,
   AgentWriterFromIdentityDeps,
+  AgentWriterFromIdentityResult,
   ServiceAccountIdentityLookups,
   ServiceAccountRow,
   TransportAuth,
