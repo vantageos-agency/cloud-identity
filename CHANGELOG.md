@@ -9,6 +9,13 @@ Additive: one resolver for the agent a person acts as.
 
 ### Added
 - `resolvePersonalAgent({ personId, orgId }, { designatedAgents, principalLookups }, { door? })`, tagged `@callerResolver`, and the `./personal-agent` subpath. A verified person acts as the agent that designates them when EXACTLY ONE active agent of the person's organisation does (the agent row stores the person's ID; the consumer injects the by-ID read of those rows). Zero or only inactive designations (`reason` `none` / `inactive`) and more than one active (`ambiguous`) leave the person as the person: `{ ok: true, actingAs: "person", reason }`. An agent of another organisation, or one designating someone else, is neither selected nor counted. The one selected agent is re-read by ID through `resolveActingPrincipal` and returned as `{ ok: true, actingAs: "agent", principal }`. An absent or throwing lookup, a malformed row or an empty ID is a typed refusal (`{ ok: false, refusal }`, never "the person", its text never surfaced). No new refusal reason. `test/personal-agent.test.ts` pins 18 outcomes.
+## [0.27.0] - 2026-10-28
+
+Additive: the agent-writer decision can take the transport identity instead of a consumer-resolved scope. `resolveAgentWriter` is unchanged.
+
+### Added
+- `resolveAgentWriterFromIdentity({ identity, verifiedActor, targetOrgId? }, { principalLookups, serviceAccountLookups }, { door? })`, tagged `@callerResolver`, on the root and the `./agent-writer` subpath. `identity` is the host-verified identity record (for Convex, `ctx.auth.getUserIdentity()`). The package decides the service-account standing itself: the verified subject (`requireSubjectFromIdentity`), the stored service-account rows carrying that subject (`serviceAccountsBySubject`, subject compared byte-equal), the row named back by its own organisation (`serviceAccountIdOfOrg`), and the row resolved by `resolveActingPrincipal` to the `fleet` principal. An org claim on the identity takes no part. The claim is then resolved by the same code path as `resolveAgentWriter`. No new refusal reason is added. `test/agent-writer-from-identity.test.ts` pins 27 outcomes.
+- Types `AgentWriterFromIdentityInput`, `AgentWriterFromIdentityDeps`, `ServiceAccountIdentityLookups`, `ServiceAccountRow`.
 
 ## [0.26.0] - 2026-10-27
 
