@@ -651,7 +651,9 @@ const mayWrite = resolveWriterRole({
 - `orgMappingRowSchema` / `ResolvedOrg` also carry `addressableFleetCoordinatorIds`
   (0.29.0), the client organisation's roster of operator agent IDs; read it in
   your `RecipientLookups.rosterOf`.
-- `resolvePersonTenantAccess` is a strict equality on the organisation; an
+- `resolvePersonTenantAccess` is a strict equality on the organisation: on
+  `principal.orgId` when the principal carries one (0.29.0; pass the row's org ID
+  as `rowOrgId`, a slug never matches), else on the slug (legacy). An
   unstamped row is refused.
 - `resolveWriterRole` / `requireWriterRole` check the verified role against a
   writer allowlist you hold as data. A missing role, a missing list and an

@@ -7,7 +7,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [0.29.0] - 2026-10-29
 
-Additive: the person principal can select its organisation by permanent ID, and the mapping row exposes the roster of addressable fleet coordinators. Every existing test passes unchanged (1091/1091); 27 new tests pin the new behaviour.
+Additive: the person principal can select its organisation by permanent ID, and the mapping row exposes the roster of addressable fleet coordinators. Every existing test passes unchanged (1091/1091); 33 new tests pin the new behaviour.
 
 ### Added
 - `PersonTokenRecord.orgId` (optional, nullish): the organisation's permanent ID. A present non-string or empty value makes the record malformed (`person-token-not-live`), like `serviceAccountId` in 0.27.0. `PersonPrincipal.orgId` is returned when the ID path was taken.
@@ -15,7 +15,8 @@ Additive: the person principal can select its organisation by permanent ID, and 
 - `orgMappingRowSchema.addressableFleetCoordinatorIds` (optional, non-empty strings) and `ResolvedOrg.addressableFleetCoordinatorIds`, exposed when the row has it (an empty list stays empty, absent stays absent), like `allowedAgentIds`. A present but malformed list refuses the row (`org-mapping-record-invalid`). The package builds no roster itself: `RecipientLookups.rosterOf` stays the consumer's, which reads this field. `test/org-mapping-coordinators.test.ts`.
 
 ### Changed
-- `PersonPrincipalDeps.lookupOrganisation` is optional (type-level): absent, the slug path refuses `org-not-active`. `PersonPrincipal.orgSlug` is `""` when the token carried only an `orgId`.
+- `resolvePersonTenantAccess` compares by ID when the principal carries `orgId`: the row's `rowOrgId` stamp must equal it and a slug never matches. A principal with no `orgId` keeps the slug comparison (legacy). A missing, empty or non-equal stamp is refused with the existing reason `other-organisation`. `test/person-org-id.test.ts`.
+- `PersonPrincipalDeps.lookupOrganisation` is optional (type-level): absent, the slug path refuses `org-not-active`. `PersonPrincipal.orgSlug` is `""` when the token carried only an `orgId`; `resolvePersonTenantAccess` handles that principal by ID.
 
 ## [0.28.0] - 2026-10-29
 
