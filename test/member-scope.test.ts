@@ -32,7 +32,6 @@ describe("memberScopeFrom — pole: a well-formed org and actor build the member
         userId: "user_1",
         orgSlug: "acme-hr",
         orgClerkId: "org_A",
-        allowedOrchestrators: ["alpha"],
         allowedAgentIds: ["agent_1", "agent_2"],
         fleetWide: false,
         scopes: ["tasks:read", "tasks:write"],
@@ -40,6 +39,11 @@ describe("memberScopeFrom — pole: a well-formed org and actor build the member
         orgRole: "org:admin",
       },
     });
+  });
+
+  it("declared divergence: the legacy NAME roster is never copied into the scope", () => {
+    const r = memberScopeFrom(ORG, { userId: "user_1" }, { door: DOOR });
+    expect(r.ok && "allowedOrchestrators" in r.scope).toBe(false);
   });
 
   it("is a 'member' standing for scopeStanding", () => {
@@ -56,7 +60,6 @@ describe("memberScopeFrom — pole: a well-formed org and actor build the member
     const bare: ResolvedOrg = { id: "org_B", label: "b", scopes: [], orgKind: null };
     const r = memberScopeFrom(bare, { userId: "u" }, { door: DOOR });
     expect(r.ok && r.scope.allowedAgentIds).toEqual([]);
-    expect(r.ok && r.scope.allowedOrchestrators).toEqual([]);
   });
 
   it("copies the lists: mutating the scope does not mutate the resolved org", () => {

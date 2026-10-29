@@ -5,6 +5,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-29
+
+Additive: the member scope is built by the package, and the writer-role list can be chosen per organisation with a fleet default. Every existing test passes unchanged.
+
+### Added
+- `memberScopeFrom(org, { userId, orgRole?, orgId? }, { door? })` and `memberScopeOfPerson(org, principal, { door? })`, and the `./member-scope` subpath, also on the root. They return `{ ok: true, scope }` or `{ ok: false, refusal }`; the scope (`MemberScope`) is `userId`, `orgSlug` (label), `orgClerkId` (permanent ID), `allowedAgentIds`, `scopes`, `fleetWide: false`, `isMaster: false` and `orgRole` when verified; `scopeStanding` reads it as `"member"`. Refusals use existing reasons: `org-mapping-record-invalid`, `no-verified-subject`, `other-organisation` (actor's `orgId` compared to the row's by ID). Declared divergence: no `allowedOrchestrators` (legacy name roster; no export takes a name). Types `MemberScope`, `MemberScopeOrg`, `MemberActor`, `MemberScopeOptions`, `MemberScopeResult`. `test/member-scope.test.ts`.
+- `selectWriterRoles(orgRoles, fleetDefaultRoles)` and `resolveWriterRoleForOrg({ role, orgRoles, fleetDefaultRoles, door, orgSlug? })`. The organisation's list wins (an empty one too), else the fleet default, else none; none refuses every role (`role-not-writer`). A malformed list selects itself with no roles and never falls through. `resolveWriterRole` / `requireWriterRole` are unchanged: they take one list and cannot tell "no row" from "empty row". Types `WriterRoleListSource`, `SelectedWriterRoles`. `test/writer-role-list.test.ts`.
+
 ## [0.29.0] - 2026-10-29
 
 Additive: the person principal can select its organisation by permanent ID, and the mapping row exposes the roster of addressable fleet coordinators. Every existing test passes unchanged (1091/1091); 33 new tests pin the new behaviour.

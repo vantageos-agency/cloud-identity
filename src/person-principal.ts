@@ -488,3 +488,71 @@ export function requireWriterRole(input: WriterRoleInput): void {
   const r = resolveWriterRole(input);
   if (!r.ok) throw new PersonRefusalError(r.refusal);
 }
+
+// ---------------------------------------------------------------------------
+// 4b. Writer-role list per organisation, with a fleet default (0.30.0)
+// ---------------------------------------------------------------------------
+
+/** Where the selected writer-role list came from. */
+export type WriterRoleListSource = "org" | "fleet-default" | "none";
+
+export type SelectedWriterRoles = {
+  source: WriterRoleListSource;
+  /** A copy; `[]` for "none" and for any list that was malformed. */
+  roles: string[];
+};
+
+function wellFormedRoles(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  if (!list.every((r) => typeof r === "string" && r.length > 0)) return [];
+  return [...list];
+}
+
+/**
+ * Selects the writer-role list that applies to an organisation, from data the
+ * consumer read (the package reads no store):
+ *   1. `orgRoles` present (even an empty array): that list. An organisation's
+ *      empty list means nobody writes there; it never falls back to the default;
+ *   2. else `fleetDefaultRoles` present: the fleet default;
+ *   3. else `source: "none"` with no roles.
+ * A list that is present but not an array of non-empty strings selects itself
+ * with NO roles: a malformed organisation list is never rescued by the default.
+ */
+export function selectWriterRoles(
+  orgRoles: readonly string[] | null | undefined,
+  fleetDefaultRoles: readonly string[] | null | undefined,
+): SelectedWriterRoles {
+  if (orgRoles !== undefined && orgRoles !== null) {
+    return { source: "org", roles: wellFormedRoles(orgRoles) };
+  }
+  if (fleetDefaultRoles !== undefined && fleetDefaultRoles !== null) {
+    return { source: "fleet-default", roles: wellFormedRoles(fleetDefaultRoles) };
+  }
+  return { source: "none", roles: [] };
+}
+
+type WriterRoleForOrgInput = {
+  /** The VERIFIED role claim of the token. Absent or null is refused. */
+  role: string | null | undefined;
+  /** The organisation's own list, when the consumer's store has a row for it. */
+  orgRoles: readonly string[] | null | undefined;
+  /** The fleet default list, when the consumer's store has one. */
+  fleetDefaultRoles: readonly string[] | null | undefined;
+  door: string;
+  orgSlug?: string | null;
+};
+
+/**
+ * {@link resolveWriterRole} over the list {@link selectWriterRoles} selects:
+ * the organisation's list, else the fleet default, else none (which refuses
+ * every role). Non-throwing; the refusal is `role-not-writer`.
+ */
+export function resolveWriterRoleForOrg(input: WriterRoleForOrgInput): PersonAccessResult {
+  const { roles } = selectWriterRoles(input.orgRoles, input.fleetDefaultRoles);
+  return resolveWriterRole({
+    role: input.role,
+    writerRoles: roles,
+    door: input.door,
+    ...(input.orgSlug !== undefined ? { orgSlug: input.orgSlug } : {}),
+  });
+}
