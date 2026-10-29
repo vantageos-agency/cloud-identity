@@ -5,6 +5,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-29
+
+Additive: the person principal can select its organisation by permanent ID, and the mapping row exposes the roster of addressable fleet coordinators. Every existing test passes unchanged (1091/1091); 27 new tests pin the new behaviour.
+
+### Added
+- `PersonTokenRecord.orgId` (optional, nullish): the organisation's permanent ID. A present non-string or empty value makes the record malformed (`person-token-not-live`), like `serviceAccountId` in 0.27.0. `PersonPrincipal.orgId` is returned when the ID path was taken.
+- `PersonPrincipalDeps.lookupOrganisationById(orgId)` and `PersonPrincipalDeps.organisationId(organisation)`. When the record carries `orgId` AND the deps carry the ID lookup, `resolvePersonPrincipal` uses the ID path only: a miss or an inactive organisation is refused `org-not-active` and the slug never rescues it. Otherwise the slug path runs, unchanged, and is now declared legacy. When the record carries both `orgId` and `orgSlug`, the slug is looked up only to check it names the same organisation; a different one (or one whose ID cannot be read through `organisationId`) is refused with the existing reason `other-organisation`. A slug that names nothing is not a mismatch (a label may be renamed away). No new refusal reason. `test/person-org-id.test.ts`.
+- `orgMappingRowSchema.addressableFleetCoordinatorIds` (optional, non-empty strings) and `ResolvedOrg.addressableFleetCoordinatorIds`, exposed when the row has it (an empty list stays empty, absent stays absent), like `allowedAgentIds`. A present but malformed list refuses the row (`org-mapping-record-invalid`). The package builds no roster itself: `RecipientLookups.rosterOf` stays the consumer's, which reads this field. `test/org-mapping-coordinators.test.ts`.
+
+### Changed
+- `PersonPrincipalDeps.lookupOrganisation` is optional (type-level): absent, the slug path refuses `org-not-active`. `PersonPrincipal.orgSlug` is `""` when the token carried only an `orgId`.
+
 ## [0.28.0] - 2026-10-29
 
 Additive: a generic HMAC-SHA256 body-signature verifier, and two refusal reasons. Existing reasons and functions are unchanged.
