@@ -112,6 +112,12 @@ export const orgMappingRowSchema = z.object({
   active: z.boolean(),
   allowedOrchestrators: z.array(z.string()).optional(),
   allowedAgentIds: z.array(z.string().min(1)).optional(),
+  /**
+   * The roster of operator-organisation agent IDs this (client) organisation
+   * stores as reachable (0.29.0). Exposed on `ResolvedOrg`; the package builds
+   * no roster from it: a consumer's `RecipientLookups.rosterOf` reads it.
+   */
+  addressableFleetCoordinatorIds: z.array(z.string().min(1)).optional(),
   scopes: z.array(z.string()),
   orgKind: z.string().nullish(),
   /**
@@ -181,6 +187,11 @@ export type ResolvedOrg = {
    * roster: nothing is admitted by it.
    */
   allowedAgentIds?: string[];
+  /**
+   * The mapping row's roster of addressable fleet-coordinator agent IDs (0.29.0),
+   * present when the row has one (an empty list is returned as empty).
+   */
+  addressableFleetCoordinatorIds?: string[];
   scopes: string[];
   orgKind: OrgKind | null;
 };
@@ -239,6 +250,9 @@ export async function resolveOrgFromClaim(
           ? { allowedOrchestrators: row.allowedOrchestrators }
           : {}),
         ...(row.allowedAgentIds !== undefined ? { allowedAgentIds: row.allowedAgentIds } : {}),
+        ...(row.addressableFleetCoordinatorIds !== undefined
+          ? { addressableFleetCoordinatorIds: row.addressableFleetCoordinatorIds }
+          : {}),
         scopes: row.scopes,
         orgKind: kindOf(row.orgKind),
       },

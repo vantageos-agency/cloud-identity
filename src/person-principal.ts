@@ -129,7 +129,13 @@ export function isPersonActorName(name: string): boolean {
 export const personTokenRecordSchema = z.object({
   principal: z.string().optional(),
   subject: z.string(),
+  /** The organisation's LABEL the token was minted under. Legacy selector. */
   orgSlug: z.string().optional(),
+  /**
+   * The organisation's permanent ID (0.29.0). Optional and nullish; a present
+   * non-string or empty value makes the record malformed (`person-token-not-live`).
+   */
+  orgId: z.string().min(1).nullish(),
   orgRole: z.string().optional(),
   revokedAt: z.number().optional(),
   expiresAt: z.number(),
@@ -139,7 +145,13 @@ export type PersonTokenRecord = z.input<typeof personTokenRecordSchema>;
 /** A verified person: who, in which organisation, with which role. */
 export type PersonPrincipal = {
   subject: string;
+  /**
+   * The organisation label. Empty string when the token carried only an
+   * `orgId` (ID path): a label is display text and is never invented here.
+   */
   orgSlug: string;
+  /** The organisation's permanent ID, present when the token carried one (0.29.0). */
+  orgId?: string;
   /** Present only when the token carries a verified role. Never defaulted. */
   orgRole?: string;
   /** "user:<subject>" — the name this person acts under. */
@@ -152,8 +164,25 @@ export type OrganisationState = { isActive: boolean };
 export type PersonPrincipalDeps<O extends OrganisationState> = {
   /** Epoch milliseconds, supplied by the caller so the decision is pure. */
   now: number;
-  /** Resolves the organisation row for a slug; null when unmapped. */
-  lookupOrganisation: (orgSlug: string) => Promise<O | null>;
+  /**
+   * LEGACY. Resolves the organisation row for a slug (a renamable label); null
+   * when unmapped. Used only when the token record carries no `orgId`, or the
+   * deps carry no `lookupOrganisationById`. Absent: that path refuses.
+   */
+  lookupOrganisation?: (orgSlug: string) => Promise<O | null>;
+  /**
+   * Resolves the organisation row for a permanent ID (0.29.0); null when
+   * unmapped. When the token record carries an `orgId` AND this is supplied,
+   * it is the ONLY lookup that selects the organisation.
+   */
+  lookupOrganisationById?: (orgId: string) => Promise<O | null>;
+  /**
+   * Reads the permanent ID of an organisation row (0.29.0). Needed only to
+   * check that a record's `orgSlug` and `orgId` name the same organisation, and
+   * to check the ID lookup answered the organisation asked for. Absent where it
+   * is needed: refused (`other-organisation`), never guessed.
+   */
+  organisationId?: (organisation: O) => string | null | undefined;
 };
 
 export type PersonPrincipalResult<O extends OrganisationState> =
@@ -165,6 +194,17 @@ export type PersonPrincipalResult<O extends OrganisationState> =
  * the token is live (present, unrevoked, unexpired); it acts for a PERSON;
  * it is bound to an organisation; that organisation exists and is active.
  * The only organisation ever looked up is the token's own.
+ *
+ * Which lookup selects the organisation (0.29.0):
+ *   - the record carries `orgId` AND `deps.lookupOrganisationById` exists: the
+ *     ID path ONLY. A miss or an inactive organisation there is a refusal; the
+ *     slug is never used to rescue it. If the record also carries `orgSlug`
+ *     and `deps.lookupOrganisation` exists, the slug is looked up solely to
+ *     check it names the same organisation; a different one is refused
+ *     `other-organisation` (a slug that names nothing is not a mismatch: the
+ *     ID is authoritative and a label may have been renamed away);
+ *   - otherwise the slug path, LEGACY and unchanged: a label is renamable
+ *     display text, so prefer tokens that carry `orgId`.
  *
  * @callerResolver — resolves a verified caller; consumers may derive their accepted sinks from this tag.
  */
@@ -196,23 +236,59 @@ export async function resolvePersonPrincipal<O extends OrganisationState>(
       "verifiedPerson names a token that does not act for a person",
     );
   }
+  const orgId = row.orgId ?? undefined;
   const orgSlug = row.orgSlug;
-  if (orgSlug === undefined || orgSlug === "") {
+  const byId = orgId !== undefined && typeof deps.lookupOrganisationById === "function";
+  if (!byId && (orgSlug === undefined || orgSlug === "")) {
     return deny("person-token-no-org", "the person's token is bound to no organisation");
   }
-  const organisation = await deps.lookupOrganisation(orgSlug);
-  if (organisation === null || !organisation.isActive) {
-    return deny(
-      "org-not-active",
-      `Org "${orgSlug}" not in client_org_mapping or inactive`,
-    );
+  let organisation: O | null;
+  if (byId) {
+    organisation = await deps.lookupOrganisationById!(orgId!);
+    if (organisation === null || !organisation.isActive) {
+      return deny(
+        "org-not-active",
+        `Org "${orgId}" not in client_org_mapping or inactive`,
+      );
+    }
+    const idOf = deps.organisationId;
+    // The ID lookup must have answered the organisation asked for. Checked
+    // whenever the ID can be read from a row.
+    if (typeof idOf === "function" && idOf(organisation) !== orgId) {
+      return deny(
+        "other-organisation",
+        "the organisation found is not the one the token names",
+      );
+    }
+    if (orgSlug !== undefined && orgSlug !== "" && typeof deps.lookupOrganisation === "function") {
+      // The slug is looked up ONLY to prove it names the same organisation.
+      const bySlug = await deps.lookupOrganisation(orgSlug);
+      if (bySlug !== null && (typeof idOf !== "function" || idOf(bySlug) !== orgId)) {
+        return deny(
+          "other-organisation",
+          "the token's organisation ID and label name different organisations",
+        );
+      }
+    }
+  } else {
+    if (typeof deps.lookupOrganisation !== "function") {
+      return deny("org-not-active", `Org "${orgSlug}" not in client_org_mapping or inactive`);
+    }
+    organisation = await deps.lookupOrganisation(orgSlug!);
+    if (organisation === null || !organisation.isActive) {
+      return deny(
+        "org-not-active",
+        `Org "${orgSlug}" not in client_org_mapping or inactive`,
+      );
+    }
   }
   return {
     ok: true,
     organisation,
     principal: {
       subject: row.subject,
-      orgSlug,
+      orgSlug: orgSlug ?? "",
+      ...(byId ? { orgId: orgId! } : {}),
       ...(row.orgRole !== undefined ? { orgRole: row.orgRole } : {}),
       actor: personActorName(row.subject),
     },
