@@ -215,3 +215,45 @@ describe("resolvePersonPrincipal — organisation by ID (0.29.0)", () => {
     expect(r.refusal.reason).toBe("org-not-active");
   });
 });
+
+import { resolvePersonTenantAccess, type PersonPrincipal } from "../src/person-principal.js";
+
+describe("resolvePersonTenantAccess — by ID when the principal carries orgId (0.29.0)", () => {
+  const idOnly: PersonPrincipal = {
+    subject: "user_alice",
+    orgSlug: "",
+    orgId: "org_A",
+    actor: "user:user_alice",
+  };
+  const both: PersonPrincipal = { ...idOnly, orgSlug: "org-a" };
+  const legacy: PersonPrincipal = {
+    subject: "user_alice",
+    orgSlug: "org-a",
+    actor: "user:user_alice",
+  };
+  const t = (principal: PersonPrincipal, rowOrgId: string | null | undefined) =>
+    resolvePersonTenantAccess({ principal, rowOrgId, door: DOOR });
+
+  it("an ID-only principal is admitted on its own organisation's row", () => {
+    expect(t(idOnly, "org_A")).toEqual({ ok: true });
+  });
+  it("refused on another organisation's row", () => {
+    const r = t(idOnly, "org_B");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.refusal.reason).toBe("other-organisation");
+  });
+  it("refused on a row that only carries a slug", () => {
+    expect(t(idOnly, "org-a").ok).toBe(false);
+  });
+  it("a principal with orgId AND a slug never matches on the slug alone", () => {
+    expect(t(both, "org-a").ok).toBe(false);
+    expect(t(both, "org_A")).toEqual({ ok: true });
+  });
+  it("an unstamped row is refused for an ID principal", () => {
+    for (const v of [undefined, null, ""]) expect(t(idOnly, v).ok).toBe(false);
+  });
+  it("a slug-only principal is unchanged", () => {
+    expect(t(legacy, "org-a")).toEqual({ ok: true });
+    expect(t(legacy, "org_A").ok).toBe(false);
+  });
+});
