@@ -107,7 +107,10 @@ export type IdentityRefusalReason =
   | "webhook-headers-missing"
   | "webhook-timestamp-out-of-window"
   | "webhook-signature-mismatch"
-  | "membership-event-invalid";
+  | "membership-event-invalid"
+  // acting principal and member-writer doors (0.28.0)
+  | "assignee-not-an-agent-of-org"
+  | "no-organisation";
 
 export type IdentityRefusal = {
   code: IdentityRefusalCode;

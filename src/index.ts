@@ -464,6 +464,14 @@ export {
   membershipPersonLookups,
   planMembershipReconcile,
 } from "./membership-sync.js";
+// 0.28.0 — generic HMAC-SHA256 body-signature verification (Web Crypto, constant time).
+export { verifyHmacSha256Signature } from "./hmac-signature.js";
+export type {
+  HmacSignatureEncoding,
+  HmacSignatureDelivery,
+  VerifyHmacSha256SignatureOptions,
+  VerifyHmacSha256SignatureResult,
+} from "./hmac-signature.js";
 export type {
   SvixDelivery,
   VerifySvixWebhookOptions,
