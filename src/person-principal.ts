@@ -420,7 +420,8 @@ export type PersonAccessResult = { ok: true } | { ok: false; refusal: PersonRefu
 
 /**
  * A row is reachable only when its organisation stamp EQUALS the person's
- * organisation. An absent or empty stamp never equals a resolved organisation,
+ * organisation: the permanent `orgId` when the principal carries one (0.29.0;
+ * the slug never matches then), the slug otherwise (legacy). An absent or empty stamp never equals a resolved organisation,
  * so an unstamped row is refused.
  */
 export function resolvePersonTenantAccess(input: {
@@ -429,7 +430,11 @@ export function resolvePersonTenantAccess(input: {
   door: string;
 }): PersonAccessResult {
   const { principal, rowOrgId, door } = input;
-  if (typeof rowOrgId === "string" && rowOrgId !== "" && rowOrgId === principal.orgSlug) {
+  // A principal carrying `orgId` is compared by ID ONLY: the row's stamp must
+  // equal it, and the slug never matches. The slug comparison is LEGACY, for a
+  // principal with no `orgId`.
+  const expected = principal.orgId !== undefined ? principal.orgId : principal.orgSlug;
+  if (typeof rowOrgId === "string" && rowOrgId !== "" && rowOrgId === expected) {
     return { ok: true };
   }
   return {
