@@ -259,6 +259,8 @@ export {
   resolvePersonTenantAccess,
   resolveWriterRole,
   requireWriterRole,
+  selectWriterRoles,
+  resolveWriterRoleForOrg,
 } from "./person-principal.js";
 export type {
   PersonRefusal,
@@ -271,7 +273,20 @@ export type {
   PersonPrincipalResult,
   PersonActingNameResult,
   PersonAccessResult,
+  WriterRoleListSource,
+  SelectedWriterRoles,
 } from "./person-principal.js";
+
+// 0.30.0 — The ordinary member scope, built from a resolved organisation and a
+// verified principal.
+export { memberScopeFrom, memberScopeOfPerson } from "./member-scope.js";
+export type {
+  MemberScope,
+  MemberScopeOrg,
+  MemberActor,
+  MemberScopeOptions,
+  MemberScopeResult,
+} from "./member-scope.js";
 
 // 0.21.5 — Support access: a time-bounded, audited grant instead of membership
 export { buildSupportGrant, resolveSupportAccess } from "./support-access.js";

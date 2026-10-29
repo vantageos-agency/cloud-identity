@@ -658,6 +658,19 @@ const mayWrite = resolveWriterRole({
 - `resolveWriterRole` / `requireWriterRole` check the verified role against a
   writer allowlist you hold as data. A missing role, a missing list and an
   empty list all refuse. `requireWriterRole` throws `PersonRefusalError`.
+- **A writer list per organisation, with a fleet default (0.30.0).** Your store
+  holds an optional list per organisation and an optional fleet default. Read
+  both (the package reads no store) and let the package choose:
+  `selectWriterRoles(orgRoles, fleetDefaultRoles)` returns
+  `{ source: "org" | "fleet-default" | "none", roles }`. A list for the
+  organisation wins, even an empty one (an empty organisation list means nobody
+  writes there, it never falls back); an absent one (`undefined` or `null`)
+  falls back to the fleet default; no list anywhere is `"none"`. A list that is
+  present but malformed selects itself with no roles, never the default.
+  `resolveWriterRoleForOrg({ role, orgRoles, fleetDefaultRoles, door, orgSlug })`
+  is `resolveWriterRole` over that choice: no list, an empty list or an absent
+  role all refuse (`role-not-writer`), never "all roles". Types
+  `WriterRoleListSource`, `SelectedWriterRoles`.
 - Every refusal is a `PersonRefusal` (`PersonRefusalCode`, `PersonRefusalReason`,
   `door`, `detail`); you choose the transport shape. `personTokenRecordSchema`,
   `PersonTokenRecord`, `PersonPrincipal`, `OrganisationState`,
@@ -1268,6 +1281,38 @@ if (!t.ok) return respond(t.status, "headers" in t ? t.headers : {}); // 401, 40
   `status: 403`. The refusal carries `door` (from the config, default
   `resolveTenantFromAccessToken`) and never the token.
 - Types: `ResolveTenantFromAccessTokenResult`, `TokenPrincipal`.
+
+### The member scope of a resolved organisation (`/member-scope`, 0.30.0)
+
+A door that branches on a scope object for an ordinary member needs the
+organisation's row and the verified principal copied into one shape. The
+package builds it, so you assemble nothing:
+
+```ts
+import { memberScopeFrom, memberScopeOfPerson } from "@vantageos/cloud-identity/member-scope";
+
+const built = memberScopeOfPerson(resolvedOrg, principal, { door: "tasks.create" });
+if (!built.ok) return deny(built.refusal);
+const scope = built.scope;   // scopeStanding(scope) === "member"
+```
+
+- `memberScopeFrom(org, { userId, orgRole?, orgId? }, { door? })` and
+  `memberScopeOfPerson(org, personPrincipal, { door? })` return
+  `{ ok: true, scope }` or `{ ok: false, refusal }`. The scope carries
+  `userId`, `orgSlug` (the label), `orgClerkId` (the permanent ID), `allowedAgentIds`,
+  `scopes`, `fleetWide: false`, `isMaster: false`, and `orgRole` only when the
+  principal has a verified one. An absent roster is `[]` (nothing admitted). The
+  lists are copies.
+- Refusals (`RBAC_DENIED`): `org-mapping-record-invalid` (no permanent ID or label,
+  or a malformed roster or scope list), `no-verified-subject`, and
+  `other-organisation` when the actor's `orgId` is not the row's (compared by ID,
+  never by label).
+- **Declared divergence:** the scope has no `allowedOrchestrators`. That is the
+  legacy name roster (deprecated since 0.24.0) and no export of this package takes
+  a name. A consumer whose remaining legacy readers need it adds that one field
+  from its own row until it removes them.
+- Types: `MemberScope`, `MemberScopeOrg`, `MemberActor`, `MemberScopeOptions`,
+  `MemberScopeResult`.
 
 ### The standing of a resolved org scope (`/scope-standing`, 0.20.0)
 
