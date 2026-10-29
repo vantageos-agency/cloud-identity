@@ -641,6 +641,16 @@ const mayWrite = resolveWriterRole({
   person's call already stripped of its name. `PERSON_ACTOR_PREFIX`,
   `personActorName` and `isPersonActorName` spell and reserve the actor name:
   refuse it when someone registers an agent.
+- **By ID (0.29.0).** A token record may carry `orgId` and the deps a
+  `lookupOrganisationById(orgId)` (plus `organisationId(org)` to read an org
+  row's ID). Then the ID path alone selects the organisation: a miss never
+  falls back to the slug. A record with both `orgId` and `orgSlug` naming
+  different organisations is refused (`other-organisation`). Without `orgId`
+  (or without the ID lookup) the slug path runs as before; it is legacy, since a
+  label is renamable.
+- `orgMappingRowSchema` / `ResolvedOrg` also carry `addressableFleetCoordinatorIds`
+  (0.29.0), the client organisation's roster of operator agent IDs; read it in
+  your `RecipientLookups.rosterOf`.
 - `resolvePersonTenantAccess` is a strict equality on the organisation; an
   unstamped row is refused.
 - `resolveWriterRole` / `requireWriterRole` check the verified role against a
