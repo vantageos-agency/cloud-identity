@@ -1,6 +1,6 @@
 {
   "name": "@vantageos/cloud-identity",
-  "version": "0.27.0",
+  "version": "0.28.0",
   "description": "Framework-agnostic identity + scope-filter primitives for VantagePeers Cloud (multi-tenant MCP).",
   "type": "module",
   "main": "./dist/index.js",
@@ -137,6 +137,10 @@
     "./authorize-runtime": {
       "types": "./dist/authorize-runtime.d.ts",
       "import": "./dist/authorize-runtime.js"
+    },
+    "./hmac-signature": {
+      "types": "./dist/hmac-signature.d.ts",
+      "import": "./dist/hmac-signature.js"
     }
   },
   "files": [

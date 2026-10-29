@@ -5,6 +5,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-10-29
+
+Additive: a generic HMAC-SHA256 body-signature verifier, and two refusal reasons. Existing reasons and functions are unchanged.
+
+### Added
+- `verifyHmacSha256Signature({ body, signature }, { secret, encoding? })` and the `./hmac-signature` subpath, also on the root. Web Crypto HMAC-SHA256 over the raw `body` (text or bytes), keyed by the UTF-8 bytes of `secret`. `signature` is the header value: hex by default (either case) or `encoding: "base64"`, with an optional `sha256=` prefix accepted in both. The presented digest is always decoded to 32 bytes (a malformed one to zeros) and compared with the existing `timingSafeEqualSync`, so there is no early exit and no second compare helper. Returns `{ ok: true }` or `{ ok: false, refusal }` (`CREDENTIAL_REFUSED`) with an existing reason: `webhook-secret-invalid` (secret absent or empty), `webhook-headers-missing` (signature absent or empty), `webhook-signature-mismatch` (a wrong or malformed digest alike). No refusal carries the secret, the signature or the body; nothing is logged. A narrow import bundles 0 `@clerk` modules and no `node:crypto` (`test/hmac-signature-subpath.test.ts`). Types `HmacSignatureDelivery`, `HmacSignatureEncoding`, `VerifyHmacSha256SignatureOptions`, `VerifyHmacSha256SignatureResult`. `test/hmac-signature.test.ts` pins the outcomes against a `node:crypto` oracle held in the test only.
+- Two `IdentityRefusalReason` members, `assignee-not-an-agent-of-org` and `no-organisation`, for the acting-principal and member-writer doors of a consumer (type-level note: an exhaustive `switch` over `IdentityRefusalReason` gains two cases). No function of this package returns them yet. `test/new-refusal-reasons.test.ts`.
+
 ## [0.27.0] - 2026-10-28
 
 Additive: the agent-writer decision can take the host transport instead of a consumer-resolved scope (`resolveAgentWriter` is unchanged), and one resolver for the agent a person acts as.

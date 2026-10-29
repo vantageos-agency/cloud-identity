@@ -1846,6 +1846,38 @@ const { apply, revive } = decideMembershipEvent(row, parsed);
 if (apply) await writeRow(parsed, { revive });
 ```
 
+### A signed body, verified in constant time (`/hmac-signature`, 0.28.0)
+
+**`verifyHmacSha256Signature({ body, signature }, { secret, encoding? })`** checks a
+provider that signs the raw request body with a shared secret (a Gumroad-style
+`X-...-Signature` header) with Web Crypto: HMAC-SHA256 of `body`, keyed by the UTF-8
+bytes of `secret`. `body` is the text (or bytes) before any parse; `signature` is the
+header value, hex by default (either case) or base64 with `encoding: "base64"`, and
+a leading `sha256=` is accepted in both. The presented digest is decoded to 32 bytes
+and compared with `timingSafeEqualSync`, so the time taken does not say where it
+differs. Returns `{ ok: true }` or `{ ok: false, refusal }` (`CREDENTIAL_REFUSED`) with
+`webhook-secret-invalid` (absent or empty secret, a server misconfiguration),
+`webhook-headers-missing` (absent or empty signature) or `webhook-signature-mismatch`
+(a wrong or malformed digest alike). No refusal carries the secret, the signature or
+the body. A narrow import from `@vantageos/cloud-identity/hmac-signature` bundles no
+`@clerk` module. Types `HmacSignatureDelivery`, `HmacSignatureEncoding`,
+`VerifyHmacSha256SignatureOptions`, `VerifyHmacSha256SignatureResult`.
+
+```ts
+import { verifyHmacSha256Signature } from "@vantageos/cloud-identity/hmac-signature";
+
+const verdict = await verifyHmacSha256Signature(
+  { body: rawBody, signature: req.headers.get("x-provider-signature") },
+  { secret: process.env.PROVIDER_SECRET },
+);
+if (!verdict.ok) return new Response("unauthorized", { status: 401 });
+```
+
+Two refusal reasons joined the vocabulary in 0.28.0 for a consumer's own doors, and
+no function here returns them: `assignee-not-an-agent-of-org` (the named assignee is
+not an agent of the organisation) and `no-organisation` (the caller has no
+organisation).
+
 ## May a typed name act as the agent? (`/acting-claim`, 0.22.0)
 
 A name a caller types into a call is a CLAIM. `decideActingClaim` decides, from

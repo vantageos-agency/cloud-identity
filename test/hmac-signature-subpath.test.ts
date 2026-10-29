@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { build } from "esbuild";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -31,7 +31,13 @@ async function bundle(spec: string) {
 }
 
 beforeAll(() => {
-  execSync("npx tsc", { cwd: REPO_ROOT, stdio: "ignore" });
+  // Build only when dist is absent or predates this entry point (as the
+  // machine-caller subpath test does), so a parallel file never reads a dist
+  // that is being rewritten.
+  const built = resolve(REPO_ROOT, "dist/hmac-signature.js");
+  if (!existsSync(built) || !readFileSync(built, "utf-8").includes("verifyHmacSha256Signature")) {
+    execSync("npx tsc", { cwd: REPO_ROOT, stdio: "ignore" });
+  }
 });
 
 describe("./hmac-signature subpath", () => {
