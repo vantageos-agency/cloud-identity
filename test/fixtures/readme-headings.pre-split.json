@@ -1,0 +1,153 @@
+{
+  "source": "README.md at 0.33.0 (b79d185), before the docs/ split",
+  "headings": [
+    {
+      "level": 2,
+      "text": "Install"
+    },
+    {
+      "level": 2,
+      "text": "Quick start"
+    },
+    {
+      "level": 2,
+      "text": "A host-verified identity to its tenant"
+    },
+    {
+      "level": 2,
+      "text": "A service calling Convex: the machine credential"
+    },
+    {
+      "level": 2,
+      "text": "Convex consumers: pass the digest, never the token"
+    },
+    {
+      "level": 2,
+      "text": "Both caller paths, one contract"
+    },
+    {
+      "level": 2,
+      "text": "What each function does"
+    },
+    {
+      "level": 2,
+      "text": "Authorize a person and bind an organisation"
+    },
+    {
+      "level": 2,
+      "text": "Wiring person sign-in in an MCP server"
+    },
+    {
+      "level": 2,
+      "text": "Wiring the authorize runtime (`/authorize-runtime`, 0.21.7)"
+    },
+    {
+      "level": 2,
+      "text": "Role policy, membership, namespace writes and secrets (0.10.0)"
+    },
+    {
+      "level": 2,
+      "text": "The acting principal by ID, and the target checked by ID (0.11.0)"
+    },
+    {
+      "level": 3,
+      "text": "A caller's standing (0.14.0)"
+    },
+    {
+      "level": 2,
+      "text": "Protecting an MCP server as an OAuth resource (`/resource-server`)"
+    },
+    {
+      "level": 3,
+      "text": "The session from the raw request, with Clerk's own handshake (`/clerk-handshake`, 0.19.0)"
+    },
+    {
+      "level": 3,
+      "text": "From a token to `{ principal, orgId }` (`/tenant-from-token`, 0.18.0)"
+    },
+    {
+      "level": 3,
+      "text": "The member scope of a resolved organisation (`/member-scope`, 0.30.0)"
+    },
+    {
+      "level": 3,
+      "text": "The standing of a resolved org scope (`/scope-standing`, 0.20.0)"
+    },
+    {
+      "level": 3,
+      "text": "From verified claims to the caller (`/caller-from-claims`, 0.20.0)"
+    },
+    {
+      "level": 3,
+      "text": "From a verified agent credential to the caller and its owner"
+    },
+    {
+      "level": 3,
+      "text": "The agent behind a service-account write (`/agent-writer`)"
+    },
+    {
+      "level": 4,
+      "text": "From the transport (`resolveAgentWriterFromIdentity`, 0.27.0)"
+    },
+    {
+      "level": 3,
+      "text": "The agent a person acts as (`/personal-agent`)"
+    },
+    {
+      "level": 3,
+      "text": "Rows in a person's scope, inside the organisation (`/person-scope`)"
+    },
+    {
+      "level": 2,
+      "text": "An organisation is its permanent ID (0.16.0)"
+    },
+    {
+      "level": 2,
+      "text": "Support access: a time-bounded, audited grant instead of membership"
+    },
+    {
+      "level": 2,
+      "text": "Agent link: one agent of an organisation reaches one agent of another (0.23.0)"
+    },
+    {
+      "level": 2,
+      "text": "Clerk membership sync (0.21.6)"
+    },
+    {
+      "level": 3,
+      "text": "A signed body, verified in constant time (`/hmac-signature`, 0.28.0)"
+    },
+    {
+      "level": 3,
+      "text": "A verified identity with no organisation (`/identity-refusal`, 0.32.0)"
+    },
+    {
+      "level": 2,
+      "text": "May a typed name act as the agent? (`/acting-claim`, 0.22.0)"
+    },
+    {
+      "level": 2,
+      "text": "Agent tool roles: which tools an agent may see and call (/tool-role, 0.33.0)"
+    },
+    {
+      "level": 2,
+      "text": "What this package does not do"
+    },
+    {
+      "level": 2,
+      "text": "Upgrading to 0.4.0"
+    },
+    {
+      "level": 2,
+      "text": "Upgrading to 0.3.0"
+    },
+    {
+      "level": 2,
+      "text": "License"
+    },
+    {
+      "level": 2,
+      "text": "Issues"
+    }
+  ]
+}
