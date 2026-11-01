@@ -5,6 +5,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-11-01
+
+Additive: the producer of the `no-organisation` refusal declared in 0.28.0. Existing reasons and functions are unchanged.
+
+### Added
+- `noOrganisationRefusal(from)`, on the root and the `./identity-refusal` subpath. Given a refusal whose reason is `no-verified-organisation` (a verified identity with no organisation attached, as `resolveCallerFromClaims` and `resolveOrgFromClaim` refuse it), returns `{ code: "RBAC_DENIED", reason: "no-organisation", door: from.door, detail: "identity has no verified organisation attached" }`; any other refusal answers null. A consumer's door forwards it instead of building the `no-organisation` refusal itself. The input is not mutated. `test/no-organisation-refusal.test.ts`.
+
 ## [0.31.0] - 2026-11-01
 
 Breaking for slug-only consumers (MINOR bump under 0.x): a slug is a label, not an identity.

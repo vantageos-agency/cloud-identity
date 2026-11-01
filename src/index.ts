@@ -331,7 +331,7 @@ export type {
 } from "./acting-claim.js";
 
 // 0.10.0 — Identity gaps closed in the package so consumers adapt, never copy.
-export { IdentityRefusalError } from "./identity-refusal.js";
+export { IdentityRefusalError, noOrganisationRefusal } from "./identity-refusal.js";
 export type {
   IdentityRefusal,
   IdentityRefusalCode,

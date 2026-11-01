@@ -1937,10 +1937,36 @@ const verdict = await verifyHmacSha256Signature(
 if (!verdict.ok) return new Response("unauthorized", { status: 401 });
 ```
 
-Two refusal reasons joined the vocabulary in 0.28.0 for a consumer's own doors, and
-no function here returns them: `assignee-not-an-agent-of-org` (the named assignee is
-not an agent of the organisation) and `no-organisation` (the caller has no
-organisation).
+Two refusal reasons joined the vocabulary in 0.28.0 for a consumer's own doors:
+`assignee-not-an-agent-of-org` (the named assignee is not an agent of the
+organisation; no function here returns it) and `no-organisation` (the caller has no
+organisation; produced by `noOrganisationRefusal` since 0.32.0, below).
+
+### A verified identity with no organisation (`/identity-refusal`, 0.32.0)
+
+**`noOrganisationRefusal(from: IdentityRefusal): IdentityRefusal | null`** is the
+producer of the `no-organisation` refusal. The package's resolvers refuse a verified
+identity that has no organisation attached with their own reason,
+`no-verified-organisation` (`resolveCallerFromClaims`, `resolveOrgFromClaim`, and the
+others that read a verified organisation ID). A door that tells "signed in, no
+organisation" apart from every other refusal forwards what this returns instead of
+building that refusal itself: `{ code: "RBAC_DENIED", reason: "no-organisation",
+door: from.door, detail: "identity has no verified organisation attached" }`. Every
+other refusal answers null: an anonymous caller is `credential-invalid`, and an
+organisation that is claimed but unmapped or inactive keeps its own reason. A slug
+claim alone is still no verified organisation (a label never selects one). The input
+is not mutated. Exported from the root and from `@vantageos/cloud-identity/identity-refusal`.
+
+```ts
+import { noOrganisationRefusal, resolveCallerFromClaims } from "@vantageos/cloud-identity";
+
+const caller = await resolveCallerFromClaims(identity, deps, { adminRoles, door });
+if (!caller.ok) {
+  const noOrg = noOrganisationRefusal(caller.refusal);
+  if (noOrg) return { ok: false, reason: noOrg.reason, detail: noOrg.detail };
+  // ... every other refusal
+}
+```
 
 ## May a typed name act as the agent? (`/acting-claim`, 0.22.0)
 
