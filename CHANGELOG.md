@@ -5,6 +5,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-11-01
+
+Additive: the agent tool-role decision. Existing exports are unchanged.
+
+### Added
+- `decideToolRole(lookup, tool, caller, { door? })` and `filterGrantedTools(lookup, tools, caller)`, root export: the pure agent tool-role decision (spec ElPi-Corp fab6c779, rules 1, 2, 3, 5, 6). Grant = domain grant (read for read tools, write for write tools), then `add`, then `remove` wins. Deny by default: `TOOL_ROLE_DENIED` with reasons `no-role`, `role-not-found`, `role-invalid`, `caller-not-resolved`, `other-organisation` (by `orgClerkId`, never a label), `tool-undeclared`, `tool-mode-invalid`, `tool-removed`, `write-on-read-grant`, `domain-not-granted`; a failed role-store read is `TOOL_ROLE_UNRESOLVED` `role-store-failed`. A tool is `{ toolId, domain, mode }` (`toolId` = MCP tool name; no root export takes a name-like field). The caller is the resolved org scope (`scopeStanding` "member"). `filterGrantedTools` equals the per-tool decisions. Additive; no existing export changes. `test/tool-role.test.ts`.
+
 ## [0.32.0] - 2026-11-01
 
 Additive: the producer of the `no-organisation` refusal declared in 0.28.0. Existing reasons and functions are unchanged.
