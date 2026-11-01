@@ -1324,7 +1324,7 @@ on its `isMaster` boolean. That boolean mixes "may read the whole fleet" with
 |---|---|
 | `"fleet"` | master, `masterSource` `"service-account"` or `"internal"` |
 | `"operator-admin"` | master, `masterSource` `"operator-admin"`: reads the fleet, is not the fleet |
-| `"member"` | not master, bound to one organisation (`orgClerkId`, or `orgSlug` while ids are filled) |
+| `"member"` | not master, bound to one organisation by its permanent ID: a non-empty `orgClerkId` (0.31.0) |
 | `"refused"` | anything else |
 
 ```ts
@@ -1335,6 +1335,13 @@ requireStanding(scope, "tasks.list", ["fleet", "operator-admin", "member"]);
 if (hasFleetRead(scope)) { /* unfiltered read: fleet or operator-admin */ }
 ```
 
+- A slug is a label, not an identity (0.31.0). A non-master scope carrying
+  `orgSlug` and no non-empty `orgClerkId` is `"refused"`, not `"member"`. Before
+  0.31.0 such a scope was read as `"member"` while ids were being filled.
+  Migration: a consumer whose resolver can build a member scope from an org with
+  no permanent ID (e.g. a mapping row with no Clerk org ID) must either fill
+  that ID or expect `"refused"` (and `requireStanding` to throw
+  `scope-not-resolved`) for that scope.
 - Fail closed. A scope is `"fleet"` or `"operator-admin"` only when `isMaster`,
   `fleetWide` and a known `masterSource` agree; an absent or malformed scope, the
   `refused` flag, no organisation, or any disagreement is `"refused"` — never the

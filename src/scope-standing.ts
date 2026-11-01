@@ -11,8 +11,10 @@
  *                       (`masterSource` "service-account" or "internal").
  *   - "operator-admin"  a master scope granted to the operator's org:admin
  *                       human: it reads the fleet, it is not the fleet.
- *   - "member"          a non-master scope bound to one organisation
- *                       (`orgClerkId`, or `orgSlug` while ids are being filled).
+ *   - "member"          a non-master scope bound to one organisation by its
+ *                       permanent ID (`orgClerkId`, non-empty). Since 0.31.0 an
+ *                       `orgSlug` alone is NOT enough: a slug is a label, not an
+ *                       identity, so a slug-only scope is "refused".
  *   - "refused"         everything else: absent, malformed, flagged `refused`,
  *                       no organisation, or self-contradicting.
  *
@@ -61,7 +63,7 @@ export function scopeStanding(scope: unknown): ScopeStanding {
   }
 
   if (s.masterSource !== undefined) return "refused";
-  if (nonEmptyString(s.orgClerkId) || nonEmptyString(s.orgSlug)) return "member";
+  if (nonEmptyString(s.orgClerkId)) return "member";
   return "refused";
 }
 

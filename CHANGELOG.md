@@ -5,6 +5,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-01
+
+Breaking for slug-only consumers (MINOR bump under 0.x): a slug is a label, not an identity.
+
+### Changed
+- `scopeStanding` reads a non-master scope as `"member"` only when it carries a non-empty `orgClerkId`. A non-master scope carrying `orgSlug` alone is now `"refused"` (before: `"member"`, an expand-phase allowance while ids were being filled). `requireStanding` therefore throws `RBAC_DENIED` `scope-not-resolved` for it, and every `"member"` branch a consumer wrote stops admitting it. `"fleet"`, `"operator-admin"`, `hasFleetRead` and `bearerStanding` are unchanged. `test/scope-standing.test.ts`.
+
+### Migration
+- A consumer whose org-scope resolver can return a non-master scope with `orgSlug` and no `orgClerkId` (for example one built from a mapping row that has no Clerk org ID) must fill that ID on the row, or accept that such a scope is now refused at every door that branches on `"member"`. `memberScopeFrom` (0.30.0) already refuses an organisation without a permanent ID, so scopes it builds are unaffected.
+
 ## [0.30.0] - 2026-10-29
 
 Additive: the member scope is built by the package, and the writer-role list can be chosen per organisation with a fleet default. Every existing test passes unchanged.
