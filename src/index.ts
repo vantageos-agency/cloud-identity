@@ -504,3 +504,20 @@ export type {
   MembershipTombstone,
   MembershipReconcilePlan,
 } from "./membership-sync.js";
+
+// Unreleased — agent tool roles: one pure decision for `tools/list` (filter) and
+// `tools/call` (refuse). Deny by default, TOOL_ROLE_DENIED with a reason per
+// branch; a failed role-store read is TOOL_ROLE_UNRESOLVED, never "all tools".
+export { decideToolRole, filterGrantedTools } from "./tool-role.js";
+export type {
+  ToolRoleRefusalCode,
+  ToolRoleRefusalReason,
+  ToolRoleRefusal,
+  ToolMode,
+  ToolDeclaration,
+  ToolRoleDomainGrant,
+  ToolRole,
+  ToolRoleLookup,
+  ToolRoleDecision,
+  ToolRoleOptions,
+} from "./tool-role.js";

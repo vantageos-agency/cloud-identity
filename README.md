@@ -2012,6 +2012,56 @@ if (!r.ok) return deny(`${r.refusal.code}: ${r.refusal.detail}`);
   `ActingClaimRefusalCode`, `ActingClaimRefusalReason`, `ActingClaimResult`,
   `ActingClaimVia`.
 
+## Agent tool roles: which tools an agent may see and call (Unreleased)
+
+A server sold with an agent layer decides, per calling agent, which tools exist
+for it. One pure function decides; `tools/list` filters with it and `tools/call`
+refuses with it, so a hidden tool cannot be called by name.
+
+```ts
+import { decideToolRole, filterGrantedTools } from "@vantageos/cloud-identity";
+
+// `lookup` is your role-store read for the calling agent, resolved from the
+// verified credential; `scope` is the package's resolved org scope (e.g. memberScopeFrom).
+const lookup = { status: "resolved", role }; // | { status: "absent", cause?: "unassigned" | "deleted" } | { status: "unresolved" }
+
+// tools/list
+const listed = filterGrantedTools(lookup, declaredTools, scope);
+// identity tool (rule 6): grantedTools equals what tools/list serves
+const grantedTools = listed.map((t) => t.toolId);
+
+// tools/call
+const d = decideToolRole(lookup, declaration, scope, { door: "tools/call" });
+if (!d.ok) return { isError: true, structuredContent: { error: d.refusal } };
+```
+
+- A role is `{ roleId, orgClerkId, domains: [{ domain, read, write }], add, remove }`;
+  a tool declares `{ toolId, domain, mode }` with `mode` exactly `"read"` or `"write"`;
+  `toolId` is the MCP tool name (spelled so because no root export takes a
+  name-like field).
+- Grant order: the domain grant (`read` for a read tool, `write` for a write tool),
+  then `add` grants single tools outside it, then `remove` withdraws (remove wins,
+  over `add` too). `read` and `write` are separate: a write grant does not grant
+  a read tool.
+- `decideToolRole(lookup, tool, caller, { door? })` returns
+  `{ ok: true, tool, via: "domain" | "add" }` or `{ ok: false, refusal }`, the
+  refusal carrying `code`, `reason`, `door`, `detail` (the `IdentityRefusal` shape).
+- `TOOL_ROLE_UNRESOLVED` `role-store-failed`: the role-store read failed. Never
+  "all tools".
+- `TOOL_ROLE_DENIED` reasons: `no-role`, `role-not-found` (the role no longer
+  exists), `role-invalid` (malformed role or lookup, duplicated domain entry),
+  `caller-not-resolved` (the caller is not a `"member"` standing with an
+  `orgClerkId`), `other-organisation` (the role's `orgClerkId` is not the caller's,
+  compared by permanent ID, never by label), `tool-undeclared`, `tool-mode-invalid`,
+  `tool-removed`, `write-on-read-grant`, `domain-not-granted`.
+- `filterGrantedTools(lookup, tools, caller)` returns exactly the declarations
+  `decideToolRole` allows, in input order.
+- Pure: no storage, no I/O, no clock. The package does not store roles.
+- Root export only for now; a `./tool-role` subpath lands with the next release.
+- Types: `ToolRole`, `ToolRoleDomainGrant`, `ToolDeclaration`, `ToolMode`,
+  `ToolRoleLookup`, `ToolRoleDecision`, `ToolRoleOptions`, `ToolRoleRefusal`,
+  `ToolRoleRefusalCode`, `ToolRoleRefusalReason`.
+
 ## What this package does not do
 
 Worth reading before you rely on it.
