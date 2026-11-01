@@ -140,3 +140,27 @@ export function refusal(
 ): IdentityRefusal {
   return { code, reason, door, detail };
 }
+
+/**
+ * The producer of the `no-organisation` refusal (0.32.0): a verified identity
+ * with no organisation attached.
+ *
+ * The package's resolvers (`resolveCallerFromClaims`, `resolveOrgFromClaim`,
+ * `resolveActingPrincipal`, `resolveTenantFromAccessToken`, the membership
+ * assertion) refuse such an identity with `no-verified-organisation`, the
+ * resolver's own reason. A consumer's door that tells "signed in, no
+ * organisation" apart from every other refusal forwards the refusal this
+ * returns instead of minting its own: same `code`, the refusing `door`, reason
+ * `no-organisation`. Any other refusal answers null (an anonymous caller is
+ * `credential-invalid`, not "no organisation"; an organisation claimed but not
+ * provable is its own reason). Never mutates its input.
+ */
+export function noOrganisationRefusal(from: IdentityRefusal): IdentityRefusal | null {
+  if (from.reason !== "no-verified-organisation") return null;
+  return refusal(
+    "RBAC_DENIED",
+    "no-organisation",
+    from.door,
+    "identity has no verified organisation attached",
+  );
+}
