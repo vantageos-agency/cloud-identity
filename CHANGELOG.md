@@ -5,6 +5,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-11-01
+
+Documentation only. No source change; every export is unchanged.
+
+### Changed
+- README.md is split under the npm registry's 64 KiB `readme` limit (115203 bytes before, 18766 after), so the npm page no longer cuts off past the 0.2x sections. README keeps the introduction, install, quick start, the per-function overview, what the package does not do, versioning, and an index linking each topic page by absolute GitHub URL. The long sections moved verbatim to ten pages under `docs/`: `caller-paths.md`, `authorize.md`, `role-policy.md`, `principal-by-id.md`, `resource-server.md`, `organisation-id.md`, `cross-org-access.md`, `membership-sync.md`, `agent-tools.md`, `upgrading.md`. The tarball carries them (`"files"`: `docs/*.md`). `test/readme-size.test.ts` keeps README at or under 61440 bytes, checks that every linked docs page exists, and checks that every heading of the pre-split README (`test/fixtures/readme-headings.pre-split.json`) appears exactly once across README.md and docs/.
+
 ## [0.33.0] - 2026-11-01
 
 Additive: the agent tool-role decision. Existing exports are unchanged.

@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
 
 /**
  * The npm registry truncates a package's `readme` field at 64 KiB, so any
@@ -20,8 +20,7 @@ const REPO_ROOT = resolve(__dirname, "..");
 const README = resolve(REPO_ROOT, "README.md");
 const DOCS_DIR = resolve(REPO_ROOT, "docs");
 const README_MAX_BYTES = 61440;
-const DOCS_URL_PREFIX =
-  "https://github.com/vantageos-agency/cloud-identity/blob/main/docs/";
+const DOCS_URL_PREFIX = "https://github.com/vantageos-agency/cloud-identity/blob/main/docs/";
 
 interface Heading {
   level: number;
