@@ -1951,7 +1951,7 @@ identity that has no organisation attached with their own reason,
 others that read a verified organisation ID). A door that tells "signed in, no
 organisation" apart from every other refusal forwards what this returns instead of
 building that refusal itself: `{ code: "RBAC_DENIED", reason: "no-organisation",
-door: from.door, detail: "identity has no verified organisation attached" }`. Every
+door: from.door, detail: "The verified identity has no organisation attached." }`. Every
 other refusal answers null: an anonymous caller is `credential-invalid`, and an
 organisation that is claimed but unmapped or inactive keeps its own reason. A slug
 claim alone is still no verified organisation (a label never selects one). The input

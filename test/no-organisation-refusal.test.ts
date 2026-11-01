@@ -29,7 +29,7 @@ const deps = {
 };
 const opts = { adminRoles: ["org:admin"], door: "door:x" } as const;
 
-const DETAIL = "identity has no verified organisation attached";
+const DETAIL = "The verified identity has no organisation attached.";
 
 async function refusedBy(claims: Record<string, unknown> | null): Promise<IdentityRefusal> {
   const r = await resolveCallerFromClaims(claims, deps, opts);
