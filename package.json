@@ -1,6 +1,6 @@
 {
   "name": "@vantageos/cloud-identity",
-  "version": "0.33.0",
+  "version": "0.33.1",
   "description": "Framework-agnostic identity + scope-filter primitives for VantagePeers Cloud (multi-tenant MCP).",
   "type": "module",
   "main": "./dist/index.js",
@@ -153,6 +153,8 @@
   },
   "files": [
     "dist",
+    "docs/*.md",
+    "!docs/RED-PHASE-EVIDENCE.md",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"

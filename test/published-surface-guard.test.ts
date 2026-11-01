@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
 
 /**
  * Guards the published npm tarball, not the whole repository.
@@ -14,7 +14,10 @@ import { resolve } from "node:path";
  *       /root or /home path, or a path traversing another repo
  *       (vantage-memory/, mcp-server/).
  *   (c) asserts every symbol the built bundle actually exports (parsed from
- *       dist/index.d.ts, not a hand-typed list) is named in README.md.
+ *       dist/index.d.ts, not a hand-typed list) is named in the PACKED
+ *       documentation: README.md plus every docs/*.md the tarball carries
+ *       (README is split under npm's 64 KiB readme limit and links each page;
+ *       a docs page that is not packed does not count).
  */
 
 const REPO_ROOT = resolve(__dirname, "..");
@@ -85,37 +88,33 @@ describe("published-surface guard", () => {
   });
 
   it("(b) contains no internal reference in any packed file", () => {
-    const files = packedPaths
-      .filter(isTextFile)
-      .map((path) => ({
-        path,
-        content: readFileSync(resolve(REPO_ROOT, path), "utf-8"),
-      }));
+    const files = packedPaths.filter(isTextFile).map((path) => ({
+      path,
+      content: readFileSync(resolve(REPO_ROOT, path), "utf-8"),
+    }));
 
     const hits = findInternalReferences(files);
 
-    expect(
-      hits,
-      hits
-        .map((h) => `${h.path}: ${h.pattern} -> "${h.snippet}"`)
-        .join("\n"),
-    ).toEqual([]);
+    expect(hits, hits.map((h) => `${h.path}: ${h.pattern} -> "${h.snippet}"`).join("\n")).toEqual(
+      [],
+    );
   });
 
   it("(b) positive control: the detector CAN catch a planted internal reference", () => {
-    const files = packedPaths
-      .filter(isTextFile)
-      .map((path) => ({
-        path,
-        content: readFileSync(resolve(REPO_ROOT, path), "utf-8"),
-      }));
+    const files = packedPaths.filter(isTextFile).map((path) => ({
+      path,
+      content: readFileSync(resolve(REPO_ROOT, path), "utf-8"),
+    }));
 
     // RED: an in-memory copy with a fake 32-char id planted in one file.
     // Nothing on disk is touched — this proves detector sensitivity without
     // any risk of leaving the repository dirty.
     const poisoned = files.map((f, i) =>
       i === 0
-        ? { ...f, content: `${f.content}\n// id abcdef0123456789abcdef0123456789\n` }
+        ? {
+            ...f,
+            content: `${f.content}\n// id abcdef0123456789abcdef0123456789\n`,
+          }
         : f,
     );
     const redHits = findInternalReferences(poisoned);
@@ -127,34 +126,37 @@ describe("published-surface guard", () => {
     expect(greenHits).toEqual([]);
   });
 
-  it("(c) every symbol exported by the built bundle is named in README.md", () => {
+  it("(c) every symbol exported by the built bundle is named in the packed docs (README.md + docs/*.md)", () => {
     const dts = readFileSync(resolve(REPO_ROOT, "dist/index.d.ts"), "utf-8");
-    const readme = readFileSync(resolve(REPO_ROOT, "README.md"), "utf-8");
+    const docPaths = [
+      "README.md",
+      ...packedPaths.filter((p) => p.startsWith("docs/") && p.endsWith(".md")),
+    ];
+    const readme = docPaths.map((p) => readFileSync(resolve(REPO_ROOT, p), "utf-8")).join("\n");
 
     // Parse the REAL export surface out of the built declaration file —
     // both `export { a, b }` and `export type { c, d }` blocks — rather than
     // hand-maintaining a symbol list that drifts from the source.
     const exportBlockRe = /export\s+(?:type\s+)?\{([^}]*)\}/g;
     const symbols = new Set<string>();
-    let match: RegExpExecArray | null;
-    // eslint-disable-next-line no-cond-assign
-    while ((match = exportBlockRe.exec(dts)) !== null) {
+    for (const match of dts.matchAll(exportBlockRe)) {
       const inner = match[1] ?? "";
       for (const rawEntry of inner.split(",")) {
-        const entry = rawEntry.trim().replace(/^type\s+/, "").trim();
+        const entry = rawEntry
+          .trim()
+          .replace(/^type\s+/, "")
+          .trim();
         if (entry.length > 0) symbols.add(entry);
       }
     }
 
     expect(symbols.size).toBeGreaterThan(0);
 
-    const missing = [...symbols].filter(
-      (sym) => !new RegExp(`\\b${sym}\\b`).test(readme),
-    );
+    const missing = [...symbols].filter((sym) => !new RegExp(`\\b${sym}\\b`).test(readme));
 
     expect(
       missing,
-      `symbols exported by dist/index.d.ts but not named in README.md: ${missing.join(", ")}`,
+      `symbols exported by dist/index.d.ts but not named in ${docPaths.join(" + ")}: ${missing.join(", ")}`,
     ).toEqual([]);
   });
 });
