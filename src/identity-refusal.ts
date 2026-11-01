@@ -161,6 +161,6 @@ export function noOrganisationRefusal(from: IdentityRefusal): IdentityRefusal | 
     "RBAC_DENIED",
     "no-organisation",
     from.door,
-    "identity has no verified organisation attached",
+    "The verified identity has no organisation attached.",
   );
 }
