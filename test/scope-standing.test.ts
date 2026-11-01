@@ -27,9 +27,28 @@ describe("scopeStanding", () => {
     expect(scopeStanding(operatorAdmin)).toBe("operator-admin");
   });
 
-  it("a non-master scope with an organisation is member (by id or, during expand, by slug)", () => {
+  it("a non-master scope with an organisation's permanent ID is member", () => {
     expect(scopeStanding(memberById)).toBe("member");
-    expect(scopeStanding(memberBySlug)).toBe("member");
+    expect(scopeStanding({ isMaster: false, fleetWide: false, orgSlug: "acme", orgClerkId: "org_1" })).toBe(
+      "member",
+    );
+    expect(scopeStanding({ isMaster: false, fleetWide: false, orgSlug: null, orgClerkId: "org_1" })).toBe(
+      "member",
+    );
+  });
+
+  it("a non-master scope carrying a slug alone is refused: a slug is a label, not an identity (0.31.0)", () => {
+    expect(scopeStanding(memberBySlug)).toBe("refused");
+    expect(scopeStanding({ isMaster: false, fleetWide: false, orgSlug: "acme" })).toBe("refused");
+    expect(scopeStanding({ isMaster: false, fleetWide: false, orgSlug: "acme", orgClerkId: "" })).toBe("refused");
+    expect(scopeStanding({ isMaster: false, fleetWide: false, orgSlug: "acme", orgClerkId: 42 })).toBe("refused");
+    expect(hasFleetRead(memberBySlug)).toBe(false);
+  });
+
+  it("master and fleet poles are unchanged by the member rule", () => {
+    expect(scopeStanding({ ...service, orgSlug: "acme" })).toBe("fleet");
+    expect(scopeStanding({ ...operatorAdmin, orgSlug: "acme" })).toBe("operator-admin");
+    expect(scopeStanding({ ...service, orgClerkId: "org_1" })).toBe("fleet");
   });
 
   it("no organisation, the refused flag, or a missing field is refused", () => {
