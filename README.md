@@ -2012,7 +2012,7 @@ if (!r.ok) return deny(`${r.refusal.code}: ${r.refusal.detail}`);
   `ActingClaimRefusalCode`, `ActingClaimRefusalReason`, `ActingClaimResult`,
   `ActingClaimVia`.
 
-## Agent tool roles: which tools an agent may see and call (Unreleased)
+## Agent tool roles: which tools an agent may see and call (/tool-role, 0.33.0)
 
 A server sold with an agent layer decides, per calling agent, which tools exist
 for it. One pure function decides; `tools/list` filters with it and `tools/call`
@@ -2057,7 +2057,7 @@ if (!d.ok) return { isError: true, structuredContent: { error: d.refusal } };
 - `filterGrantedTools(lookup, tools, caller)` returns exactly the declarations
   `decideToolRole` allows, in input order.
 - Pure: no storage, no I/O, no clock. The package does not store roles.
-- Root export only for now; a `./tool-role` subpath lands with the next release.
+- On the root and the `./tool-role` subpath.
 - Types: `ToolRole`, `ToolRoleDomainGrant`, `ToolDeclaration`, `ToolMode`,
   `ToolRoleLookup`, `ToolRoleDecision`, `ToolRoleOptions`, `ToolRoleRefusal`,
   `ToolRoleRefusalCode`, `ToolRoleRefusalReason`.
