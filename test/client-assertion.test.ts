@@ -7,6 +7,7 @@ import {
   createClientAssertionVerifier,
   createJtiStore,
   JWT_BEARER_ASSERTION_TYPE,
+  MAX_ASSERTION_LIFETIME_SECONDS,
 } from "../src/client-assertion.js";
 
 /**
@@ -170,6 +171,10 @@ describe("constants", () => {
       "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
     );
     expect([...ASSERTION_SIGNING_ALGS]).toEqual(["RS256"]);
+  });
+
+  it("caps an assertion's lifetime at 300 s (plus the 30 s skew)", () => {
+    expect(MAX_ASSERTION_LIFETIME_SECONDS).toBe(300);
   });
 });
 
