@@ -5,6 +5,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-02
+
+Additive: the private_key_jwt client-assertion verifier, on a new Node-only subpath. Existing exports are unchanged.
+
+### Added
+- `createClientAssertionVerifier(options?)` and `createJtiStore(maxEntries?)`, on the `./client-assertion` subpath only (not the root: its SSRF guard uses `node:net` and `node:dns/promises`). `verify({ assertionType, assertion, clientId?, audiences })` returns `{ ok: true, clientId }` or `{ ok: false, reason }`. Assertion type `urn:ietf:params:oauth:client-assertion-type:jwt-bearer` only; the unverified `iss` only locates the key set and is re-checked after verification (`iss` = `sub` = client id; a sent `client_id` must equal `iss`); keys from the `jwks_uri` of the client's CIMD document, fetched through an SSRF guard (https, public addresses only, no redirects, 64 KiB cap); alg pinned to RS256 (a CIMD declaring another signing alg is refused; `none` and HMAC cannot verify; RSA under 2048 bits and any `crit` header refused); `aud` = token endpoint or issuer; `exp` required, 30 s skew; `jti` required and accepted once, in a bounded store that fails closed when full and never evicts a live jti. `now`, `fetchImpl`, `resolveHost`, `timeoutMs` and `jtiStore` are injectable. Reasons (`AssertionRefusalReason`): `unsupported client assertion`, `malformed client assertion`, `unknown client`, `client_id does not match the assertion issuer`, `client has no verifiable key set`, `unsupported signing algorithm`, `invalid jwks_uri`, `key set unavailable`, `client assertion rejected`, `client assertion replayed`. Lifted from the vantage-mcp-boilerplate verifier with its decisions and reason strings unchanged; the RS256 check uses Web Crypto and this package's base64url helpers instead of `jose`, so no runtime dependency is added. Two stricter edges: a non-string `jti` is `client assertion rejected` (the boilerplate keyed its store on the string form), and an empty `jti` stays `client assertion replayed` as before.
+- On the same subpath, the pieces the verifier is built from: `resolveCimdDocument`, `fetchGuardedJson`, `isPublicAddress`, `isUrlShapedClientId`, `isAllowedRedirectUri`, types `CimdDocument`, `CimdOptions`, `AssertionResult`, `AssertionVerifierOptions`, `ClientAssertionInput`, `ClientAssertionVerifier`, `JtiStore`, constants `JWT_BEARER_ASSERTION_TYPE`, `ASSERTION_SIGNING_ALGS`. Documented in `docs/client-assertion.md`. `test/client-assertion.test.ts`, `test/client-assertion-ssrf.test.ts`, `test/client-assertion-subpath.test.ts`.
+
 ## [0.33.1] - 2026-11-01
 
 Documentation only. No source change; every export is unchanged.

@@ -47,7 +47,8 @@ console.log(tenantId);                    // "org_abc"
 console.log(scopeFilterList(ctx, rows));  // only the first row
 ```
 
-Every symbol is available from the package root. Subpath imports
+Every symbol is available from the package root, except the Node-only
+`./client-assertion` subpath (0.34.0). Subpath imports
 (`@vantageos/cloud-identity/scope-filter` and friends) also work if you prefer
 to be explicit about where something comes from.
 
@@ -76,6 +77,7 @@ The long-form guides live in `docs/`, one page per topic:
 - [Reaching across organisations: support access and agent links](https://github.com/vantageos-agency/cloud-identity/blob/main/docs/cross-org-access.md): time-bounded audited support access, and one agent of an organisation reaching one agent of another (0.23.0).
 - [Clerk membership sync](https://github.com/vantageos-agency/cloud-identity/blob/main/docs/membership-sync.md): syncing Clerk memberships (0.21.6), HMAC-signed bodies (`/hmac-signature`, 0.28.0) and the no-organisation refusal (`/identity-refusal`, 0.32.0).
 - [Agents: acting claims and tool roles](https://github.com/vantageos-agency/cloud-identity/blob/main/docs/agent-tools.md): whether a typed name may act as the agent (`/acting-claim`, 0.22.0), and which tools an agent may see and call (`/tool-role`, 0.33.0).
+- [Verifying a private_key_jwt client assertion](https://github.com/vantageos-agency/cloud-identity/blob/main/docs/client-assertion.md): a CIMD client's signed `/token` assertion, RS256 only, keys fetched through an SSRF guard, each `jti` accepted once (`/client-assertion`, 0.34.0, Node only).
 - [Upgrading](https://github.com/vantageos-agency/cloud-identity/blob/main/docs/upgrading.md): upgrade guides for 0.3.0 (breaking: the scope context is required) and 0.4.0 (additive).
 
 ## What each function does
@@ -311,10 +313,11 @@ Worth reading before you rely on it.
   package only insists that a row it is handed be believed in constant time,
   and refused identically however it fails.
 - **It does not verify an arbitrary signed JWT.** The presented-bearer path is
-  for an OPAQUE token — one whose only meaning is the row it matches. The one
-  signed token it verifies is a Clerk session token (`verifyClerkSessionToken`,
-  RS256 only). For any other signed credential, verify the signature with a
-  JWT library first.
+  for an OPAQUE token — one whose only meaning is the row it matches. The
+  signed tokens it verifies are a Clerk session token (`verifyClerkSessionToken`,
+  RS256 only) and a `private_key_jwt` client assertion
+  (`createClientAssertionVerifier`, RS256 only, `./client-assertion`). For any
+  other signed credential, verify the signature with a JWT library first.
 
 ## Versioning
 
