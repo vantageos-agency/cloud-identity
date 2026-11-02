@@ -1,11 +1,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   ASSERTION_SIGNING_ALGS,
+  type AssertionRefusalReason,
   type AssertionResult,
   type AssertionVerifierOptions,
-  JWT_BEARER_ASSERTION_TYPE,
   createClientAssertionVerifier,
   createJtiStore,
+  JWT_BEARER_ASSERTION_TYPE,
 } from "../src/client-assertion.js";
 
 /**
@@ -161,7 +162,7 @@ const input = (jwt: string, clientId?: string) => ({
   audiences: AUDIENCES,
 });
 
-const refused = (reason: string): AssertionResult => ({ ok: false, reason });
+const refused = (reason: AssertionRefusalReason): AssertionResult => ({ ok: false, reason });
 
 describe("constants", () => {
   it("accepts only the RFC 7523 jwt-bearer type, signed with RS256", () => {
@@ -437,7 +438,7 @@ describe("refusal: client assertion rejected", () => {
     ["wrong key", () => assertion({ key: other.privateKey })],
     ["HS256", () => hs256Assertion()],
     ["missing jti", () => assertion({ omit: ["jti"] })],
-    ["empty jti", () => assertion({ claims: { jti: "" } })],
+    ["a numeric jti", () => assertion({ claims: { jti: 7 } })],
     ["missing exp", () => assertion({ omit: ["exp"] })],
     ["missing sub", () => assertion({ omit: ["sub"] })],
     ["missing aud", () => assertion({ omit: ["aud"] })],
@@ -512,6 +513,11 @@ describe("refusal: client assertion replayed", () => {
     expect(await verifier({ extra: { jtiStore } }).verify(input(jwt))).toEqual(
       refused("client assertion replayed"),
     );
+  });
+
+  it("an empty jti is never accepted (answered as a replay, as the boilerplate does)", async () => {
+    const jwt = await assertion({ claims: { jti: "" } });
+    expect(await verifier().verify(input(jwt))).toEqual(refused("client assertion replayed"));
   });
 
   it("a full store fails closed (a NEW jti is refused, never accepted by evicting)", async () => {
