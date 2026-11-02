@@ -562,3 +562,73 @@ describe("createJtiStore", () => {
     expect(s.accept("c", "b", NOW_S + 60, NOW_S + 40)).toBe(true);
   });
 });
+
+describe("assertion lifetime cap (task k1734g39kq2dv007zm6n4bgne58hfzpr)", () => {
+  // The cap is 300 s past now, plus the 30 s skew: exp = now + 330 is the last accepted second.
+  const YEAR = 365 * 24 * 3600;
+
+  it("an otherwise valid assertion with exp one year ahead is rejected", async () => {
+    const jwt = await assertion({ claims: { exp: NOW_S + YEAR } });
+    expect(await verifier().verify(input(jwt))).toEqual(refused("client assertion rejected"));
+  });
+
+  it("exp = now + 60 s is accepted", async () => {
+    const jwt = await assertion({ claims: { exp: NOW_S + 60 } });
+    expect(await verifier().verify(input(jwt))).toEqual({ ok: true, clientId: ID });
+  });
+
+  it("exp = now + 300 + 30 (the boundary) is accepted", async () => {
+    const jwt = await assertion({ claims: { exp: NOW_S + 300 + 30 } });
+    expect(await verifier().verify(input(jwt))).toEqual({ ok: true, clientId: ID });
+  });
+
+  it("exp = now + 300 + 30 + 1 (one second past the boundary) is rejected", async () => {
+    const jwt = await assertion({ claims: { exp: NOW_S + 300 + 30 + 1 } });
+    expect(await verifier().verify(input(jwt))).toEqual(refused("client assertion rejected"));
+  });
+
+  it("iat in the future past the 30 s skew is rejected", async () => {
+    const jwt = await assertion({ claims: { iat: NOW_S + 31 } });
+    expect(await verifier().verify(input(jwt))).toEqual(refused("client assertion rejected"));
+  });
+
+  it("iat in the future inside the 30 s skew is accepted", async () => {
+    const jwt = await assertion({ claims: { iat: NOW_S + 30 } });
+    expect(await verifier().verify(input(jwt))).toEqual({ ok: true, clientId: ID });
+  });
+
+  it("far-future assertions never reach the store, so they cannot fill it", async () => {
+    // The store is shrunk from 10000 to 3 so the flood is cheap to sign; the logic is the same.
+    const inner = createJtiStore(3);
+    let accepted = 0;
+    const jtiStore = {
+      accept(c: string, j: string, e: number, n: number) {
+        const ok = inner.accept(c, j, e, n);
+        if (ok) accepted++;
+        return ok;
+      },
+    };
+    const v = verifier({ extra: { jtiStore } });
+    for (let i = 0; i < 5; i++) {
+      const jwt = await assertion({ claims: { exp: NOW_S + YEAR } });
+      expect(await v.verify(input(jwt))).toEqual(refused("client assertion rejected"));
+    }
+    expect(accepted).toBe(0);
+    // A legitimate client is still served after the flood.
+    expect(await v.verify(input(await assertion()))).toEqual({ ok: true, clientId: ID });
+  });
+
+  it("a store filled with maximum-lifetime assertions frees itself 360 s later", async () => {
+    let t = NOW_MS;
+    const jtiStore = createJtiStore(2);
+    const v = verifier({ extra: { jtiStore, now: () => t } });
+    for (let i = 0; i < 2; i++) {
+      const jwt = await assertion({ claims: { exp: NOW_S + 330 } });
+      expect(await v.verify(input(jwt))).toEqual({ ok: true, clientId: ID });
+    }
+    expect(await v.verify(input(await assertion()))).toEqual(refused("client assertion replayed"));
+    t = NOW_MS + 360 * 1000;
+    const late = await assertion({ claims: { iat: NOW_S + 360, exp: NOW_S + 420 } });
+    expect(await v.verify(input(late))).toEqual({ ok: true, clientId: ID });
+  });
+});
