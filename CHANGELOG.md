@@ -5,6 +5,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.34.1] - 2026-11-02
+
+Security fix to the client-assertion verifier. 0.34.0 was never published to npm; 0.34.1 is the first release of `./client-assertion`.
+
+### Security
+- An assertion's `exp` may be at most `MAX_ASSERTION_LIFETIME_SECONDS` (300, new export on `./client-assertion`) plus the 30 s skew ahead of now; further out is `client assertion rejected`. In 0.34.0 `exp` had no upper bound: each accepted jti is held until its `exp` and the default store (10000 entries) fails closed when full, and client ids are open (any host serving a CIMD and a key set), so 10000 valid assertions with `exp` years ahead locked every client assertion out, process-wide, until they expired. Now every held jti expires within 360 s of acceptance. `iat`, when present, is also `client assertion rejected` when it is in the future past the 30 s skew. The store's fail-closed semantics are unchanged (a live jti is never evicted); no per-client cap is added, because a client id is free to mint, so it would not bound an attacker. `test/client-assertion.test.ts` (lifetime cap block).
+
 ## [0.34.0] - 2026-11-02
 
 Additive: the private_key_jwt client-assertion verifier, on a new Node-only subpath. Existing exports are unchanged.

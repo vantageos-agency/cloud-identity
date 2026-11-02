@@ -7,7 +7,9 @@
  *  - alg is pinned to RS256 (a document declaring another signing alg is refused), so `none`
  *    and HMAC assertions cannot verify;
  *  - `iss` and `sub` equal the client_id; `aud` is this token endpoint or this issuer; `exp`
- *    is required (30 s skew); `jti` is required and accepted ONCE.
+ *    is required (30 s skew) and at most `MAX_ASSERTION_LIFETIME_SECONDS` (300 s) plus the
+ *    skew ahead of now; `iat`, when present, is not in the future past the skew; `jti` is
+ *    required and accepted ONCE.
  *
  * Lifted from the vantage-mcp-boilerplate (`src/oauth/clientAssertion.ts`). The decisions and
  * the refusal reasons are unchanged; the one difference is the JWT library. The boilerplate
@@ -43,6 +45,13 @@ export const JWT_BEARER_ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion
 export const ASSERTION_SIGNING_ALGS = ["RS256"] as const;
 
 const SKEW_SECONDS = 30;
+/**
+ * The furthest ahead of now an assertion's `exp` may be (plus the 30 s skew). Each accepted jti
+ * is held until its `exp`, and client ids are open (any host serving a CIMD and a key set), so
+ * without this bound one caller could fill the bounded jti store with far-future assertions and
+ * lock every client out until those expire.
+ */
+export const MAX_ASSERTION_LIFETIME_SECONDS = 300;
 const MAX_JWKS_BYTES = 64 * 1024;
 const MIN_RSA_MODULUS_BITS = 2048;
 
@@ -208,10 +217,13 @@ async function verifyRs256Assertion(
     return null;
   }
   if (typeof payload.exp !== "number" || payload.exp <= now - SKEW_SECONDS) return null;
+  if (payload.exp - now > MAX_ASSERTION_LIFETIME_SECONDS + SKEW_SECONDS) return null;
   if (payload.nbf !== undefined && (typeof payload.nbf !== "number" || payload.nbf > now + SKEW_SECONDS)) {
     return null;
   }
-  if (payload.iat !== undefined && typeof payload.iat !== "number") return null;
+  if (payload.iat !== undefined && (typeof payload.iat !== "number" || payload.iat > now + SKEW_SECONDS)) {
+    return null;
+  }
   return payload;
 }
 

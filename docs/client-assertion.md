@@ -30,12 +30,18 @@ that assertion or must not accept it; ignoring it is not an option.
   set is fetched, and an `alg: none` or HMAC assertion cannot verify. An RSA key
   under 2048 bits does not verify; a `crit` header is refused.
 - `aud` must name one of `audiences` (your token endpoint, your issuer). `exp`
-  is required, with 30 seconds of clock tolerance; `nbf` and `iat` must be
-  numbers when present.
+  is required, with 30 seconds of clock tolerance, and may be at most
+  `MAX_ASSERTION_LIFETIME_SECONDS` (300) plus those 30 seconds ahead of now: an
+  assertion whose `exp` is further out is refused (`client assertion rejected`).
+  `nbf` and `iat` must be numbers when present, and neither may be in the
+  future past the 30 seconds of tolerance.
 - `jti` is required and accepted ONCE. The default store (`createJtiStore(maxEntries = 10000)`)
   holds each jti until its `exp` plus 30 seconds. When it is full, a new jti is
   refused: a live jti is never evicted to make room, so a flood cannot reopen a
-  replay window. Pass `jtiStore` to share one store across instances (an object
+  replay window. Because `exp` is capped, every held jti expires within 360
+  seconds of being accepted, so a flood of valid assertions can fill the store
+  for at most that long after it stops; rate-limit `/token` per client and per
+  address in front of the verifier. Pass `jtiStore` to share one store across instances (an object
   with `accept(clientId, jti, exp, nowSeconds): boolean`, type `JtiStore`).
 
 Reasons (`AssertionRefusalReason`): `unsupported client assertion`,
