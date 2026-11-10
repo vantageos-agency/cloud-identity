@@ -5,6 +5,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-10
+
+Widening: the scope filters compare roster names in normalised form. No exported signature changes.
+
+### Changed
+- `passesScopeFilter`, `scopeFilterList` and `scopeFilterGet` compare a row's `createdBy` and each declared grant field (string or string[]) against `fromAllowList` on the normalised form of both sides: NFC, lowercase, trim, the package's one label form (`normalizeLabel`, identical to the consumer's `normalizeOrchestratorId`). Stored actor labels are normalised at write while a roster holds the agent's exact stored name, so roster `["Ada"]` was refused its own `"ada"` rows (get answered "not found", lists were empty). Roster `["Ada"]` now admits `"Ada"`, `"ada"`, `"ADA"` and NFD spellings; it still refuses `"bram"`. Accents do not fold. A value or roster entry that normalises to the empty string never matches. Master detection (`scope === "master"` or a literal `"*"`) and namespace prefixes are unchanged. Consumers that fed both spellings through a wrapper can drop it. `test/scope-filter-normalised-roster.test.ts`.
+
 ## [0.34.1] - 2026-11-02
 
 Security fix to the client-assertion verifier. 0.34.0 was never published to npm; 0.34.1 is the first release of `./client-assertion`.

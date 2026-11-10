@@ -60,10 +60,20 @@
  *           (prefix matched as exact-equal OR followed by '/' boundary)
  *   - Row missing BOTH `createdBy` and `namespace` = denied for non-master.
  *
+ * Contract (0.35.0 — widening, case/NFC/whitespace only):
+ *   - Every roster compare (`createdBy` and declared grant fields) is done on
+ *     the normalised form of BOTH sides: NFC, lowercase, trim (the package's
+ *     one label form, `normalizeLabel`, identical to the consumer's
+ *     `normalizeOrchestratorId`). Roster ["Ada"] admits rows labelled "Ada",
+ *     "ada", "ADA"; it still refuses "bram". Accents do not fold. A value or
+ *     roster entry that normalises to "" never matches. Master detection
+ *     (`scope === "master"` or a literal "*") is unchanged.
+ *
  * NOTE: this module is intentionally framework-agnostic — no McpServer / Hono
  * imports — to keep the helpers trivially unit-testable.
  */
 
+import { normalizeLabel } from "./label-normal.js";
 import type { OAuthCtx } from "./types.js";
 
 /**
@@ -144,13 +154,34 @@ export type GrantFieldDeclaration = readonly string[];
 
 const NO_GRANT_FIELDS: GrantFieldDeclaration = [];
 
-function grantFieldMatches(value: unknown, fromAllowList: readonly string[]): boolean {
-  if (typeof value === "string") return fromAllowList.includes(value);
-  if (Array.isArray(value)) {
-    return value.some(
-      (entry) => typeof entry === "string" && fromAllowList.includes(entry),
-    );
+/**
+ * The caller's roster in comparison form (0.35.0): each name through
+ * `normalizeLabel` (NFC, lowercase, trim). Stored actor labels are normalised
+ * at write while a roster holds the agent's exact stored name ("Ada"), so an
+ * exact compare refused a caller its own rows. A name that normalises to the
+ * empty string names nobody and is dropped. `"*"` is kept as is; it is only
+ * read by `isMasterScope`, which runs on the raw list and is unchanged.
+ */
+function normalisedNamesOf(ctx: OAuthCtx): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const name of namesOf(ctx)) {
+    if (typeof name !== "string") continue;
+    const n = normalizeLabel(name);
+    if (n !== "") out.add(n);
   }
+  return out;
+}
+
+/** True when `value` is a string whose normalised form is in `names`. */
+function nameIn(value: unknown, names: ReadonlySet<string>): boolean {
+  if (typeof value !== "string") return false;
+  const n = normalizeLabel(value);
+  return n !== "" && names.has(n);
+}
+
+function grantFieldMatches(value: unknown, names: ReadonlySet<string>): boolean {
+  if (typeof value === "string") return nameIn(value, names);
+  if (Array.isArray(value)) return value.some((entry) => nameIn(entry, names));
   return false;
 }
 
@@ -195,9 +226,9 @@ export function passesScopeFilter<T extends ScopeFilterable>(
 ): boolean {
   assertOauthCtx(oauthCtx);
   if (isMasterScope(oauthCtx)) return true;
-  const names = namesOf(oauthCtx);
+  const names = normalisedNamesOf(oauthCtx);
   const { createdBy, namespace } = row;
-  if (createdBy && names.includes(createdBy)) return true;
+  if (createdBy && nameIn(createdBy, names)) return true;
   if (namespace) {
     for (const p of oauthCtx.namespaceReadPrefixes) {
       if (namespaceMatchesPrefix(namespace, p)) return true;
