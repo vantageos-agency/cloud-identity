@@ -68,7 +68,7 @@ function isAbsoluteUrl(value: string, requireHttps: boolean): boolean {
  */
 export function buildDiscoveryDocument(config: DiscoveryConfig): DiscoveryResult {
   const bad: DiscoveryResult = { ok: false, refusal: refusal("issuer-invalid") };
-  if (!isAbsoluteUrl(config.issuer, true)) return bad;
+  if (!isAbsoluteUrl(config.issuer, false)) return bad;
   const issuer = new URL(config.issuer);
   if (issuer.search !== "" || issuer.hash !== "") return bad;
   const endpoints = [
@@ -78,7 +78,7 @@ export function buildDiscoveryDocument(config: DiscoveryConfig): DiscoveryResult
     config.userinfoEndpoint,
     ...(config.registrationEndpoint ? [config.registrationEndpoint] : []),
   ];
-  if (!endpoints.every((e) => isAbsoluteUrl(e, true))) return bad;
+  if (!endpoints.every((e) => isAbsoluteUrl(e, false))) return bad;
 
   const document: DiscoveryDocument = {
     issuer: config.issuer,
