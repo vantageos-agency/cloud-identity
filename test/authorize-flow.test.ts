@@ -612,6 +612,28 @@ describe("buildDiscoveryDocument", () => {
       registration_endpoint: "https://mcp.example.test/register",
     });
   });
+  it("accepts a plain-http issuer and endpoints on loopback only, as the contract says", () => {
+    for (const host of ["127.0.0.1:43123", "localhost:43123"]) {
+      const origin = `http://${host}`;
+      const r = buildDiscoveryDocument({
+        issuer: origin,
+        authorizationEndpoint: `${origin}/authorize`,
+        tokenEndpoint: `${origin}/token`,
+        jwksUri: `${origin}/jwks`,
+        userinfoEndpoint: `${origin}/userinfo`,
+      });
+      expect([host, r.ok]).toEqual([host, true]);
+      if (r.ok) expect(r.document.issuer).toBe(origin);
+    }
+    // a non-loopback endpoint on plain http is still refused, even with a loopback issuer
+    expect(
+      buildDiscoveryDocument({
+        ...base,
+        issuer: "http://127.0.0.1:43123",
+        tokenEndpoint: "http://mcp.example.test/token",
+      })
+    ).toEqual({ ok: false, refusal: { code: "AUTHORIZE_REFUSED", reason: "issuer-invalid" } });
+  });
   it("refuses a non-https issuer, an issuer with a query, and a relative endpoint", () => {
     for (const over of [
       { issuer: "http://mcp.example.test" },
