@@ -5,6 +5,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.36.1] - 2026-11-19
+
 ### Fixed
 - `buildDiscoveryDocument` accepts a plain-http issuer and endpoints on a loopback host (`localhost`, `127.0.0.1`), as its own contract states ("plain http only for loopback"). Both checks passed `requireHttps=true`, so a server whose public URL is `http://127.0.0.1:<port>` (a local harness, a test) answered its `/.well-known/oauth-authorization-server` with `issuer-invalid`, which consumers mapped to a 500. Plain http on any other host is still refused, an endpoint included. `test/authorize-flow.test.ts`.
 
