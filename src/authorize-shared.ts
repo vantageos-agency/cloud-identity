@@ -42,6 +42,12 @@ export type AuthorizeRefusalReason =
   | "resource-mismatch"
   | "verifier-malformed"
   | "pkce-mismatch"
+  // refresh_token grant
+  | "refresh-unknown"
+  | "refresh-reused"
+  | "refresh-expired"
+  | "refresh-store-unavailable"
+  | "refresh-reauthorization-failed"
   // OIDC
   | "subject-mismatch"
   | "openid-scope-required"
@@ -85,6 +91,10 @@ export function oauthErrorFor(r: AuthorizeRefusal): {
     case "redirect-uri-changed":
     case "verifier-malformed":
     case "pkce-mismatch":
+    case "refresh-unknown":
+    case "refresh-reused":
+    case "refresh-expired":
+    case "refresh-reauthorization-failed":
       return { error: "invalid_grant", status: 400 };
     case "session-required":
     case "session-invalid":
@@ -98,6 +108,7 @@ export function oauthErrorFor(r: AuthorizeRefusal): {
     case "client-lookup-unavailable":
     case "membership-lookup-unavailable":
     case "code-store-unavailable":
+    case "refresh-store-unavailable":
       return { error: "temporarily_unavailable", status: 503 };
     case "server-misconfigured":
     case "issuer-invalid":

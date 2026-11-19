@@ -5,6 +5,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- The `refresh_token` grant decisions and the refresh-token store contract (root and `./token-exchange`). `issueRefreshToken(claims, deps)` issues an opaque token (32 random bytes, base64url) and stores only its SHA-256 digest. `exchangeRefreshToken(input, deps)` rotates it: the token is consumed first; a replayed token is `refresh-reused` and revokes the whole family (RFC 9700 section 4.14); then expiry, client (`client-mismatch`) and resource (`resource-mismatch`) are checked and the required `reauthorize(claims)` callback re-checks membership and role now (`{ ok: false }` or a throw revokes the family: `refresh-reauthorization-failed`). Success returns the reauthorized claims and a new token in the same family. New: `RefreshTokenStore` (`put`, atomic `consume` -> `ok | unknown | already-used` with the `familyId`, `revokeFamily`), `RefreshTokenRecord`, `ConsumeRefreshResult`, `RefreshTokenIssueDeps`, `RefreshExchangeInput`, `RefreshExchangeDeps`, `RefreshExchangeResult`, `REFRESH_TOKEN_TTL_MS` (30 days). No adapter is shipped; the consumer mints the access token from the claims and persists through its own store.
+- Refusal reasons `refresh-unknown`, `refresh-reused`, `refresh-expired`, `refresh-reauthorization-failed` (`oauthErrorFor`: `invalid_grant`, 400) and `refresh-store-unavailable` (`temporarily_unavailable`, 503).
+- `buildDiscoveryDocument`: optional `refreshTokens?: boolean`; when true, `grant_types_supported` is `["authorization_code", "refresh_token"]`. The default is unchanged. `test/refresh-token.test.ts`.
+
+### Changed
+- `docs/authorize.md`: documents the refresh grant; the "issues no refresh token" limit now reads "holds no refresh-token state".
+
 ## [0.35.0] - 2026-11-10
 
 Widening: the scope filters compare roster names in normalised form. No exported signature changes.

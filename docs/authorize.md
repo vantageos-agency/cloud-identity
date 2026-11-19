@@ -91,14 +91,31 @@ const res = await exchangeAuthorizationCode(
   `{ sub, org_id, org_slug, org_role, aud, client_id, scope }` (`ExchangeInput`,
   `ExchangeDeps`, `ExchangeResult`). No field comes from a client-registration
   profile.
+- `issueRefreshToken(claims, deps)` returns an opaque token (32 random bytes,
+  base64url) and stores ONLY its SHA-256 digest through a `RefreshTokenStore`
+  you implement (`RefreshTokenRecord`, `RefreshTokenIssueDeps`,
+  `REFRESH_TOKEN_TTL_MS` = 30 days). The store's contract: digest-keyed,
+  atomic `consume` returning `ok | unknown | already-used` (`ConsumeRefreshResult`;
+  a used record is kept so a replay is `already-used` with its `familyId`),
+  `revokeFamily`, expiry swept by the store, any failure thrown.
+- `exchangeRefreshToken(input, deps)` redeems a refresh token with rotation
+  (OAuth 2.1 section 4.3, RFC 9700 section 4.14; `RefreshExchangeInput`,
+  `RefreshExchangeDeps`, `RefreshExchangeResult`). It consumes the token
+  first; a replay is `refresh-reused` and revokes the whole family; then it
+  checks expiry, client and resource, and calls your REQUIRED `reauthorize`
+  with the stored claims so membership and role are re-checked now (`{ ok:
+  false }` revokes the family: `refresh-reauthorization-failed`). On success
+  it returns the reauthorized claims and a NEW token in the same family; the
+  consumer mints the access token from the claims.
 - `buildDiscoveryDocument(config)` builds the discovery document
   (`DiscoveryConfig`, `DiscoveryDocument`, `DiscoveryResult`); the issuer must
   be https with no query. It advertises only what is implemented: the code
-  flow, PKCE, the `authorization_code` grant and UserInfo. It omits
+  flow, PKCE, the `authorization_code` grant, UserInfo, and the `refresh_token`
+  grant only when `config.refreshTokens` is true. It omits
   `id_token_signing_alg_values_supported` (OIDC Discovery lists it as required
   for a provider that issues id_tokens; this package issues none, so that is a
-  documented deviation), refresh tokens and client-authentication methods. A
-  consumer that implements any of them adds those keys itself. `buildUserInfo(claims, user)` returns `sub`, and
+  documented deviation) and client-authentication methods. A consumer that
+  implements them adds those keys itself. `buildUserInfo(claims, user)` returns `sub`, and
   `email` / `email_verified` when the token carries `email`
   (`ClerkUserLike`, `UserInfo`, `UserInfoResult`).
 - Every refusal is `{ code: "AUTHORIZE_REFUSED", reason }`
@@ -111,8 +128,8 @@ Also exported as subpaths: `/authorize`, `/token-exchange`, `/clerk-session`,
 `/oidc`.
 
 Limits, stated: `redirect_uri` matching is exact (no loopback port variation);
-the package signs no access token and no id token and issues no refresh token (the consumer mints the token
-from the claims); it fetches no key set and calls no Clerk API itself.
+the package signs no access token and no id token (the consumer mints the token
+from the claims) and holds no refresh-token state (the consumer implements `RefreshTokenStore`); it fetches no key set and calls no Clerk API itself.
 
 ## Wiring person sign-in in an MCP server
 

@@ -14,6 +14,12 @@ export interface DiscoveryConfig {
   userinfoEndpoint: string;
   registrationEndpoint?: string;
   scopesSupported?: readonly string[];
+  /**
+   * Advertise the `refresh_token` grant. Set it only when the token endpoint
+   * really serves it (`issueRefreshToken` / `exchangeRefreshToken`). Default
+   * false.
+   */
+  refreshTokens?: boolean;
 }
 
 export interface DiscoveryDocument {
@@ -53,10 +59,12 @@ function isAbsoluteUrl(value: string, requireHttps: boolean): boolean {
 /**
  * Builds the discovery document (OAuth authorization-server metadata with the
  * OIDC fields this package honours). It advertises only what is implemented:
- * the code flow, PKCE, the `authorization_code` grant, UserInfo. It does NOT
- * advertise id_tokens, refresh tokens or client-authentication methods; the
- * consumer may add those keys to the returned object if it implements them. The issuer must be an https URL with no query or fragment (plain
- * http only for loopback); every endpoint must be an absolute URL.
+ * the code flow, PKCE, the `authorization_code` grant, UserInfo, and the
+ * `refresh_token` grant only when `config.refreshTokens` is true. It does NOT
+ * advertise id_tokens or client-authentication methods; the consumer may add
+ * those keys to the returned object if it implements them. The issuer must be
+ * an https URL with no query or fragment (plain http only for loopback); every
+ * endpoint must be an absolute URL.
  */
 export function buildDiscoveryDocument(config: DiscoveryConfig): DiscoveryResult {
   const bad: DiscoveryResult = { ok: false, refusal: refusal("issuer-invalid") };
@@ -80,7 +88,9 @@ export function buildDiscoveryDocument(config: DiscoveryConfig): DiscoveryResult
     userinfo_endpoint: config.userinfoEndpoint,
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
-    grant_types_supported: ["authorization_code"],
+    grant_types_supported: config.refreshTokens
+      ? ["authorization_code", "refresh_token"]
+      : ["authorization_code"],
     subject_types_supported: ["public"],
     scopes_supported: [...(config.scopesSupported ?? ["openid", "email"])],
     code_challenge_methods_supported: [PKCE_METHOD],
