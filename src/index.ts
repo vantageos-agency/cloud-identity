@@ -214,12 +214,24 @@ export type {
   PersonScopeOptions,
   PersonScopeResult,
 } from "./person-scope.js";
-export { exchangeAuthorizationCode } from "./token-exchange.js";
+export {
+  exchangeAuthorizationCode,
+  exchangeRefreshToken,
+  issueRefreshToken,
+  REFRESH_TOKEN_TTL_MS,
+} from "./token-exchange.js";
 export type {
   AuthorizedTokenClaims,
   ExchangeInput,
   ExchangeDeps,
   ExchangeResult,
+  ConsumeRefreshResult,
+  RefreshExchangeDeps,
+  RefreshExchangeInput,
+  RefreshExchangeResult,
+  RefreshTokenIssueDeps,
+  RefreshTokenRecord,
+  RefreshTokenStore,
 } from "./token-exchange.js";
 export { verifyClerkSessionToken } from "./clerk-session.js";
 export type {
