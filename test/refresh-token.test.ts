@@ -275,22 +275,28 @@ describe("exchangeRefreshToken", () => {
     expect(reasonOf(r)).toBe("refresh-store-unavailable");
   });
 
-  it("reauthorize {ok:false} is refresh-reauthorization-failed and revokes the family", async () => {
-    const { store, records, used } = fakeStore();
-    const first = await issued(store);
-    const r = await exchangeRefreshToken(input(first.refreshToken), {
+  // Two live tokens of one family: the only shape in which revoking the family is observable.
+  // With a single token the atomic consume already marks it used, so a missing revokeFamily
+  // would go unseen; here the sibling must be refused afterwards.
+  it("reauthorize {ok:false} is refresh-reauthorization-failed and revokes the family: a sibling token is then refused", async () => {
+    const { store } = fakeStore();
+    const failing = await issueRefreshToken(CLAIMS, { refreshStore: store, now: () => NOW, familyId: "fam-reauth" });
+    const sibling = await issueRefreshToken(CLAIMS, { refreshStore: store, now: () => NOW, familyId: "fam-reauth" });
+    const r = await exchangeRefreshToken(input(failing.refreshToken), {
       refreshStore: store,
       now: () => NOW,
       reauthorize: async () => ({ ok: false }),
     });
     expect(reasonOf(r)).toBe("refresh-reauthorization-failed");
-    expect([...records.keys()].every((h) => used.has(h))).toBe(true);
+    const after = await exchangeRefreshToken(input(sibling.refreshToken), { refreshStore: store, now: () => NOW, reauthorize: allow });
+    expect(reasonOf(after)).toBe("refresh-reused");
   });
 
-  it("a reauthorize that throws refuses with refresh-reauthorization-failed", async () => {
+  it("a reauthorize that throws refuses with refresh-reauthorization-failed and revokes the family: a sibling token is then refused", async () => {
     const { store } = fakeStore();
-    const first = await issued(store);
-    const r = await exchangeRefreshToken(input(first.refreshToken), {
+    const failing = await issueRefreshToken(CLAIMS, { refreshStore: store, now: () => NOW, familyId: "fam-throw" });
+    const sibling = await issueRefreshToken(CLAIMS, { refreshStore: store, now: () => NOW, familyId: "fam-throw" });
+    const r = await exchangeRefreshToken(input(failing.refreshToken), {
       refreshStore: store,
       now: () => NOW,
       reauthorize: async () => {
@@ -298,6 +304,8 @@ describe("exchangeRefreshToken", () => {
       },
     });
     expect(reasonOf(r)).toBe("refresh-reauthorization-failed");
+    const after = await exchangeRefreshToken(input(sibling.refreshToken), { refreshStore: store, now: () => NOW, reauthorize: allow });
+    expect(reasonOf(after)).toBe("refresh-reused");
   });
 
   it("reauthorize receives the stored claims; a changed role is carried into the result and the new record", async () => {
