@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   type ActingPrincipal,
+  type OrgKind,
+  type OrgMappingLookups,
+  type PrincipalLookups,
   assertAgentOwnedBy,
   resolveActingPrincipal,
   resolveCallerFromAgentCredential,
@@ -48,10 +51,11 @@ function world(w: World = {}) {
     "agent" in w ? (w.agent as Row) : { id: AGENT, orgId: ORG_A, active: true, ownerPersonId: OWNER };
   const ownerRow: Row = "owner" in w ? (w.owner as Row) : { id: OWNER, orgId: ORG_A, active: true };
 
-  const principalLookups = {
+  const principalLookups: PrincipalLookups = {
     agentById: (id: string) => {
       calls.push("agentById");
-      return id === AGENT ? agentRow : null;
+      // The row is a loose Record on purpose: some tests feed malformed rows to the runtime guards.
+      return (id === AGENT ? agentRow : null) as never;
     },
     ...(w.noPersonLookup
       ? {}
@@ -60,16 +64,16 @@ function world(w: World = {}) {
             calls.push("personById");
             personCalls.push([personId, orgId]);
             if (w.ownerThrows) throw new Error("SECRET-DB-ERROR connection string leaked");
-            return ownerRow;
+            return ownerRow as never;
           },
         }),
     organisationById: (id: string) => (orgs[id] ? { id, active: true } : null),
-    orgKindOf: (id: string) => (orgs[id] as { orgKind?: string } | undefined)?.orgKind ?? null,
+    orgKindOf: (id: string) => ((orgs[id] as { orgKind?: string } | undefined)?.orgKind ?? null) as OrgKind | null,
   };
-  const orgLookups = {
+  const orgLookups: OrgMappingLookups = {
     orgById: (id: string) => {
       calls.push("orgById");
-      return orgs[id] ?? null;
+      return (orgs[id] ?? null) as never;
     },
   };
   return { principalLookups, orgLookups, calls, personCalls };

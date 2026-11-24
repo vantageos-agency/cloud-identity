@@ -24,7 +24,7 @@ const deps = {
   principalLookups: {
     personById: () => null,
     organisationById: (id: string) => (id === ORG_A ? { id, active: true } : null),
-    orgKindOf: () => "operator",
+    orgKindOf: () => "operator" as const,
   },
 };
 const opts = { adminRoles: ["org:admin"], door: "door:x" } as const;

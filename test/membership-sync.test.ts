@@ -331,25 +331,25 @@ describe("membershipPersonLookups", () => {
   it("a live row is an active person in that org", async () => {
     const read = vi.fn(() => ({ role: "member" as const }));
     const { personById } = membershipPersonLookups(read);
-    expect(await personById("user_1", "org_A")).toEqual({ id: "user_1", orgId: "org_A", active: true });
+    expect(await personById!("user_1", "org_A")).toEqual({ id: "user_1", orgId: "org_A", active: true });
     expect(read).toHaveBeenCalledWith("org_A", "user_1");
   });
 
   it("an absent row is null", async () => {
     const { personById } = membershipPersonLookups(async () => null);
-    expect(await personById("user_1", "org_A")).toBeNull();
+    expect(await personById!("user_1", "org_A")).toBeNull();
   });
 
   it("a tombstoned row is null", async () => {
     const { personById } = membershipPersonLookups(async () => ({ deletedAt: 5 }));
-    expect(await personById("user_1", "org_A")).toBeNull();
+    expect(await personById!("user_1", "org_A")).toBeNull();
   });
 
   it("a throwing read propagates so the resolver can refuse principal-lookup-failed", async () => {
     const { personById } = membershipPersonLookups(() => {
       throw new Error("db down");
     });
-    await expect(personById("user_1", "org_A")).rejects.toThrow("db down");
+    await expect(personById!("user_1", "org_A")).rejects.toThrow("db down");
   });
 
   it("plugs into resolveActingPrincipal: live resolves, tombstone refuses", async () => {
@@ -414,7 +414,7 @@ describe("membershipPersonLookups: lookupMembership (the stored role)", () => {
 
   it("personById is unchanged by the role being present", async () => {
     const { personById } = membershipPersonLookups(() => ({ role: "org:admin" }));
-    expect(await personById("user_1", "org_A")).toEqual({ id: "user_1", orgId: "org_A", active: true });
+    expect(await personById!("user_1", "org_A")).toEqual({ id: "user_1", orgId: "org_A", active: true });
   });
 });
 

@@ -81,7 +81,8 @@ describe("resolveOrgIdForLabelBackfillOnly", () => {
   });
 
   it("answers record-invalid for a malformed row or one under another label", async () => {
-    for (const row of [{ id: "org_a" }, mapping({ label: "other" }), mapping({ id: "" })]) {
+    // { id } alone is malformed on purpose (the runtime guard must refuse it): cast at the boundary.
+    for (const row of [{ id: "org_a" } as never, mapping({ label: "other" }), mapping({ id: "" })]) {
       const r = await resolveOrgIdForLabelBackfillOnly("acme", { orgByLabel: () => row });
       expect(r).toEqual({ present: false, absence: { code: "ORG_ID_ABSENT", reason: "record-invalid" } });
     }

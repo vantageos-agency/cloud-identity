@@ -50,7 +50,9 @@ function moduleExports(relPath: string): ts.Symbol[] {
 function collectIdentifiers(type: ts.Type, out: Set<string>, seen: Set<ts.Type>): void {
   if (seen.has(type)) return;
   seen.add(type);
-  if (type.flags & (ts.TypeFlags.Primitive | ts.TypeFlags.Literal | ts.TypeFlags.Never)) return;
+  // TypeFlags.Primitive is an @internal member: stripped from typescript.d.ts, present at runtime.
+  const primitive = (ts.TypeFlags as unknown as { Primitive: ts.TypeFlags }).Primitive;
+  if (type.flags & (primitive | ts.TypeFlags.Literal | ts.TypeFlags.Never)) return;
   if (isPlatformType(type)) {
     // a platform generic (`T[]`, `Promise<T>`, `ReadonlyArray<T>`) is not
     // walked itself, but what it carries is
