@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  type CallerStanding,
   type OrganisationRow,
   type OrgKind,
   type PrincipalLookups,
@@ -101,7 +102,8 @@ describe("resolveCallerStanding", () => {
     for (const c of [null, undefined]) {
       const r = await derive(c);
       expect(r.standing).toBe("anonymous");
-      expect(r.refusal?.code).toBe("RBAC_DENIED");
+      // Type-only narrowing: the line above asserts the anonymous standing, the only member that carries a refusal.
+      expect((r as Extract<CallerStanding, { standing: "anonymous" }>).refusal?.code).toBe("RBAC_DENIED");
     }
   });
 
@@ -109,7 +111,8 @@ describe("resolveCallerStanding", () => {
     for (const c of ["x", 7, {}, { kind: "person" }, { kind: "fleet" }, { kind: "person", personId: "", verifiedOrgId: "org_a" }]) {
       const r = await derive(c);
       expect(r.standing).toBe("anonymous");
-      expect(r.refusal?.code).toBe("RBAC_DENIED");
+      // Type-only narrowing: the line above asserts the anonymous standing, the only member that carries a refusal.
+      expect((r as Extract<CallerStanding, { standing: "anonymous" }>).refusal?.code).toBe("RBAC_DENIED");
     }
   });
 });

@@ -13,19 +13,24 @@ import {
  * a caller passes the retired `labelFallback` flag anyway (cast past the types).
  */
 const RETIRED = { labelFallback: true } as never;
+// The three functions below take no options argument: the flag is passed one argument past
+// their signature on purpose, so their types are widened here (cast past the types).
+const sameOrgPastArity = sameOrg as (...args: unknown[]) => boolean;
+const isFleetStampPastArity = isFleetStamp as (...args: unknown[]) => boolean;
+const sameTenantStampPastArity = sameTenantStamp as (...args: unknown[]) => boolean;
 const row = { id: "org_a", label: "acme", active: true, allowedOrchestrators: [], scopes: [] };
 
 describe("no label resolution: behaviour", () => {
   it("sameOrg: two label-only references are not the same org, flag or not", () => {
     expect(sameOrg({ label: "acme" }, { label: "acme" })).toBe(false);
-    expect(sameOrg({ label: "acme" }, { label: "acme" }, RETIRED)).toBe(false);
-    expect(sameOrg({ id: "org_a", label: "acme" }, { label: "acme" }, RETIRED)).toBe(false);
+    expect(sameOrgPastArity({ label: "acme" }, { label: "acme" }, RETIRED)).toBe(false);
+    expect(sameOrgPastArity({ id: "org_a", label: "acme" }, { label: "acme" }, RETIRED)).toBe(false);
   });
 
   it("isFleetStamp / sameTenantStamp: a label-only stamp never matches the operator or another stamp", () => {
     const operator = { id: "org_op", label: "operator" };
-    expect(isFleetStamp({ label: "operator" }, operator, RETIRED)).toBe(false);
-    expect(sameTenantStamp({ label: "acme" }, { label: "acme" }, operator, RETIRED)).toBe(false);
+    expect(isFleetStampPastArity({ label: "operator" }, operator, RETIRED)).toBe(false);
+    expect(sameTenantStampPastArity({ label: "acme" }, { label: "acme" }, operator, RETIRED)).toBe(false);
   });
 
   it("resolveOrgFromClaim: a label-only credential is refused and the label adapter is never called", async () => {

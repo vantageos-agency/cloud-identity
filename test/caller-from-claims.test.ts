@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { resolveCallerFromClaims } from "../src/caller-from-claims.js";
-import { resolveProvisioningLabel } from "../src/org-by-id.js";
+import { type CallerFromClaimsDeps, resolveCallerFromClaims } from "../src/caller-from-claims.js";
+import { type OrgMappingRow, resolveProvisioningLabel } from "../src/org-by-id.js";
+import type { OrgKind } from "../src/principal-by-id.js";
 
 const ORG_A = "org_aaa";
 const ORG_B = "org_bbb";
 const mappingA = { id: ORG_A, label: "acme", active: true, allowedOrchestrators: [], scopes: ["view-own-tasks"], orgKind: "client" };
 const mappingOp = { id: ORG_B, label: "operator", active: true, allowedOrchestrators: [], scopes: [], orgKind: "operator" };
 
-function deps(over: { personOrg?: string | null; mappings?: Record<string, unknown> } = {}) {
-  const mappings: Record<string, unknown> = over.mappings ?? { [ORG_A]: mappingA, [ORG_B]: mappingOp };
+function deps(over: { personOrg?: string | null; mappings?: Record<string, OrgMappingRow> } = {}): CallerFromClaimsDeps {
+  const mappings: Record<string, OrgMappingRow> = over.mappings ?? { [ORG_A]: mappingA, [ORG_B]: mappingOp };
   return {
     orgLookups: {
       orgById: (id: string) => mappings[id] ?? null,
@@ -18,7 +19,7 @@ function deps(over: { personOrg?: string | null; mappings?: Record<string, unkno
       personById: (personId: string, orgId: string) =>
         over.personOrg === null ? null : { id: personId, orgId: over.personOrg ?? orgId, active: true },
       organisationById: (id: string) => (mappings[id] ? { id, active: true } : null),
-      orgKindOf: (id: string) => ((mappings[id] as { orgKind?: string } | undefined)?.orgKind ?? null),
+      orgKindOf: (id: string) => ((mappings[id] as { orgKind?: string } | undefined)?.orgKind ?? null) as OrgKind | null,
     },
   };
 }
