@@ -167,7 +167,8 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && tsc -p tsconfig.check.json",
+    "typecheck": "tsc -p tsconfig.check.json",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
