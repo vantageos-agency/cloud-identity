@@ -19,10 +19,10 @@ import { resolveTenantIdOrAbsent } from "./org-guard.js";
 const CLERK_ORG_ID_SHAPE = /^org_[A-Za-z0-9]+$/;
 
 /**
- * Whether the `"first-present"` reader requires the Clerk `org_` shape. OPEN
- * ruling: `true` (strict) refuses a non-empty value such as `"acme"`;
- * `false` admits any non-empty string, as a hand-written `?? chain` with a
- * string check does. The `"first-valid"` readers always require the shape.
+ * Whether the `"first-present"` reader requires the Clerk `org_` shape.
+ * Ruled `true` by Pi on 2026-11-25 (task k17ebm83rppkavg31ydtfzpjbs8jxd99): one
+ * shape rule for every door, so a non-empty value such as `"acme"` is refused.
+ * The `"first-valid"` readers always require the shape.
  */
 const IDENTITY_READER_REQUIRES_ORG_SHAPE = true;
 
