@@ -5,6 +5,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-25
+
 ### Added
 - `tenantFromIdentityOrAbsent(identity)` and the types `IdentityTenantResolution`, `IdentityTenantAbsenceReason` (root and the new `./tenant-from-identity` subpath, `import` + `require`; tagged `@callerResolver`): the NON-throwing sibling of `requireTenantFromIdentity`, for a READ path over a host-verified identity. Returns `{ present: true, tenantId }` or `{ present: false, absence: { code: "TENANT_ABSENT", reason } }`, reason `no-identity`, `no-organization-claim` or `invalid-organization-claim`; never throws and never echoes the claim value. The first of `org_id`, `orgId`, nested `o.id` that is not null/undefined decides (a Clerk Convex consumer's `org_id ?? orgId ?? o?.id`); an invalid value there (empty, non-string, not a Clerk `org_` ID) is an absence and does not fall through; `organizationId` is not read. Whether the `org_` shape check applies to this reader is one internal constant, strict by default. `test/tenant-from-identity-or-absent.test.ts`.
 
