@@ -5,6 +5,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-11-25
+
 ### Added
 - JSDoc block tags in the declarations: `@signatureVerifier` on `verifyHmacSha256Signature` and `verifySvixWebhook` (compute the signature and compare it; `ok` is the verdict), `@signatureCompare` on `timingSafeEqual` and `timingSafeEqualSync` (the constant-time compare step). A static analyser derives which package calls complete a webhook signature check from the tags, as it already does for `@callerResolver`. No runtime change. `test/signature-marker.test.ts`.
 
