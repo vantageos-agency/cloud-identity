@@ -74,14 +74,21 @@ describe("the exports map routes import and require separately", () => {
 });
 
 describe("a real CommonJS consumer and a real ESM consumer", () => {
-  it("require() of the root and of every subpath returns a non-empty module", () => {
+  it("require() of the root and of every subpath loads a module object", () => {
     const script = `
       const out = {};
-      for (const s of ${JSON.stringify(SUBPATHS.map(specOf))}) out[s] = Object.keys(require(s)).length;
+      for (const s of ${JSON.stringify(SUBPATHS.map(specOf))}) {
+        const m = require(s);
+        out[s] = typeof m === "object" && m !== null ? Object.keys(m).length : -1;
+      }
       process.stdout.write(JSON.stringify(out));
     `;
     const counts = JSON.parse(runNode(["-e", script])) as Record<string, number>;
-    for (const subpath of SUBPATHS) expect(counts[specOf(subpath)], subpath).toBeGreaterThan(0);
+    for (const subpath of SUBPATHS) expect(counts[specOf(subpath)], subpath).toBeGreaterThanOrEqual(0);
+    // ./types carries declarations only, so it is the one empty module (as it is under import).
+    const empty = SUBPATHS.filter((s) => counts[specOf(s)] === 0);
+    expect(empty).toEqual(["./types"]);
+    expect(counts["@vantageos/cloud-identity"]).toBeGreaterThan(100);
   }, 60_000);
 
   it("import of the root and of every subpath returns the same export names as require", () => {
