@@ -65,15 +65,20 @@ export async function resolveClerkSessionFromRequest(
     reason: "handshake-invalid",
     headers: new Headers(),
   });
-  let state: Awaited<ReturnType<typeof client.authenticateRequest>>;
-  try {
-    state = await client.authenticateRequest(request, {
+  // The state type is read from THIS call, not from `typeof client.authenticateRequest`:
+  // `ReturnType` of an overloaded method picks its last overload, and which one that is
+  // depends on the typings resolved (the ESM and the CommonJS builds resolve different ones).
+  const authenticate = () =>
+    client.authenticateRequest(request, {
       publishableKey: options.publishableKey,
       secretKey: options.secretKey,
       ...(options.authorizedParties ? { authorizedParties: [...options.authorizedParties] } : {}),
       ...(options.jwtKey ? { jwtKey: options.jwtKey } : {}),
       acceptsToken: "session_token",
     });
+  let state: Awaited<ReturnType<typeof authenticate>>;
+  try {
+    state = await authenticate();
   } catch (error) {
     if (carriesHandshake) return invalidHandshake();
     throw error;
