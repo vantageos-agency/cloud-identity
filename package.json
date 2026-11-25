@@ -412,6 +412,17 @@
         "default": "./dist/cjs/client-assertion.js"
       },
       "default": "./dist/client-assertion.js"
+    },
+    "./tenant-from-identity": {
+      "import": {
+        "types": "./dist/tenant-from-identity.d.ts",
+        "default": "./dist/tenant-from-identity.js"
+      },
+      "require": {
+        "types": "./dist/cjs/tenant-from-identity.d.ts",
+        "default": "./dist/cjs/tenant-from-identity.js"
+      },
+      "default": "./dist/tenant-from-identity.js"
     }
   },
   "files": [

@@ -34,6 +34,7 @@ describe("@callerResolver marker", () => {
         "resolvePersonPrincipal",
         "requireTenantFromIdentity",
         "requireSubjectFromIdentity",
+        "tenantFromIdentityOrAbsent",
         "resolveSupportAccess",
         "resolveAgentLink",
         "resolveAgentWriter",
