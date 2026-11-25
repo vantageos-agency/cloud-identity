@@ -1,4 +1,4 @@
-import { claimedOrgId } from "./claimed-org-id.js";
+import { claimedOrgId, readClaimedOrgId } from "./claimed-org-id.js";
 import { IdentityRefusalError, refusal } from "./identity-refusal.js";
 
 /**
@@ -35,6 +35,51 @@ export function requireTenantFromIdentity(
     );
   }
   return tenantId;
+}
+
+/**
+ * Why `tenantFromIdentityOrAbsent` found no tenant: no identity at all, no
+ * organisation claim name present, or the first present claim is not an
+ * organisation ID.
+ */
+export type IdentityTenantAbsenceReason = "no-identity" | "no-organization-claim" | "invalid-organization-claim";
+
+/**
+ * Result of `tenantFromIdentityOrAbsent`. Branch on `present`. The absence
+ * carries the same `TENANT_ABSENT` code as `resolveTenantIdOrAbsent`'s, and
+ * never the claim value.
+ */
+export type IdentityTenantResolution =
+  | { present: true; tenantId: string }
+  | { present: false; absence: { code: "TENANT_ABSENT"; reason: IdentityTenantAbsenceReason } };
+
+/**
+ * NON-throwing sibling of `requireTenantFromIdentity`, for a READ path (a
+ * subscribed Convex query, where a throw crashes a mounted render). Takes an
+ * identity the host has ALREADY verified (`ctx.auth.getUserIdentity()`, or
+ * null) and returns `{ present: true, tenantId }` or a typed absence; it never
+ * throws.
+ *
+ * Claim order is the one a Clerk Convex consumer reads by hand
+ * (`org_id ?? orgId ?? o?.id`): the FIRST of `org_id`, `orgId`, nested
+ * `o.id` whose value is not null/undefined decides. An invalid value there
+ * (empty, non-string, not a Clerk `org_` ID) is an absence; it never falls
+ * through to the next name. `organizationId` is not read. This order differs
+ * from `requireTenantFromIdentity`, which keeps its own (`org_id`,
+ * `organizationId`, `orgId`, skipping invalid values).
+ *
+ * @callerResolver — resolves a verified caller; consumers may derive their accepted sinks from this tag.
+ */
+export function tenantFromIdentityOrAbsent(
+  identity: Record<string, unknown> | null | undefined,
+): IdentityTenantResolution {
+  const absent = (reason: IdentityTenantAbsenceReason): IdentityTenantResolution => ({
+    present: false,
+    absence: { code: "TENANT_ABSENT", reason },
+  });
+  if (identity === null || identity === undefined || typeof identity !== "object") return absent("no-identity");
+  const read = readClaimedOrgId(identity, "first-present");
+  return read.present ? { present: true, tenantId: read.orgId } : absent(read.reason);
 }
 
 /**

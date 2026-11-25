@@ -19,6 +19,23 @@ const tenantId = requireTenantFromIdentity(await ctx.auth.getUserIdentity(), {
 });
 ```
 
+On a READ path, where a throw would crash a mounted render, use the
+non-throwing `tenantFromIdentityOrAbsent(identity)` (also on the
+`./tenant-from-identity` subpath, which bundles no Clerk module). It returns
+`{ present: true, tenantId }` or `{ present: false, absence: { code:
+"TENANT_ABSENT", reason } }`, `reason` one of `no-identity`,
+`no-organization-claim`, `invalid-organization-claim`. Its claim order is the
+one a Clerk Convex JWT consumer reads by hand, `org_id ?? orgId ?? o?.id`: the
+first claim that is not null/undefined decides, and an invalid value there is
+an absence rather than a fall-through. `organizationId` is not read.
+
+```ts
+import { tenantFromIdentityOrAbsent } from "@vantageos/cloud-identity/tenant-from-identity";
+
+const tenant = tenantFromIdentityOrAbsent(await ctx.auth.getUserIdentity());
+if (!tenant.present) return { refused: true, items: [] };
+```
+
 For an audit stamp (`createdBy`), `requireSubjectFromIdentity(identity, { door })`
 (0.21.3) returns the same verified identity's subject, and throws
 `IdentityRefusalError` (`RBAC_DENIED`, `no-verified-subject`) when there is no

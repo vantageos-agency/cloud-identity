@@ -105,6 +105,17 @@ The long-form guides live in `docs/`, one page per topic:
   into one value. Use `requireTenantId` at a WRITE boundary and
   `resolveTenantIdOrAbsent` where a throw would crash a mounted render. The
   tenant id is OPAQUE — returned byte-for-byte, never a slug or display name.
+- `tenantFromIdentityOrAbsent(identity)` — the NON-throwing sibling of
+  `requireTenantFromIdentity`, for a READ path over a host-verified identity
+  (`ctx.auth.getUserIdentity()`, or null). Root and
+  `./tenant-from-identity` (no Clerk module). Returns
+  `{ present: true, tenantId }` or
+  `{ present: false, absence: { code: "TENANT_ABSENT", reason } }`
+  (`IdentityTenantResolution`, `IdentityTenantAbsenceReason`: `no-identity`,
+  `no-organization-claim`, `invalid-organization-claim`). The first of
+  `org_id`, `orgId`, nested `o.id` that is not null/undefined decides; an
+  invalid value there (empty, non-string, not a Clerk `org_` ID) is an
+  absence and never falls through. `organizationId` is not read.
 - `requireHumanRole(session, required)` — asserts the VERIFIED session
   carries `required` (a `HumanAccountRole` or a list of them, exact match, no
   hierarchy) and returns the resolved identity; throws otherwise. The role is

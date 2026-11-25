@@ -48,7 +48,12 @@ export type {
 // Organization-membership guard (unified session + bearer + self-host contract)
 export { requireTenantId, resolveTenantIdOrAbsent } from "./org-guard.js";
 // A host-verified identity (e.g. Convex `ctx.auth.getUserIdentity()`) -> its tenant
-export { requireSubjectFromIdentity, requireTenantFromIdentity } from "./tenant-from-identity.js";
+export {
+  requireSubjectFromIdentity,
+  requireTenantFromIdentity,
+  tenantFromIdentityOrAbsent,
+} from "./tenant-from-identity.js";
+export type { IdentityTenantAbsenceReason, IdentityTenantResolution } from "./tenant-from-identity.js";
 export type {
   TenantAbsence,
   TenantAbsenceReason,
