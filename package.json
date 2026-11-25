@@ -424,6 +424,7 @@
   ],
   "scripts": {
     "build": "tsc && tsc -p tsconfig.cjs.json && node scripts/write-cjs-marker.mjs",
+    "pretest": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "npm run build && tsc -p tsconfig.check.json",
