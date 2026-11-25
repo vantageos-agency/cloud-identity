@@ -53,15 +53,17 @@ beforeAll(() => {
 describe("./machine-caller subpath", () => {
 	it("the exports map declares ./machine-caller -> dist/machine-caller.{js,d.ts}", () => {
 		expect(PKG.exports["./machine-caller"]).toEqual({
-			types: "./dist/machine-caller.d.ts",
-			import: "./dist/machine-caller.js",
+			import: { types: "./dist/machine-caller.d.ts", default: "./dist/machine-caller.js" },
+			require: { types: "./dist/cjs/machine-caller.d.ts", default: "./dist/cjs/machine-caller.js" },
+			default: "./dist/machine-caller.js",
 		});
 	});
 
 	it("the exports map declares ./presented-bearer -> dist/presented-bearer.{js,d.ts}", () => {
 		expect(PKG.exports["./presented-bearer"]).toEqual({
-			types: "./dist/presented-bearer.d.ts",
-			import: "./dist/presented-bearer.js",
+			import: { types: "./dist/presented-bearer.d.ts", default: "./dist/presented-bearer.js" },
+			require: { types: "./dist/cjs/presented-bearer.d.ts", default: "./dist/cjs/presented-bearer.js" },
+			default: "./dist/presented-bearer.js",
 		});
 	});
 

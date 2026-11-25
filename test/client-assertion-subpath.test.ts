@@ -21,8 +21,9 @@ beforeAll(() => {
 describe("./client-assertion subpath", () => {
   it("the exports map declares ./client-assertion -> dist/client-assertion.{js,d.ts}", () => {
     expect(PKG.exports["./client-assertion"]).toEqual({
-      types: "./dist/client-assertion.d.ts",
-      import: "./dist/client-assertion.js",
+      import: { types: "./dist/client-assertion.d.ts", default: "./dist/client-assertion.js" },
+      require: { types: "./dist/cjs/client-assertion.d.ts", default: "./dist/cjs/client-assertion.js" },
+      default: "./dist/client-assertion.js",
     });
   });
 
