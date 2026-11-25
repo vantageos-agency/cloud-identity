@@ -187,3 +187,89 @@ export function requireOrgAdmin(input: RequireOrgAdminInput): void {
     fail("role-not-admin", "The caller's role is not an organisation-admin role.");
   }
 }
+
+// ---------------------------------------------------------------------------
+// Token/args workspace cross-check (0.37.0)
+// ---------------------------------------------------------------------------
+
+const DOOR_WORKSPACE = "requireWorkspaceMatchesToken";
+
+export type WorkspaceMatchResult =
+  | { ok: true; workspaceId: string }
+  | { ok: false; refusal: IdentityRefusal };
+
+/**
+ * Cross-check the workspace a call names in its arguments against the
+ * workspace the verified token is bound to. "Workspace" is the consumer's word
+ * for the tenant; ids are opaque and compared through {@link isRowInTenant}
+ * (strict equality, an empty side never matches).
+ *
+ *   - Token binding absent, empty or not a string -> `workspace-binding-missing`,
+ *     whatever the arguments say (an omitted workspace included).
+ *   - `args.workspaceId` absent (`undefined` or `null`, or `args` itself
+ *     `undefined`/`null`) -> the token's own workspace is returned: omission
+ *     resolves to exactly what presenting the bound workspace would, never to
+ *     anything broader. The caller uses the returned id, not the argument.
+ *   - `args.workspaceId` present and not equal to the binding (another id, an
+ *     empty string, a non-string) -> `workspace-mismatch`. `args` that is not a
+ *     plain object (a string, an array) is also `workspace-mismatch`.
+ *
+ * Refusals are `RBAC_DENIED` and carry neither id. Returns `{ ok: true,
+ * workspaceId }` with the binding on success.
+ */
+export function checkWorkspaceMatchesToken(
+  token: unknown,
+  args: unknown,
+  door: string = DOOR_WORKSPACE,
+): WorkspaceMatchResult {
+  const bound =
+    token !== null && typeof token === "object"
+      ? (token as { workspaceId?: unknown }).workspaceId
+      : undefined;
+  if (!nonEmpty(bound)) {
+    return {
+      ok: false,
+      refusal: refusal(
+        "RBAC_DENIED",
+        "workspace-binding-missing",
+        door,
+        "The token is not bound to a workspace, so it matches none.",
+      ),
+    };
+  }
+
+  const mismatch: WorkspaceMatchResult = {
+    ok: false,
+    refusal: refusal(
+      "RBAC_DENIED",
+      "workspace-mismatch",
+      door,
+      "The workspace named by the call is not the workspace the token is bound to.",
+    ),
+  };
+
+  if (args === undefined || args === null) return { ok: true, workspaceId: bound };
+  if (typeof args !== "object" || Array.isArray(args)) return mismatch;
+
+  const presented = (args as { workspaceId?: unknown }).workspaceId;
+  if (presented === undefined || presented === null) return { ok: true, workspaceId: bound };
+  if (typeof presented !== "string" || !isRowInTenant({ rowOrgId: presented, callerOrgId: bound })) {
+    return mismatch;
+  }
+  return { ok: true, workspaceId: bound };
+}
+
+/**
+ * Throwing form of {@link checkWorkspaceMatchesToken}: returns the workspace
+ * the call operates on (the token's binding), throws `IdentityRefusalError`
+ * (`workspace-binding-missing` or `workspace-mismatch`).
+ */
+export function requireWorkspaceMatchesToken(
+  token: unknown,
+  args: unknown,
+  door: string = DOOR_WORKSPACE,
+): string {
+  const result = checkWorkspaceMatchesToken(token, args, door);
+  if (!result.ok) throw new IdentityRefusalError(result.refusal);
+  return result.workspaceId;
+}

@@ -5,6 +5,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+Additive: CommonJS loadability, a decision on a set of token scopes, and a workspace binding on the bearer seam. Nothing existing changes behaviour by default.
+
+### Added
+- CommonJS build. `require("@vantageos/cloud-identity")` and `require` of every subpath threw `ERR_PACKAGE_PATH_NOT_EXPORTED`: each `exports` entry carried only `types` + `import`. The build now emits a second tree, `dist/cjs/`, marked `{"type":"commonjs"}` (`tsconfig.cjs.json`, `scripts/write-cjs-marker.mjs`); every entry routes `import` to `dist/` and `require` to `dist/cjs/`, each with its own declarations, plus a `default` fallback to the ESM file. ESM import is unchanged. Each build carries its own copy of the classes, so `instanceof IdentityRefusalError` across the two is false. `test/commonjs-dual-build.test.ts` requires and imports the root and every subpath from a real consumer directory.
+- `resolveScopeGrant`, `hasScopeGrant`, `assertScopeGrant`, `filterByScopeGrant` and the types `ScopePolicy`, `ScopeGrantInput`, `ScopeGrantResult` (root and `./role-policy`): a token's set of scopes against one required scope, over a caller-supplied alphabet (`ladder`, most privileged first; `offLadder`; `superscopes`). The ladder ordering is decided by `resolveMinRole`. An off-ladder scope is satisfied only by an exact grant or a caller-named superscope; no ladder rank implies it. Refusal reasons `scope-policy-invalid`, `scope-required-unknown`, `scopes-absent`, `scope-not-granted`. `test/scope-grant.test.ts`.
+- `requireWorkspaceMatchesToken`, `checkWorkspaceMatchesToken` and the type `WorkspaceMatchResult` (root and `./tenant-membership`): the token/args workspace cross-check through `isRowInTenant`. Another workspace, an empty or non-string `workspaceId`, or non-object args is `workspace-mismatch`; a token without a usable binding is `workspace-binding-missing`, an omitted workspace included; an omitted or `null` `workspaceId` returns the token's own workspace. `test/workspace-matches-token.test.ts`.
+- `validatePresentedBearer`, `resolvePresentedDigest` and the machine-caller resolvers: optional `deps.expectedTenantId` (a row bound to another tenant is the collapsed `mismatch`; given but empty or non-string is refused before the lookup) and an optional row field `active` (`false` is the collapsed `mismatch`). New internal reasons `inactive-token`, `tenant-mismatch`, `expected-tenant-invalid`. Omitting both keeps the earlier behaviour. `test/presented-bearer-tenant-binding.test.ts`.
+
+### Changed
+- `test/{machine-caller,org-guard,hmac-signature,client-assertion}-subpath.test.ts` pin the new `import` / `require` / `default` entry shape.
+
 ## [0.36.1] - 2026-11-19
 
 ### Fixed

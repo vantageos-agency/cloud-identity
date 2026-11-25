@@ -64,6 +64,11 @@ export const storedBearerRowSchema = z.object({
   secretHash: z.string().min(1),
   agentId: z.string().min(1).nullish(),
   revoked: z.boolean().nullish(),
+  /**
+   * 0.37.0. `false` refuses (collapsed, internal reason `inactive-token`).
+   * Absent keeps the pre-0.37.0 behaviour; a non-boolean is a malformed row.
+   */
+  active: z.boolean().nullish(),
   expiresAt: z.number().nullish(),
   scopes: z.array(z.string()).nullish(),
 });
@@ -176,7 +181,13 @@ export type PresentedBearerInternalReason =
   | "stored-digest-mismatch"
   | "lookup-failed"
   /** A digest presented to `resolvePresentedDigest` that is not 64 lowercase hex characters. */
-  | "malformed-digest";
+  | "malformed-digest"
+  /** 0.37.0: the row carries `active: false`. */
+  | "inactive-token"
+  /** 0.37.0: the row's tenant is not `deps.expectedTenantId`. */
+  | "tenant-mismatch"
+  /** 0.37.0: `deps.expectedTenantId` was given but is not a non-empty string. */
+  | "expected-tenant-invalid";
 
 export type PresentedBearerDeps = {
   /**
@@ -191,6 +202,15 @@ export type PresentedBearerDeps = {
   ) => Promise<StoredBearerRow | null | undefined>;
   /** Injectable clock. Never `Date.now()` inline, so expiry is testable. */
   now?: () => number;
+  /**
+   * 0.37.0. The tenant (the consumer's "workspace") the token must be bound
+   * to. When given, a row bound to any other tenant is refused with the
+   * collapsed refusal (internal reason `tenant-mismatch`), compared exactly.
+   * Given but not a non-empty string: refused (`expected-tenant-invalid`)
+   * before any lookup. Omitted: the identity carries the row's own tenant,
+   * which the caller must then use (never a tenant named by the request).
+   */
+  expectedTenantId?: string;
   /** Observability sink for the collapsed refusals. Must not throw; if it does, the throw is swallowed and the refusal stands. */
   onRefusal?: (reason: PresentedBearerInternalReason) => void;
 };
@@ -261,7 +281,8 @@ function collapse(
  *   3. Look the row up BY THAT DIGEST.
  *   4. Re-compare the row's stored digest against the computed one with
  *      `timingSafeEqual` — never `!==` on a secret or a digest.
- *   5. Validate the row's shape, then revocation, then expiry.
+ *   5. Validate the row's shape, then revocation, `active`, expiry, and,
+ *      when `deps.expectedTenantId` is given, the bound tenant (0.37.0).
  *   6. Resolve the tenant, and the agent as a presence or an explicit absence.
  *
  * Steps 3–5 all refuse with the SAME frozen value. A right is never granted by
@@ -405,6 +426,11 @@ async function decideOnDigest(
   presentedDigest: unknown,
   deps: PresentedBearerDeps,
 ): Promise<ValidatePresentedBearerResult> {
+  const expectedTenant: unknown = deps.expectedTenantId;
+  if (expectedTenant !== undefined && (typeof expectedTenant !== "string" || expectedTenant.length === 0)) {
+    return collapse(deps, "expected-tenant-invalid");
+  }
+
   if (typeof presentedDigest !== "string" || !DIGEST_SHAPE.test(presentedDigest)) {
     return collapse(deps, "malformed-digest");
   }
@@ -440,9 +466,18 @@ async function decideOnDigest(
     return collapse(deps, "revoked-token");
   }
 
+  if (stored.active === false) {
+    return collapse(deps, "inactive-token");
+  }
+
   const nowMs = deps.now ? deps.now() : Date.now();
   if (typeof stored.expiresAt === "number" && stored.expiresAt <= nowMs) {
     return collapse(deps, "expired-token");
+  }
+
+  // A tenant id is an opaque identifier, not a secret: exact equality.
+  if (expectedTenant !== undefined && stored.tenantId !== expectedTenant) {
+    return collapse(deps, "tenant-mismatch");
   }
 
   const agent: AgentPresence =

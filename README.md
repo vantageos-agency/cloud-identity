@@ -18,7 +18,11 @@ JavaScript runs.
 npm install @vantageos/cloud-identity
 ```
 
-Node 18 or later. ESM only.
+Node 18 or later. ESM and CommonJS (since 0.37.0): `import` resolves to
+`dist/`, `require` to `dist/cjs/`, for the root and every subpath, each with its
+own declarations. Load the package through one of the two in a given process:
+each build has its own copy of the classes (`IdentityRefusalError`), so an
+`instanceof` across them is false.
 
 ## Quick start
 
@@ -138,6 +142,14 @@ The long-form guides live in `docs/`, one page per topic:
     instead of 401. There is no branch that grants anything when the lookup
     fails.
   - `deps.now` is an injectable clock, so expiry is testable without waiting.
+  - **A row with `active: false` is refused** with the same collapsed value
+    (0.37.0). An absent `active` keeps the earlier behaviour.
+  - **`deps.expectedTenantId` binds the workspace** (0.37.0). Given, a row
+    bound to any other tenant is refused with the collapsed value; given but
+    empty or not a string, the call is refused before any lookup. Omitted, the
+    identity carries the row's own `tenantId`, and that is the workspace the
+    caller acts on, never one named by the request (cross-check the request
+    with `requireWorkspaceMatchesToken`).
   - Types: `PresentedBearerDeps`, `StoredBearerRow` (validated at runtime by
     `storedBearerRowSchema`), `ResolvedBearerIdentity`,
     `ValidatePresentedBearerResult`.
@@ -155,6 +167,45 @@ The long-form guides live in `docs/`, one page per topic:
 - `sha256Hex(input)` — the lower-case hex SHA-256 digest of a string. Exported
   so that the code storing a token row hashes it exactly the way the resolver
   will recompute it. Hash once, store the digest, discard the token.
+
+**Token scopes and the workspace cross-check (0.37.0)**
+
+- `resolveScopeGrant({ scopes, required, policy, door? })` — decides whether
+  a token's SET of scopes satisfies one required scope. The alphabet is your
+  data, a `ScopePolicy`: `ladder` (most privileged first; a rank implies every
+  rank below it), `offLadder` (scopes no rank implies) and `superscopes`
+  (scopes you name as satisfying everything). Returns `ScopeGrantResult`:
+  `{ ok: true, required, via: "exact" | "ladder" | "superscope", grantedBy }`
+  or `{ ok: false, refusal }` (`RBAC_DENIED`, reasons `scope-policy-invalid`,
+  `scope-required-unknown`, `scopes-absent`, `scope-not-granted`). An
+  off-ladder scope is satisfied ONLY by an exact grant or a named superscope:
+  `["admin"]` never reaches `"workflow-trigger"`, and the top of the ladder
+  does not either unless you list it in `superscopes`. Scopes that are not an
+  array (a space-delimited string included) are absent; unknown, empty and
+  non-string entries grant nothing; matching is exact. `ScopeGrantInput` is
+  its input type.
+- `hasScopeGrant(scopes, required, policy)` — the boolean form.
+  `assertScopeGrant(input)` — the throwing form (`IdentityRefusalError`).
+- `filterByScopeGrant(items, scopes, policy, requiredOf)` — keeps the items
+  whose required scope (read by `requiredOf`) is granted, in order; identical
+  to deciding each item. A tool list filtered per token is the intended use.
+
+  ```ts
+  const policy = { ladder: ["cloud-admin", "admin", "write", "read"],
+                   offLadder: ["workflow-trigger"], superscopes: ["cloud-admin"] };
+  hasScopeGrant(["admin"], "write", policy);            // true (ladder)
+  hasScopeGrant(["admin"], "workflow-trigger", policy); // false
+  ```
+- `requireWorkspaceMatchesToken(token, args, door?)` — cross-checks the
+  `workspaceId` a call names against the workspace the verified token is bound
+  to (`token.workspaceId`) and returns the workspace to act on. Workspace B
+  named with a token bound to A, an empty or non-string `workspaceId`, or
+  `args` that is not an object: `workspace-mismatch`. A token with no usable
+  binding matches nothing: `workspace-binding-missing`. An omitted (or `null`)
+  `workspaceId` returns the token's own workspace, exactly what presenting it
+  would. Throws `IdentityRefusalError` (`RBAC_DENIED`); the refusal carries
+  neither id. `checkWorkspaceMatchesToken(token, args, door?)` is the
+  non-throwing form, returning `WorkspaceMatchResult`.
 
 **Row filtering**
 

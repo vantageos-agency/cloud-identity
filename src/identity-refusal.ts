@@ -110,7 +110,15 @@ export type IdentityRefusalReason =
   | "membership-event-invalid"
   // acting principal and member-writer doors (0.28.0)
   | "assignee-not-an-agent-of-org"
-  | "no-organisation";
+  | "no-organisation"
+  // decision on a set of token scopes (0.37.0)
+  | "scope-policy-invalid"
+  | "scope-required-unknown"
+  | "scopes-absent"
+  | "scope-not-granted"
+  // token/args workspace cross-check (0.37.0)
+  | "workspace-binding-missing"
+  | "workspace-mismatch";
 
 export type IdentityRefusal = {
   code: IdentityRefusalCode;
