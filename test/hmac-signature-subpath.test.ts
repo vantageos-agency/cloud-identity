@@ -43,8 +43,9 @@ beforeAll(() => {
 describe("./hmac-signature subpath", () => {
   it("the exports map declares ./hmac-signature -> dist/hmac-signature.{js,d.ts}", () => {
     expect(PKG.exports["./hmac-signature"]).toEqual({
-      types: "./dist/hmac-signature.d.ts",
-      import: "./dist/hmac-signature.js",
+      import: { types: "./dist/hmac-signature.d.ts", default: "./dist/hmac-signature.js" },
+      require: { types: "./dist/cjs/hmac-signature.d.ts", default: "./dist/cjs/hmac-signature.js" },
+      default: "./dist/hmac-signature.js",
     });
   });
 

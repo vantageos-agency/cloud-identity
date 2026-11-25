@@ -50,8 +50,9 @@ beforeAll(() => {
 describe("./org-guard subpath", () => {
 	it("the exports map declares ./org-guard -> dist/org-guard.{js,d.ts}", () => {
 		expect(PKG.exports["./org-guard"]).toEqual({
-			types: "./dist/org-guard.d.ts",
-			import: "./dist/org-guard.js",
+			import: { types: "./dist/org-guard.d.ts", default: "./dist/org-guard.js" },
+			require: { types: "./dist/cjs/org-guard.d.ts", default: "./dist/cjs/org-guard.js" },
+			default: "./dist/org-guard.js",
 		});
 	});
 
