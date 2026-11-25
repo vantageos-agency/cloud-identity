@@ -36,12 +36,12 @@ const PROBE_TABLE: Row[] = [
   ["rule (a): non-string org_id does not fall through to orgId", { org_id: 5, orgId: "org_a1" }, null],
   ["rule (b): organizationId is not read", { organizationId: "org_a1" }, null],
   ["rule (c): nested o.id is read", { o: { id: "org_a1" } }, "org_a1"],
-  // OPEN RULING (d), awaiting Pi: whether the Clerk `org_` shape check applies
-  // to this reader. Default = strict (the shape check applies), so a non-`org_`
-  // value is an absence. The switch is ONE constant,
-  // `IDENTITY_READER_REQUIRES_ORG_SHAPE` in src/claimed-org-id.ts; flipping it
-  // flips this row to "acme" and nothing else in this table.
-  ["ruling (d) OPEN, strict default: a non-org_ value", { org_id: "acme" }, null],
+  // RULING (d), Pi 2026-11-25: the Clerk `org_` shape check applies to this
+  // reader too (one shape rule for every door; no live CRM org id lacks
+  // `org_`, measured by theta). A non-`org_` value is an absence (REFUSE case).
+  // The rule is ONE constant, `IDENTITY_READER_REQUIRES_ORG_SHAPE` in
+  // src/claimed-org-id.ts.
+  ["ruling (d): a non-org_ value is refused", { org_id: "acme" }, null],
 ];
 
 describe("tenantFromIdentityOrAbsent: the probe table", () => {
