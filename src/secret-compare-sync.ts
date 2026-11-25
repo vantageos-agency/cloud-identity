@@ -27,6 +27,8 @@ function toBytes(value: unknown): Uint8Array | null {
  * Compare two strings (UTF-8) or byte arrays in constant time with respect to
  * their content. Always walks the longer length; a length difference is folded
  * into the result rather than returned early. Any other input type is `false`.
+ *
+ * @signatureCompare — compares two secret values in constant time and answers the boolean; consumers may treat a call as the compare step of a signature check.
  */
 export function timingSafeEqualSync(
   a: string | Uint8Array,

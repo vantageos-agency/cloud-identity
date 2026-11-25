@@ -124,6 +124,12 @@ const verdict = await verifyHmacSha256Signature(
 if (!verdict.ok) return new Response("unauthorized", { status: 401 });
 ```
 
+The declarations carry two block tags a static analyser can read instead of a
+hand-typed list of names. `@signatureVerifier` marks `verifyHmacSha256Signature` and
+`verifySvixWebhook`: each computes the signature and compares it, and `ok` is the
+verdict. `@signatureCompare` marks `timingSafeEqual` and `timingSafeEqualSync`: each is
+the constant-time compare step of a check that computes its own signature.
+
 Two refusal reasons joined the vocabulary in 0.28.0 for a consumer's own doors:
 `assignee-not-an-agent-of-org` (the named assignee is not an agent of the
 organisation; no function here returns it) and `no-organisation` (the caller has no
