@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  checkWorkspaceMatchesToken,
-  IdentityRefusalError,
-  requireWorkspaceMatchesToken,
-} from "../src/index.js";
+import { checkWorkspaceMatchesToken, IdentityRefusalError, requireWorkspaceMatchesToken } from "../src/index.js";
 
 /**
  * The token/args workspace cross-check (0.37.0). The named scoped identity is
@@ -30,9 +26,7 @@ describe("requireWorkspaceMatchesToken: both directions", () => {
   });
 
   it("a token bound to ws_a is refused args naming ws_b", () => {
-    expect(reasonOf(() => requireWorkspaceMatchesToken(TOKEN_A, { workspaceId: "ws_b" }))).toBe(
-      "workspace-mismatch",
-    );
+    expect(reasonOf(() => requireWorkspaceMatchesToken(TOKEN_A, { workspaceId: "ws_b" }))).toBe("workspace-mismatch");
   });
 
   it("the refusal carries its code and the consumer's door, never the ids", () => {
