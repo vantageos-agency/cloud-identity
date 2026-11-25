@@ -3,8 +3,8 @@ import {
   type PresentedBearerDeps,
   type PresentedBearerInternalReason,
   resolvePresentedDigest,
-  sha256Hex,
   type StoredBearerRow,
+  sha256Hex,
   validatePresentedBearer,
 } from "../src/index.js";
 
