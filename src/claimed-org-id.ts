@@ -20,7 +20,7 @@ const CLERK_ORG_ID_SHAPE = /^org_[A-Za-z0-9]+$/;
 
 /**
  * Whether the `"first-present"` reader requires the Clerk `org_` shape.
- * Ruled `true` by Pi on 2026-11-25 (task k17ebm83rppkavg31ydtfzpjbs8jxd99): one
+ * Ruled `true` on 2026-11-25: one
  * shape rule for every door, so a non-empty value such as `"acme"` is refused.
  * The `"first-valid"` readers always require the shape.
  */
