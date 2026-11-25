@@ -7,152 +7,411 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      },
+      "default": "./dist/index.js"
     },
     "./crypto": {
-      "types": "./dist/crypto.d.ts",
-      "import": "./dist/crypto.js"
+      "import": {
+        "types": "./dist/crypto.d.ts",
+        "default": "./dist/crypto.js"
+      },
+      "require": {
+        "types": "./dist/cjs/crypto.d.ts",
+        "default": "./dist/cjs/crypto.js"
+      },
+      "default": "./dist/crypto.js"
     },
     "./scope-filter": {
-      "types": "./dist/scope-filter.d.ts",
-      "import": "./dist/scope-filter.js"
+      "import": {
+        "types": "./dist/scope-filter.d.ts",
+        "default": "./dist/scope-filter.js"
+      },
+      "require": {
+        "types": "./dist/cjs/scope-filter.d.ts",
+        "default": "./dist/cjs/scope-filter.js"
+      },
+      "default": "./dist/scope-filter.js"
     },
     "./bearer-validation": {
-      "types": "./dist/bearer-validation.d.ts",
-      "import": "./dist/bearer-validation.js"
+      "import": {
+        "types": "./dist/bearer-validation.d.ts",
+        "default": "./dist/bearer-validation.js"
+      },
+      "require": {
+        "types": "./dist/cjs/bearer-validation.d.ts",
+        "default": "./dist/cjs/bearer-validation.js"
+      },
+      "default": "./dist/bearer-validation.js"
     },
     "./org-guard": {
-      "types": "./dist/org-guard.d.ts",
-      "import": "./dist/org-guard.js"
+      "import": {
+        "types": "./dist/org-guard.d.ts",
+        "default": "./dist/org-guard.js"
+      },
+      "require": {
+        "types": "./dist/cjs/org-guard.d.ts",
+        "default": "./dist/cjs/org-guard.js"
+      },
+      "default": "./dist/org-guard.js"
     },
     "./types": {
-      "types": "./dist/types.d.ts",
-      "import": "./dist/types.js"
+      "import": {
+        "types": "./dist/types.d.ts",
+        "default": "./dist/types.js"
+      },
+      "require": {
+        "types": "./dist/cjs/types.d.ts",
+        "default": "./dist/cjs/types.js"
+      },
+      "default": "./dist/types.js"
     },
     "./tenancy-domain": {
-      "types": "./dist/tenancy-domain.d.ts",
-      "import": "./dist/tenancy-domain.js"
+      "import": {
+        "types": "./dist/tenancy-domain.d.ts",
+        "default": "./dist/tenancy-domain.js"
+      },
+      "require": {
+        "types": "./dist/cjs/tenancy-domain.d.ts",
+        "default": "./dist/cjs/tenancy-domain.js"
+      },
+      "default": "./dist/tenancy-domain.js"
     },
     "./human-path": {
-      "types": "./dist/human-path.d.ts",
-      "import": "./dist/human-path.js"
+      "import": {
+        "types": "./dist/human-path.d.ts",
+        "default": "./dist/human-path.js"
+      },
+      "require": {
+        "types": "./dist/cjs/human-path.d.ts",
+        "default": "./dist/cjs/human-path.js"
+      },
+      "default": "./dist/human-path.js"
     },
     "./presented-bearer": {
-      "types": "./dist/presented-bearer.d.ts",
-      "import": "./dist/presented-bearer.js"
+      "import": {
+        "types": "./dist/presented-bearer.d.ts",
+        "default": "./dist/presented-bearer.js"
+      },
+      "require": {
+        "types": "./dist/cjs/presented-bearer.d.ts",
+        "default": "./dist/cjs/presented-bearer.js"
+      },
+      "default": "./dist/presented-bearer.js"
     },
     "./machine-caller": {
-      "types": "./dist/machine-caller.d.ts",
-      "import": "./dist/machine-caller.js"
+      "import": {
+        "types": "./dist/machine-caller.d.ts",
+        "default": "./dist/machine-caller.js"
+      },
+      "require": {
+        "types": "./dist/cjs/machine-caller.d.ts",
+        "default": "./dist/cjs/machine-caller.js"
+      },
+      "default": "./dist/machine-caller.js"
     },
     "./agent-writer": {
-      "types": "./dist/agent-writer.d.ts",
-      "import": "./dist/agent-writer.js"
+      "import": {
+        "types": "./dist/agent-writer.d.ts",
+        "default": "./dist/agent-writer.js"
+      },
+      "require": {
+        "types": "./dist/cjs/agent-writer.d.ts",
+        "default": "./dist/cjs/agent-writer.js"
+      },
+      "default": "./dist/agent-writer.js"
     },
     "./authorize": {
-      "types": "./dist/authorize-flow.d.ts",
-      "import": "./dist/authorize-flow.js"
+      "import": {
+        "types": "./dist/authorize-flow.d.ts",
+        "default": "./dist/authorize-flow.js"
+      },
+      "require": {
+        "types": "./dist/cjs/authorize-flow.d.ts",
+        "default": "./dist/cjs/authorize-flow.js"
+      },
+      "default": "./dist/authorize-flow.js"
     },
     "./token-exchange": {
-      "types": "./dist/token-exchange.d.ts",
-      "import": "./dist/token-exchange.js"
+      "import": {
+        "types": "./dist/token-exchange.d.ts",
+        "default": "./dist/token-exchange.js"
+      },
+      "require": {
+        "types": "./dist/cjs/token-exchange.d.ts",
+        "default": "./dist/cjs/token-exchange.js"
+      },
+      "default": "./dist/token-exchange.js"
     },
     "./clerk-session": {
-      "types": "./dist/clerk-session.d.ts",
-      "import": "./dist/clerk-session.js"
+      "import": {
+        "types": "./dist/clerk-session.d.ts",
+        "default": "./dist/clerk-session.js"
+      },
+      "require": {
+        "types": "./dist/cjs/clerk-session.d.ts",
+        "default": "./dist/cjs/clerk-session.js"
+      },
+      "default": "./dist/clerk-session.js"
     },
     "./clerk-handshake": {
-      "types": "./dist/clerk-handshake.d.ts",
-      "import": "./dist/clerk-handshake.js"
+      "import": {
+        "types": "./dist/clerk-handshake.d.ts",
+        "default": "./dist/clerk-handshake.js"
+      },
+      "require": {
+        "types": "./dist/cjs/clerk-handshake.d.ts",
+        "default": "./dist/cjs/clerk-handshake.js"
+      },
+      "default": "./dist/clerk-handshake.js"
     },
     "./oidc": {
-      "types": "./dist/oidc.d.ts",
-      "import": "./dist/oidc.js"
+      "import": {
+        "types": "./dist/oidc.d.ts",
+        "default": "./dist/oidc.js"
+      },
+      "require": {
+        "types": "./dist/cjs/oidc.d.ts",
+        "default": "./dist/cjs/oidc.js"
+      },
+      "default": "./dist/oidc.js"
     },
     "./personal-agent": {
-      "types": "./dist/personal-agent.d.ts",
-      "import": "./dist/personal-agent.js"
+      "import": {
+        "types": "./dist/personal-agent.d.ts",
+        "default": "./dist/personal-agent.js"
+      },
+      "require": {
+        "types": "./dist/cjs/personal-agent.d.ts",
+        "default": "./dist/cjs/personal-agent.js"
+      },
+      "default": "./dist/personal-agent.js"
     },
     "./member-scope": {
-      "types": "./dist/member-scope.d.ts",
-      "import": "./dist/member-scope.js"
+      "import": {
+        "types": "./dist/member-scope.d.ts",
+        "default": "./dist/member-scope.js"
+      },
+      "require": {
+        "types": "./dist/cjs/member-scope.d.ts",
+        "default": "./dist/cjs/member-scope.js"
+      },
+      "default": "./dist/member-scope.js"
     },
     "./person-principal": {
-      "types": "./dist/person-principal.d.ts",
-      "import": "./dist/person-principal.js"
+      "import": {
+        "types": "./dist/person-principal.d.ts",
+        "default": "./dist/person-principal.js"
+      },
+      "require": {
+        "types": "./dist/cjs/person-principal.d.ts",
+        "default": "./dist/cjs/person-principal.js"
+      },
+      "default": "./dist/person-principal.js"
     },
     "./identity-refusal": {
-      "types": "./dist/identity-refusal.d.ts",
-      "import": "./dist/identity-refusal.js"
+      "import": {
+        "types": "./dist/identity-refusal.d.ts",
+        "default": "./dist/identity-refusal.js"
+      },
+      "require": {
+        "types": "./dist/cjs/identity-refusal.d.ts",
+        "default": "./dist/cjs/identity-refusal.js"
+      },
+      "default": "./dist/identity-refusal.js"
     },
     "./tool-role": {
-      "types": "./dist/tool-role.d.ts",
-      "import": "./dist/tool-role.js"
+      "import": {
+        "types": "./dist/tool-role.d.ts",
+        "default": "./dist/tool-role.js"
+      },
+      "require": {
+        "types": "./dist/cjs/tool-role.d.ts",
+        "default": "./dist/cjs/tool-role.js"
+      },
+      "default": "./dist/tool-role.js"
     },
     "./role-policy": {
-      "types": "./dist/role-policy.d.ts",
-      "import": "./dist/role-policy.js"
+      "import": {
+        "types": "./dist/role-policy.d.ts",
+        "default": "./dist/role-policy.js"
+      },
+      "require": {
+        "types": "./dist/cjs/role-policy.d.ts",
+        "default": "./dist/cjs/role-policy.js"
+      },
+      "default": "./dist/role-policy.js"
     },
     "./tenant-membership": {
-      "types": "./dist/tenant-membership.d.ts",
-      "import": "./dist/tenant-membership.js"
+      "import": {
+        "types": "./dist/tenant-membership.d.ts",
+        "default": "./dist/tenant-membership.js"
+      },
+      "require": {
+        "types": "./dist/cjs/tenant-membership.d.ts",
+        "default": "./dist/cjs/tenant-membership.js"
+      },
+      "default": "./dist/tenant-membership.js"
     },
     "./agent-link": {
-      "types": "./dist/agent-link.d.ts",
-      "import": "./dist/agent-link.js"
+      "import": {
+        "types": "./dist/agent-link.d.ts",
+        "default": "./dist/agent-link.js"
+      },
+      "require": {
+        "types": "./dist/cjs/agent-link.d.ts",
+        "default": "./dist/cjs/agent-link.js"
+      },
+      "default": "./dist/agent-link.js"
     },
     "./namespace-write": {
-      "types": "./dist/namespace-write.d.ts",
-      "import": "./dist/namespace-write.js"
+      "import": {
+        "types": "./dist/namespace-write.d.ts",
+        "default": "./dist/namespace-write.js"
+      },
+      "require": {
+        "types": "./dist/cjs/namespace-write.d.ts",
+        "default": "./dist/cjs/namespace-write.js"
+      },
+      "default": "./dist/namespace-write.js"
     },
     "./secret-compare-sync": {
-      "types": "./dist/secret-compare-sync.d.ts",
-      "import": "./dist/secret-compare-sync.js"
+      "import": {
+        "types": "./dist/secret-compare-sync.d.ts",
+        "default": "./dist/secret-compare-sync.js"
+      },
+      "require": {
+        "types": "./dist/cjs/secret-compare-sync.d.ts",
+        "default": "./dist/cjs/secret-compare-sync.js"
+      },
+      "default": "./dist/secret-compare-sync.js"
     },
     "./principal-by-id": {
-      "types": "./dist/principal-by-id.d.ts",
-      "import": "./dist/principal-by-id.js"
+      "import": {
+        "types": "./dist/principal-by-id.d.ts",
+        "default": "./dist/principal-by-id.js"
+      },
+      "require": {
+        "types": "./dist/cjs/principal-by-id.d.ts",
+        "default": "./dist/cjs/principal-by-id.js"
+      },
+      "default": "./dist/principal-by-id.js"
     },
     "./resource-server": {
-      "types": "./dist/resource-server.d.ts",
-      "import": "./dist/resource-server.js"
+      "import": {
+        "types": "./dist/resource-server.d.ts",
+        "default": "./dist/resource-server.js"
+      },
+      "require": {
+        "types": "./dist/cjs/resource-server.d.ts",
+        "default": "./dist/cjs/resource-server.js"
+      },
+      "default": "./dist/resource-server.js"
     },
     "./org-by-id": {
-      "types": "./dist/org-by-id.d.ts",
-      "import": "./dist/org-by-id.js"
+      "import": {
+        "types": "./dist/org-by-id.d.ts",
+        "default": "./dist/org-by-id.js"
+      },
+      "require": {
+        "types": "./dist/cjs/org-by-id.d.ts",
+        "default": "./dist/cjs/org-by-id.js"
+      },
+      "default": "./dist/org-by-id.js"
     },
     "./tenant-from-token": {
-      "types": "./dist/tenant-from-token.d.ts",
-      "import": "./dist/tenant-from-token.js"
+      "import": {
+        "types": "./dist/tenant-from-token.d.ts",
+        "default": "./dist/tenant-from-token.js"
+      },
+      "require": {
+        "types": "./dist/cjs/tenant-from-token.d.ts",
+        "default": "./dist/cjs/tenant-from-token.js"
+      },
+      "default": "./dist/tenant-from-token.js"
     },
     "./scope-standing": {
-      "types": "./dist/scope-standing.d.ts",
-      "import": "./dist/scope-standing.js"
+      "import": {
+        "types": "./dist/scope-standing.d.ts",
+        "default": "./dist/scope-standing.js"
+      },
+      "require": {
+        "types": "./dist/cjs/scope-standing.d.ts",
+        "default": "./dist/cjs/scope-standing.js"
+      },
+      "default": "./dist/scope-standing.js"
     },
     "./caller-from-claims": {
-      "types": "./dist/caller-from-claims.d.ts",
-      "import": "./dist/caller-from-claims.js"
+      "import": {
+        "types": "./dist/caller-from-claims.d.ts",
+        "default": "./dist/caller-from-claims.js"
+      },
+      "require": {
+        "types": "./dist/cjs/caller-from-claims.d.ts",
+        "default": "./dist/cjs/caller-from-claims.js"
+      },
+      "default": "./dist/caller-from-claims.js"
     },
     "./person-scope": {
-      "types": "./dist/person-scope.d.ts",
-      "import": "./dist/person-scope.js"
+      "import": {
+        "types": "./dist/person-scope.d.ts",
+        "default": "./dist/person-scope.js"
+      },
+      "require": {
+        "types": "./dist/cjs/person-scope.d.ts",
+        "default": "./dist/cjs/person-scope.js"
+      },
+      "default": "./dist/person-scope.js"
     },
     "./acting-claim": {
-      "types": "./dist/acting-claim.d.ts",
-      "import": "./dist/acting-claim.js"
+      "import": {
+        "types": "./dist/acting-claim.d.ts",
+        "default": "./dist/acting-claim.js"
+      },
+      "require": {
+        "types": "./dist/cjs/acting-claim.d.ts",
+        "default": "./dist/cjs/acting-claim.js"
+      },
+      "default": "./dist/acting-claim.js"
     },
     "./authorize-runtime": {
-      "types": "./dist/authorize-runtime.d.ts",
-      "import": "./dist/authorize-runtime.js"
+      "import": {
+        "types": "./dist/authorize-runtime.d.ts",
+        "default": "./dist/authorize-runtime.js"
+      },
+      "require": {
+        "types": "./dist/cjs/authorize-runtime.d.ts",
+        "default": "./dist/cjs/authorize-runtime.js"
+      },
+      "default": "./dist/authorize-runtime.js"
     },
     "./hmac-signature": {
-      "types": "./dist/hmac-signature.d.ts",
-      "import": "./dist/hmac-signature.js"
+      "import": {
+        "types": "./dist/hmac-signature.d.ts",
+        "default": "./dist/hmac-signature.js"
+      },
+      "require": {
+        "types": "./dist/cjs/hmac-signature.d.ts",
+        "default": "./dist/cjs/hmac-signature.js"
+      },
+      "default": "./dist/hmac-signature.js"
     },
     "./client-assertion": {
-      "types": "./dist/client-assertion.d.ts",
-      "import": "./dist/client-assertion.js"
+      "import": {
+        "types": "./dist/client-assertion.d.ts",
+        "default": "./dist/client-assertion.js"
+      },
+      "require": {
+        "types": "./dist/cjs/client-assertion.d.ts",
+        "default": "./dist/cjs/client-assertion.js"
+      },
+      "default": "./dist/client-assertion.js"
     }
   },
   "files": [
@@ -164,7 +423,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc -p tsconfig.cjs.json && node scripts/write-cjs-marker.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "npm run build && tsc -p tsconfig.check.json",

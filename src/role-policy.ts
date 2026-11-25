@@ -194,3 +194,185 @@ export function mapRoleClaim(input: MapRoleClaimInput): MapRoleClaimResult {
     ),
   };
 }
+
+// ---------------------------------------------------------------------------
+// A decision on a SET of token scopes (0.37.0)
+// ---------------------------------------------------------------------------
+
+const DOOR_SCOPE = "resolveScopeGrant";
+
+/**
+ * The consumer's scope alphabet, as data. The package never knows what scopes
+ * exist.
+ *
+ *   - `ladder`: scopes where a higher rank implies every rank below it, MOST
+ *     privileged FIRST (the `resolveMinRole` order convention, e.g.
+ *     `["cloud-admin", "admin", "write", "read"]`). May be empty.
+ *   - `offLadder`: scopes that no ladder rank implies (e.g.
+ *     `"workflow-trigger"`). Each is satisfied only by an exact grant or by a
+ *     named superscope.
+ *   - `superscopes`: scopes the CALLER names as satisfying every required
+ *     scope, off-ladder ones included. Never inferred from the top of the
+ *     ladder: omit it and no scope reaches an off-ladder scope except itself.
+ *
+ * Valid only when every entry is a non-empty string, `ladder` and `offLadder`
+ * are distinct and disjoint, their union is non-empty, and every superscope is
+ * in that union. An invalid policy refuses every request.
+ */
+export type ScopePolicy = {
+  ladder: readonly string[];
+  offLadder?: readonly string[];
+  superscopes?: readonly string[];
+};
+
+export type ScopeGrantInput = {
+  /**
+   * The token's scopes, as verified. Only an array counts: a space-delimited
+   * string, an object or an absence is `scopes-absent`. Non-string entries are
+   * skipped, never coerced. Matching is exact (no case-folding, no trim).
+   */
+  scopes: unknown;
+  /** The scope the entry point requires. Must be in the policy's alphabet. */
+  required: string;
+  policy: ScopePolicy;
+  /** The consumer's own name for the entry point. Defaults to the function name. */
+  door?: string;
+};
+
+/**
+ * `via` says which rule granted: `exact` (the token holds `required`),
+ * `ladder` (a higher ladder rank, named in `grantedBy`), `superscope` (a
+ * caller-named superscope, named in `grantedBy`).
+ */
+export type ScopeGrantResult =
+  | { ok: true; required: string; via: "exact" | "ladder" | "superscope"; grantedBy: string }
+  | { ok: false; refusal: IdentityRefusal };
+
+function distinctNonEmptyStrings(list: unknown): list is readonly string[] {
+  return (
+    Array.isArray(list) &&
+    list.every((s) => typeof s === "string" && s.length > 0) &&
+    new Set(list).size === list.length
+  );
+}
+
+function policyAlphabet(policy: unknown): ReadonlySet<string> | null {
+  if (policy === null || typeof policy !== "object") return null;
+  const { ladder, offLadder = [], superscopes = [] } = policy as ScopePolicy;
+  if (!distinctNonEmptyStrings(ladder)) return null;
+  if (!distinctNonEmptyStrings(offLadder)) return null;
+  if (!distinctNonEmptyStrings(superscopes)) return null;
+  const alphabet = new Set<string>([...ladder, ...offLadder]);
+  if (alphabet.size === 0 || alphabet.size !== ladder.length + offLadder.length) return null;
+  if (!superscopes.every((s) => alphabet.has(s))) return null;
+  return alphabet;
+}
+
+/**
+ * Decide whether a token's SET of scopes satisfies one required scope.
+ *
+ * Order: policy valid, required scope in the alphabet, scopes an array; then
+ * exact grant, then ladder rank (through `resolveMinRole`, the one ordering
+ * decision in this package), then a caller-named superscope. Everything else
+ * is `scope-not-granted`.
+ *
+ * Off-ladder ruling: a required scope that is not on the ladder is satisfied
+ * ONLY by holding it exactly or by holding a scope the caller named in
+ * `superscopes`. No ladder rank implies it, the top rank included, and holding
+ * it implies nothing on the ladder.
+ *
+ * Refusals (`RBAC_DENIED`): `scope-policy-invalid`, `scope-required-unknown`,
+ * `scopes-absent`, `scope-not-granted`. A token scope outside the alphabet
+ * (e.g. an unexpanded `"mcp:full"`) grants nothing.
+ */
+export function resolveScopeGrant(input: ScopeGrantInput): ScopeGrantResult {
+  const door = input.door ?? DOOR_SCOPE;
+  const { scopes, required, policy } = input;
+
+  const alphabet = policyAlphabet(policy);
+  if (alphabet === null) {
+    return {
+      ok: false,
+      refusal: refusal(
+        "RBAC_DENIED",
+        "scope-policy-invalid",
+        door,
+        "The scope policy must name distinct, non-empty scopes; superscopes must be among them.",
+      ),
+    };
+  }
+  if (typeof required !== "string" || !alphabet.has(required)) {
+    return {
+      ok: false,
+      refusal: refusal(
+        "RBAC_DENIED",
+        "scope-required-unknown",
+        door,
+        "The required scope is not part of the scope policy.",
+      ),
+    };
+  }
+  if (!Array.isArray(scopes)) {
+    return {
+      ok: false,
+      refusal: refusal("RBAC_DENIED", "scopes-absent", door, "No list of token scopes was presented."),
+    };
+  }
+
+  const held = scopes.filter((s): s is string => typeof s === "string" && alphabet.has(s));
+  if (held.includes(required)) {
+    return { ok: true, required, via: "exact", grantedBy: required };
+  }
+
+  const ladder = policy.ladder;
+  if (ladder.includes(required)) {
+    for (const scope of held) {
+      if (!ladder.includes(scope)) continue;
+      if (resolveMinRole({ role: scope, minimum: required, order: ladder, door }).ok) {
+        return { ok: true, required, via: "ladder", grantedBy: scope };
+      }
+    }
+  }
+
+  const superscope = held.find((s) => (policy.superscopes ?? []).includes(s));
+  if (superscope !== undefined) {
+    return { ok: true, required, via: "superscope", grantedBy: superscope };
+  }
+
+  return {
+    ok: false,
+    refusal: refusal(
+      "RBAC_DENIED",
+      "scope-not-granted",
+      door,
+      "The token's scopes do not grant the required scope.",
+    ),
+  };
+}
+
+/** Boolean form of {@link resolveScopeGrant}. */
+export function hasScopeGrant(scopes: unknown, required: string, policy: ScopePolicy): boolean {
+  return resolveScopeGrant({ scopes, required, policy }).ok;
+}
+
+/** Throwing form of {@link resolveScopeGrant}; returns the required scope, throws `IdentityRefusalError`. */
+export function assertScopeGrant(input: ScopeGrantInput): string {
+  const result = resolveScopeGrant(input);
+  if (!result.ok) throw new IdentityRefusalError(result.refusal);
+  return result.required;
+}
+
+/**
+ * Keep the items whose required scope (read by `requiredOf`) the token's
+ * scopes grant, in their original order. Identical to deciding each item with
+ * {@link resolveScopeGrant}; an item whose required scope is outside the
+ * policy is never kept, and absent scopes keep nothing.
+ */
+export function filterByScopeGrant<T>(
+  items: readonly T[],
+  scopes: unknown,
+  policy: ScopePolicy,
+  requiredOf: (item: T) => string,
+): T[] {
+  return items.filter((item) => hasScopeGrant(scopes, requiredOf(item), policy));
+}

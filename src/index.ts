@@ -349,20 +349,36 @@ export type {
   IdentityRefusalCode,
   IdentityRefusalReason,
 } from "./identity-refusal.js";
-export { resolveMinRole, assertMinRole, mapRoleClaim } from "./role-policy.js";
+export {
+  resolveMinRole,
+  assertMinRole,
+  mapRoleClaim,
+  // 0.37.0 — a decision on a set of token scopes.
+  resolveScopeGrant,
+  hasScopeGrant,
+  assertScopeGrant,
+  filterByScopeGrant,
+} from "./role-policy.js";
 export type {
   MinRoleInput,
   MinRoleResult,
   MapRoleClaimInput,
   MapRoleClaimResult,
+  ScopePolicy,
+  ScopeGrantInput,
+  ScopeGrantResult,
 } from "./role-policy.js";
 export {
   isRowInTenant,
   resolveMembership,
   requireOrgAdmin,
   membershipRecordSchema,
+  // 0.37.0 — token/args workspace cross-check.
+  checkWorkspaceMatchesToken,
+  requireWorkspaceMatchesToken,
 } from "./tenant-membership.js";
 export type {
+  WorkspaceMatchResult,
   MembershipRecord,
   ResolvedMembership,
   ResolveMembershipInput,
