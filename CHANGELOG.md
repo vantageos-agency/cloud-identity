@@ -5,6 +5,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-25
+
 Additive: CommonJS loadability, a decision on a set of token scopes, and a workspace binding on the bearer seam. Nothing existing changes behaviour by default.
 
 ### Added
