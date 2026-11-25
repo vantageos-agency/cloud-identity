@@ -72,6 +72,8 @@ function base64ToBytes(b64: string): Uint8Array | null {
  * 32 zero bytes) and compared with the package's `timingSafeEqualSync`, so the
  * work does not depend on where, or whether, the value differs. A malformed
  * value can never pass, whatever the compare returns.
+ *
+ * @signatureVerifier — computes the signature over the delivery and compares it with the received one; `ok` is the verdict. Consumers may treat a call refused on `!ok` as a complete signature check.
  */
 export async function verifyHmacSha256Signature(
   delivery: HmacSignatureDelivery,

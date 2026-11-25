@@ -65,6 +65,8 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
  * Every `v1,<base64>` candidate is decoded and compared, with no early exit, so
  * the time taken does not say which candidate was right. A timestamp that is
  * not a plain number of seconds is outside the window.
+ *
+ * @signatureVerifier — computes the signature over the delivery and compares it with the received one; `ok` is the verdict. Consumers may treat a call refused on `!ok` as a complete signature check.
  */
 export async function verifySvixWebhook(
   delivery: SvixDelivery,

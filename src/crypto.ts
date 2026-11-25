@@ -13,6 +13,8 @@
  * Web Crypto (`crypto.subtle`) is used for the dummy work (not Node's
  * `crypto.timingSafeEqual`) for portability across runtimes (Node 20+, Bun,
  * Deno, edge runtimes) and parity with the original Convex implementation.
+ *
+ * @signatureCompare — compares two secret values in constant time and answers the boolean; consumers may treat a call as the compare step of a signature check.
  */
 export async function timingSafeEqual(
   a: Uint8Array,
